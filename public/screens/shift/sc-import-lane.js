@@ -825,7 +825,11 @@ S.ShiftLane = {
     const on = m => (this._salesMode === m || (m === 'import' && this._salesMode !== 'manual'));
     const btn = (m, label) => '<button type="button" class="btn btn-sm" data-salesmode="' + m + '" style="'
       + (on(m) ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;' : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    return '<div class="seg-toggle" style="margin-bottom:14px;">' + btn('import', 'Import File') + btn('manual', 'Enter Manually') + '</div>';
+    /* ⚠ THE KEYS ARE DATA, THE LABELS ARE DISPLAY. `week-close.js` gates which body it draws AND
+       where it mounts the CSV mapper on `_salesMode === 'manual'`, so renaming the key would draw
+       the grid and mount the mapper into a zone that was never rendered — a live-looking dead
+       control. Only the words moved (T135). */
+    return '<div class="seg-toggle" style="margin-bottom:14px;">' + btn('import', 'Enter the Week') + btn('manual', 'Enter by Day') + '</div>';
   },
   _weekDays() {
     const out = [], s = new Date(this._ckWeekStart() + 'T00:00:00');
@@ -835,17 +839,164 @@ S.ShiftLane = {
     }
     return out;
   },
+  /* ── THE WEEK TOTAL: THREE NUMBERS (T135, Kyle 2026-09-02) ──────────────────────────────────
+     ⛔⛔ ONE NUMBER IN, ONE ROW OUT. This deliberately does NOT spread the week across seven days.
+     My first design did — an even split, or a split by the operator's recent day mix, shown in the
+     grid for them to accept — and Kyle was right to refuse it. That borrowed the shape of the
+     tip-out rule without the half that makes it work: there the manager KNOWS what they handed each
+     busser, and here the operator does not know Tuesday. Not knowing Tuesday is exactly WHY they
+     are typing a week total, so "they saw it and pressed Save" would be a fig leaf over seven
+     invented numbers feeding Books, the IRS 8027 worksheet and the cash forecast
+     ([[output-honesty]]).
+     ⭐ DATED THE WEEK END, and that is not arbitrary. `ConfirmWeek.salesRollup` sums `sc_shifts`
+     rows inside the week, so the row has to land there or Confirm the Week never sees it. Dating it
+     at `period_end` also makes the books agree with themselves: `hub-books` books a week whole to
+     the month it ENDS in, so the daily basis and the confirmed-weeks basis return the SAME figure
+     for that week instead of the window shift measured under T134.
+     ⚠ THE RETURN IS THREE-VALUED, because the caller has three different things to say:
+     an array = save it · null = nothing was entered · false = a negative was entered.
+     A single falsy would have collapsed "empty" and "refused" into one message. */
+  /* ⚠ A METHOD, NOT A DATA PROPERTY. Written as `WEEK_TOTAL_TYPE: 'Week Total'` at object level it
+     was invisible to every slicer in the suite — they lift METHODS by name — so
+     `verify-manual-sales-grid` threw `this._weekTotalRow is not a function` and printed no summary
+     at all. A constant a member reads becomes a method the moment anything needs to lift it
+     ([[the-loop]] #16/#26/#120; the tell is writing `NAME:` at object level). */
+  _weekTotalType() { return 'Week Total'; },
+  _weekSalesRows(bar, food, covers) {
+    const has = x => x != null && String(x).trim() !== '';
+    const n = x => App.parseNum(x) ?? 0;
+    if (!(has(bar) || has(food) || has(covers))) return null;
+    // Covers with no sales is not a saveable week, the same rule the daily grid applies to a day.
+    if (!(has(bar) || has(food))) return null;
+    if (n(bar) < 0 || n(food) < 0 || n(covers) < 0) return false;
+    // ⚠ An explicit zero week is a real answer (a week closed for renovation), so it is NOT folded
+    // into the empty case the way a blank is.
+    return [{
+      date: this._ckWeekEnd(),
+      bar: has(bar) ? String(bar) : '0',
+      food: has(food) ? String(food) : '0',
+      covers: has(covers) ? String(covers) : '0'
+    }];
+  },
+
+  /* The three boxes. Pre-filled from a saved week row so a correction is an edit, not a re-entry —
+     the same contract the daily grid has with its cells. */
+  _weekSalesForm() {
+    const w = this._weekTotalRow();
+    const v = f => (w && w[f] != null && w[f] !== '') ? w[f] : '';
+    const z = this._ckZone('import');
+    const cell = (id, label, val, pre, step) =>
+      '<div class="f" style="flex:1 1 150px;"><label>' + label + '</label>'
+      + '<div class="fw" style="margin:0;">' + (pre ? '<span class="pre">$</span>' : '')
+      + '<input class="form-input' + (pre ? ' pre' : '') + '" type="number" step="' + step + '" min="0" id="' + id + '" value="' + val + '"/></div></div>';
+    return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:14px;">'
+      + 'Enter your week-end totals. Two numbers close the week, plus covers if you count them.</div>'
+      + '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">'
+      +   cell(z + '-wkbar', 'Bar Sales', v('bar_revenue'), true, '0.01')
+      +   cell(z + '-wkfood', 'Food Sales', v('floor_revenue'), true, '0.01')
+      +   cell(z + '-wkcov', 'Covers', v('covers'), false, '1')
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
+      +   '<button class="btn btn-primary btn-sm wc-saveweek" data-saveweek="1">Save the Week</button>'
+      + '</div>';
+  },
+
+  /* ⛔ THROUGH `importSales`, THE DOOR THE DAILY GRID ALREADY USES. A second commit path would be a
+     second implementation of protect-vs-replace, source stamping and refusal handling — the drift
+     this suite exists to catch.
+     ⛔⛔ AND IT ASKS BEFORE IT OVERWRITES. Days the operator already entered (or dropped) are their
+     figures; a week total landing on top of them is two operator-entered values in conflict, which
+     is a PROMPT app-wide and never a silent overwrite ([[user-chooses-conflicts]]). */
+  async saveWeekSales() {
+    const z = this._ckZone('import');
+    const el = id => document.getElementById(id) || {};
+    const eBar = el(z + '-wkbar'), eFood = el(z + '-wkfood'), eCov = el(z + '-wkcov');
+    const res = document.getElementById(z + '-res');
+    const fail = m => { if (res) res.innerHTML = '<div style="font-size:13px;color:var(--red);margin-top:12px;">' + m + '</div>'; };
+    /* ⚠ A NUMBER INPUT HANDS BACK "" FOR ANYTHING IT CANNOT PARSE while still SHOWING what was
+       typed — a trailing decimal, a pasted thousands comma. Blank means zero here, so an unreadable
+       cell would be saved as 0. `validity.badInput` is the only thing that tells the two apart. */
+    const bad = e => !!(e.validity && e.validity.badInput);
+    if (bad(eBar) || bad(eFood) || bad(eCov)) {
+      fail('Bar Cop could not read one of those numbers. Check for a stray comma or a trailing decimal point, then save again.');
+      return;
+    }
+    const rows = this._weekSalesRows(eBar.value, eFood.value, eCov.value);
+    if (rows === false) { fail('Sales and covers cannot be negative. Check the figures and save again.'); return; }
+    if (rows === null) {
+      fail('Enter your bar or food sales for the week before saving. Covers on their own are not a week.');
+      return;
+    }
+    // Days already in for this week, excluding the week row itself — those are what a week total
+    // would replace, and the operator decides.
+    const we = this._ckWeekEnd();
+    /* ⚠ EVERY ROW IN THE WEEK EXCEPT THE WEEK ROW ITSELF, written as one negation. The first draft
+       was `A && B || C`, and `&&` binds tighter than `||` — a precedence tangle that happened to be
+       nearly right, which is the worst kind. */
+    const days = this.shifts().filter(s => s && this._ckInWeek(s.date)
+      && !(String(s.date).slice(0, 10) === we && s.shift_type === this._weekTotalType()));
+    if (days.length) {
+      const n = new Set(days.map(s => String(s.date).slice(0, 10))).size;
+      const ok = await App.confirm({
+        title: 'Replace ' + n + ' day' + (n === 1 ? '' : 's') + ' already in?',
+        message: 'This week already has ' + n + ' day' + (n === 1 ? '' : 's')
+          + ' of sales in, from a file or entered by hand. Saving a week total replaces '
+          + (n === 1 ? 'it' : 'them') + ' with one figure for the whole week. Your day by day '
+          + 'numbers would no longer be on file.',
+        confirmText: 'Replace with the week total', danger: true
+      });
+      if (!ok) return;
+      for (const s of days) { if (!(await App.removeRecord('sc', 'shift', s.id))) { fail('Could not clear the days already in. Try the save again.'); return; } }
+    }
+    // ⚠ `shiftType` rides the same opts object straight through to `buildSales`, so the row labels
+    // itself as the week rather than being relabelled by a second write afterwards.
+    await this.importSales(rows, { manual: true, weekTotal: true, shiftType: this._weekTotalType() });
+  },
+
+  // The saved week-total row for the week on screen, if there is one.
+  _weekTotalRow() {
+    const we = this._ckWeekEnd();
+    return this.shifts().filter(s => s && String(s.date).slice(0, 10) === we
+      && s.shift_type === this._weekTotalType())[0] || null;
+  },
+
   _manualSalesGrid() {
     const days = this._weekDays(), existing = {};
-    this.shifts().filter(s => this._ckInWeek(s.date)).forEach(s => { existing[String(s.date).slice(0, 10)] = s; });
+    /* ⛔ THE WEEK ROW IS NOT A SUNDAY. It is dated the week's end, so without this filter it would
+       pre-fill the Sunday cells with the WHOLE WEEK's figures — and the operator saving that grid
+       would book the week's takings again as one day. Excluded here and named above the grid
+       instead. */
+    this.shifts().filter(s => this._ckInWeek(s.date) && s.shift_type !== this._weekTotalType())
+      .forEach(s => { existing[String(s.date).slice(0, 10)] = s; });
     const fmt = ymd => { const d = new Date(ymd + 'T00:00:00'); return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
     const v = (s, f) => (s && s[f] != null && s[f] !== '') ? s[f] : '';
     const dollar = (id, val) => '<td style="background:var(--zone);"><div class="fw" style="margin:0;"><span class="pre">$</span><input class="form-input pre" type="number" step="0.01" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></div></td>';
     const plain = (id, val) => '<td style="background:var(--zone);"><input class="form-input" type="number" step="1" min="0" id="' + id + '" value="' + val + '" style="width:100%;min-width:0;"/></td>';
     const lbl = t => '<td style="font-weight:600;color:var(--t1);background:var(--zone);white-space:nowrap;">' + t + '</td>';
-    const rows = days.map(d => { const s = existing[d];
+    /* ⛔ A WEEK ROW MUST NOT LOOK LIKE A MISSING WEEK. The grid pre-fills from `sc_shifts`, and a
+       week total is ONE row dated the week's end — so with nothing here the operator would see
+       seven empty days and read it as the week being gone. Shown as its own READ-ONLY row at the
+       top: it is a figure that is genuinely on file, in the columns it belongs to.
+       ⚠ A ROW, NOT A PARAGRAPH. The first version was an explainer box above the grid, which is
+       card prose and `verify-design-code` RULE 2b caught it. The state is data; showing it as data
+       says the same thing and adds no prose to a card. */
+    const ro = val => '<td style="background:var(--zone);color:var(--t2);">' + (val === '' ? '' : esc(String(val))) + '</td>';
+    const wkRowHtml = wk
+      ? '<tr class="cw-line">'
+        + '<td style="font-weight:600;color:var(--t2);background:var(--zone);white-space:nowrap;">Week total (on file)</td>'
+        + ro(wk.bar_revenue != null ? App.fmtCurrency(wk.bar_revenue) : '')
+        + ro(wk.floor_revenue != null ? App.fmtCurrency(wk.floor_revenue) : '')
+        + ro(wk.covers || '')
+        + '</tr>'
+      : '';
+    const rows = wkRowHtml + days.map(d => { const s = existing[d];
       return '<tr class="cw-line">' + lbl(fmt(d)) + dollar(this._mgCell('bar', d), v(s, 'bar_revenue')) + dollar(this._mgCell('food', d), v(s, 'floor_revenue')) + plain(this._mgCell('cov', d), v(s, 'covers')) + '</tr>';
     }).join('');
+    /* ⛔ A WEEK ROW MUST NOT LOOK LIKE A MISSING WEEK. The grid pre-fills from `sc_shifts`, and a
+       week total is one row dated the week's end — so without this it would render as a lone Sunday
+       holding the whole week with six blank days above it, which reads as six days lost. Name it
+       instead, above the grid, and say what typing days would do to it. */
+    const wk = this._weekTotalRow();
     return '<div style="font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:12px;">No POS export this week? Key it in by hand. Enter each day\'s bar and food sales, plus covers if you track them, then save. It lands exactly like the file drop and feeds Confirm the Week the same way.</div>'
       + '<div style="overflow-x:auto;"><table class="ing-tbl pill" style="table-layout:fixed;width:100%;">'
       + '<colgroup><col style="width:120px;"/><col/><col/><col style="width:90px;"/></colgroup>'
@@ -969,7 +1120,10 @@ S.ShiftLane = {
        one on screen ([[the-loop]] #36). A date with no saved record can never match, so a brand-new
        day always writes. */
     const priorByDate = {};
-    this.shifts().filter(s => this._ckInWeek(s.date)).forEach(s => { priorByDate[String(s.date).slice(0, 10)] = s; });
+    // ⚠ Same exclusion as the grid's prefill: compare against the record the CELL WAS FILLED FROM,
+    // and the week row never fills a cell.
+    this.shifts().filter(s => this._ckInWeek(s.date) && s.shift_type !== this._weekTotalType())
+      .forEach(s => { priorByDate[String(s.date).slice(0, 10)] = s; });
     const cents = x => Math.round((App.parseNum(x) ?? 0) * 100);
     const unchanged = r => {
       const p = priorByDate[r.date];
@@ -1032,7 +1186,20 @@ S.ShiftLane = {
             : (attempted === 1 ? 'the day' : 'those ' + attempted + ' days') + '. Try the save again.') + coTail);
       return;
     }
-    if (changedRows.length) { await this.importSales(changedRows, { manual: true, cleared: cleared, coversOnly: coversOnlyLabels }); return; }
+    /* ⛔⛔ DAYS REPLACE THE WEEK TOTAL, AND THE GRID SAYS SO. Without this the week row survives
+       alongside the days just written and the week is counted TWICE — into Confirm the Week's
+       prefill, the cash-forecast baseline and every Books figure. It only ever removes itself when
+       the operator typed the Sunday, because `_commitSales` clears by date, so the six other days
+       would have left it standing. The note above the grid promises this; this is what makes the
+       promise true. */
+    if (changedRows.length) {
+      const wkRow = this._weekTotalRow();
+      if (wkRow && !(await App.removeRecord('sc', 'shift', wkRow.id))) {
+        fail('Could not clear the week total that these days replace. Try the save again.' + coTail);
+        return;
+      }
+      await this.importSales(changedRows, { manual: true, cleared: cleared, coversOnly: coversOnlyLabels }); return;
+    }
 
     // Zeroed days only: nothing left to write, so report the clear from here.
     const co = coversOnlyLabels.length
