@@ -420,7 +420,10 @@ S.WeekClose = {
      REFUSES to price a week off a count pair that does not span it. Promising automatic COGS to a
      monthly counter would be the 4x prime-cost defect written into the copy. */
   LANE_TEXT: {
-    sales:    'Drop your POS sales export for the week. Bar Cop reads each day off it and shows you every row before anything saves.',
+    /* ⚠ "Or" LEADS IT (Kyle, 2026-09-02). The week boxes sit directly above this with a divider
+       between, so the sentence is the SECOND way in, not the first — without the word it reads as
+       the instruction for the whole panel and the three boxes above look like something else. */
+    sales:    'Or drop your POS sales export for the week. Bar Cop reads each day off it and shows you every row before anything saves.',
     hours:    'Drop your timeclock export for the week. Bar Cop matches each row to your roster and rates, or click Log Hours to key them in by hand.',
     tips:     'Drop your tip export for the week, or click Tip Tracking to enter them by hand.',
     cash:     'Drop your drawer count export for the week, or click Cash Control to count a drawer by hand.',
