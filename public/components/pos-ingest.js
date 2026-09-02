@@ -1391,9 +1391,18 @@ const PosIngest = {
     // then blocked every Save of that week over a -12 the operator never typed.
     // The clamp belongs HERE and not in covOf: a per-ROW negative is legitimate, the daypart rows
     // above aggregate and a refund row should reduce the day the same way it does bar and food.
+    /* ⚠ `shift_type` IS A LABEL ON A SALES ROW, and it now has a second legitimate value. T135's
+       week-total door writes ONE row standing for the whole week, and calling that row 'Full Day'
+       would be the record describing itself wrongly on the sheet that prints it (the Books cash
+       reconciliation lists these by date and type). Defaulted, so every existing caller is
+       byte-identical ([[the-loop]] #58 — widening a mechanism means re-deriving what it assumed).
+       ⚠ SAFE TO VARY, MEASURED: the Books cash join keys on DATE ALONE — `shift_type` was dead on
+       the variance side and the join was re-pointed for it — and `App.tipShiftKey` reads the field
+       on TIP rows, never on sales. */
+    const rowType = opts.shiftType || 'Full Day';
     const mkRec = (date, bar, food, covers, manual, reuseId) => ({
       id: reuseId || App.uid(), date, bar_revenue: bar, floor_revenue: food, covers: Math.max(0, covers || 0),
-      total_revenue: cents(bar + food), shift_type: 'Full Day', status: 'Closed',
+      total_revenue: cents(bar + food), shift_type: rowType, status: 'Closed',
       source: manual ? 'manual' : 'import', imported: !manual, created_at: new Date().toISOString()
     });
     // "Did this day sell anything" is a question about the DAY (a refund line "(50)" REDUCES it),
