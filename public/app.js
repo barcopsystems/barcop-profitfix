@@ -5183,9 +5183,22 @@ const App = {
     App._syncModalInert();
     const card = overlay.firstElementChild;
     const first = overlay.querySelector('input:not([type=hidden]),select,textarea,button:not(.app-modal-x),[tabindex]:not([tabindex="-1"])');
+    /* ⛔⛔ AND THE FALLBACK MUST NOT PAINT A FOCUS RING (Kyle, 2026-09-03, walking the Needs
+       attention list: *"modal opens with white highlight outline .. goes away if i right click the
+       screen"* — right-clicking clears `:focus-visible`, which is the tell that it IS a ring and not
+       a border). MEASURED: every modal in the app until now has been a FORM, so `first` resolves to
+       a real input or button and the ring lands on that control, where it belongs and looks
+       ordinary. The Needs attention list is the first modal with NO focusable control in it, so it
+       took this branch — and Chrome drew its default ring around the whole card.
+       ⭐ THE RING IS SUPPRESSED ONLY ON THIS BRANCH, so the blast radius is exactly the modals that
+       have nothing to focus. A form modal still shows its indicator on the field that has focus, and
+       no real control anywhere loses one: a ring on a container that exists solely to receive
+       programmatic focus tells a keyboard operator nothing it does not already know from the
+       backdrop going inert ([[the-loop]] #93 — a guard belongs on the narrowest thing that owns the
+       problem). Focus still MOVES here, which is the half that matters for the next Tab. */
     try {
       if (first) first.focus();
-      else if (card) { card.setAttribute('tabindex', '-1'); card.focus(); }
+      else if (card) { card.setAttribute('tabindex', '-1'); card.style.outline = 'none'; card.focus(); }
     } catch (e) { /* a detached or hidden node is not worth throwing over */ }
     return overlay;
   },
