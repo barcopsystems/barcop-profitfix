@@ -862,6 +862,9 @@ S.InventorySpotCheck = {
     if (!el || typeof CSVMapper === 'undefined') return;
     const loc = document.getElementById('sp-loc')?.value || 'this register';
     CSVMapper.mount(el, {
+      // T120 — where the report lives. Named by REPORT, never by brand ([[pos-agnostic-claim]]).
+      // This door wants one register for one shift, so the filter is part of the directions.
+      hint: 'Look under Reports in your POS for Item Sales, filtered to this register and this shift.',
       dropTitle: 'Drop the ' + loc + ' POS sales report for this shift',
       subject: loc,
       dropSub: 'Needs columns for product name and pours or bottles sold. That register only, not the whole venue.<br>The sold number fills in on each product you have added.',

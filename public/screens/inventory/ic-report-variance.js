@@ -479,6 +479,14 @@ S.InventoryVarianceReport = {
       CSVMapper.mount(document.getElementById('vr-import'), {
         actionsEl: document.getElementById('vr-import-actions'),
         confirmLabel: 'Import POS Sales',
+        /* ⭐ WHERE THE REPORT LIVES, NOT WHAT IS IN IT (T120). The `dropSub` below says which
+           columns are needed; nothing anywhere said where to GO AND GET the file, which is the
+           first thing a manager who has never run that report asks.
+           ⛔ NAMES THE REPORT, NEVER A BRAND. [[pos-agnostic-claim]]: there is not one
+           vendor-specific code path in the import and this must not add one, so an operator on an
+           unnamed system is helped exactly as much as anyone else. `hint` renders ABOVE the box, so
+           the short drop line Kyle asked for is untouched. */
+        hint: 'Look under Reports in your POS for Product Mix, PMIX, or Item Sales.',
         dropTitle: 'Drop your ' + this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date) + ' POS sales file here',
         subject: this.fmtLong(period.startC.date) + ' to ' + this.fmtLong(period.endC.date),
         dropSub: 'Needs columns for product name, quantity sold, and sales amount.',
