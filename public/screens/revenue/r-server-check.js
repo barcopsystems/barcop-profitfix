@@ -797,6 +797,8 @@ S.RevenueServerCheck = {
     const el = document.getElementById('rsc-imp-csv');
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
+      // T120 — where the report lives, named by REPORT and never by brand.
+      hint: 'Look under Reports in your POS for Server Sales, Employee Sales, or Sales by Employee.',
       dropTitle: 'Drop your POS per-server sales report here',
       subject: 'Server Checks',
       dropSub: 'One row per server with covers and total sales. Bar Cop matches each row to your roster by name.',

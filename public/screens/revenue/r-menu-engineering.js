@@ -897,6 +897,8 @@ S.RevenueMenuEngineering = {
     const el = document.getElementById('me-cov-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
+      // T120 — where the report lives, named by REPORT and never by brand.
+      hint: 'Look under Reports in your POS for Product Mix, PMIX, or Item Sales.',
       dropTitle: 'Drop your POS product-mix (PMIX) report here',
       subject: 'Product Mix',
       dropSub: 'One row per item with units sold for the week. Bar Cop matches each row to a menu item by name and refreshes its weekly units sold.',
