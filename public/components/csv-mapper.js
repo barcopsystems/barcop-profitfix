@@ -9,7 +9,16 @@
 
    CSVMapper.mount(containerEl, {
      fields:       [{ key, label, required, match:[keywords] }],
-     hint:         'optional help line (HTML allowed)',
+     hint:         'the line ABOVE the drop box, answering WHERE the file comes from (HTML allowed)',
+       ⛔ `hint` HAD ZERO CALLERS UNTIL T120 (2026-09-03) AND NOW TEN DOORS DEPEND ON IT, so it is
+       no longer safe to retire as an unused option or to move where it paints.
+       It answers "where do I get this file"; `dropSub` answers "what columns must it have". Two
+       different questions, kept in two lines on purpose, and
+       `verify-import-door-says-where` B1 asserts every POS or timeclock door supplies one.
+       ⛔ WHY NOT FOLDED INTO `dropSub`: `verify-sales-integrity-import-door` P1 caps that door's
+       drop line at the longest of four sibling doors, because Kyle asked for it short. Two of
+       those four siblings are POS doors themselves, so appending a where-line to them would have
+       LIFTED the ceiling while P1 stayed green. Keeping it here leaves the short line untouched.
      dropTitle:    'optional dropzone prompt (plain text; default "Drop your file here")',
      confirmLabel: 'Import',
      onComplete:   rows => {}      // rows: [{ <key>: value, ... }] one per data row
