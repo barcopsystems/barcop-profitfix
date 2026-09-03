@@ -1028,9 +1028,18 @@ S.Hub = {
   _needsMore(shown, total) {
     const s = Number(shown) || 0, t = Number(total) || 0;
     if (t <= s) return '';
-    return '<span onclick="S.Hub._openNeedsAll()" style="cursor:pointer;color:var(--gold);'
+    /* ⚠ THE COUNT CAME OFF AND SO DID THE GOLD (Kyle, 2026-09-03, after walking it): *"change the
+       link to just (view all) and not in gold text... so needs attention - view all that only shows
+       if there is more than 5"*. It read `(5 of 10)` in gold.
+       ⭐ THE NUMBERS WERE THE PART I ARGUED FOR AND HE IS RIGHT TO CUT THEM: an operator does not
+       need to know the card is showing five of ten, only that there are more and where they are.
+       That is the same call as *"remove the '6 more' that has no meaning to a user"* — what was
+       missing then was the DOOR, not the arithmetic, and the door is what this keeps.
+       ⚠ STILL CONDITIONAL. `t <= s` means nothing is hidden, so no link — which is his "only shows
+       if there is more than 5", stated as the thing that is actually true rather than as a five. */
+    return '<span onclick="S.Hub._openNeedsAll()" style="cursor:pointer;color:var(--t2);'
       + 'text-decoration:underline;font-size:10px;font-weight:600;letter-spacing:0;'
-      + 'text-transform:none;margin-left:8px;">(' + s + ' of ' + t + ')</span>';
+      + 'text-transform:none;margin-left:8px;">(view all)</span>';
   },
 
   /* ⭐ ONE SPELLING OF "WHERE DOES AN ALERT ROW GO", so the card and the modal cannot drift. This was
