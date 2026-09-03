@@ -5168,8 +5168,24 @@ const App = {
       attemptClose();
     };
     document.addEventListener('keydown', onKey);
-    // Backdrop = the overlay itself; a click inside the card bubbles from a child and is ignored.
-    overlay.addEventListener('click', e => { if (e.target === overlay) attemptClose(); });
+    /* ⛔⛔⛔ THE BACKDROP CLOSE IS GONE (T137, Kyle 2026-09-03): *"i can click the screen on any popup
+       and it closes the popup... some of them give a warning prompt if data in the popup form has
+       been entered to keep editing or discard.. but some of them don't.. big issue."*
+       MEASURED before removing it: **68 call sites, 7 pass `confirmDirty`, 29 render a FORM and do
+       not** — Count Drawer, Safe Count, Log an expense, the day and week hours editors, the wage
+       editor, permits, and Confirm the Week among them. `confirmDirty` is opt-in, so on those 29 a
+       mis-aimed click discarded typed work with no prompt at all. A close route that is this easy to
+       hit by accident cannot be the one route that is not guarded.
+       ⭐⭐ AND IT WAS SAFE TO REMOVE ONLY BECAUSE THE DEFECT IT WAS ADDED FOR HAS ANOTHER FIX. It
+       landed on 2026-07-31 because this helper had ONLY an X, so an operator who navigated away sat
+       under a full-viewport overlay that ate every click. `App.navigate` calls `closeAllModals()` on
+       every navigation, independently — that is what actually closes the stranded case, and it is
+       asserted and RUN in `verify-modal-closes-on-navigation` block B. Two escapes remain (the X and
+       ESC) and both route through `attemptClose`, so the dirty guard keeps its say on each.
+       ⚠ SCOPED TO THIS HELPER. Four other backdrop closes in the tree were read and LEFT: the demo
+       welcome, the demo upsell, the no-access notice and `App.confirm` — none holds a form, and a
+       backdrop click on a confirm resolves to the SAFE answer. "Fix all the popups" is a population
+       claim, and the population that loses data is this one ([[lessons-paid-for]] #75). */
     if (x) x.addEventListener('click', attemptClose);
     /* ⚠ THE BACKGROUND GOING INERT DROPS FOCUS TO `<body>` unless something inside the modal takes
        it, and the operator's next Tab would then start from the top of the document. So focus moves
