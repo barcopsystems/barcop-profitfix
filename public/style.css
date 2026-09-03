@@ -1846,9 +1846,9 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      breakpoint, so the phone reaches each of them through the burger drawer exactly as before.
      A hide rule for a node nobody renders is the same leftover as a class that outlives its node,
      and it reads to the next person as though the control is still up there. */
-  /* `#tn-acct #topbar-group-dashboard{display:none !important}` went with `#tn-acct`. The group
-     dashboard was retired long ago and `renderAccountSwitcher` already hides its slots on every
-     run, so nothing here has to say it a second time. */
+  /* A third override here went with `#tn-acct`. Its subject was the group dashboard, and at T123
+     (2026-09-03) that screen, its two mount slots and the loop that cleared them were all deleted,
+     so there is nothing left for any rule to hide. */
   /* The shared nav replaces the old header on mobile and the burger opens the
      drawer, so hide the old topbar everywhere so it does not double up. */
   body.chrome-on .topbar{display:none;}
@@ -2200,10 +2200,13 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 }
 .sidebar-mobile-close:hover{border-color:rgba(255,255,255,0.25);color:var(--w);}
 
-/* Mobile-only multi-location slot at the top of the sidebar. Holds the
-   location switcher dropdown + the Group Dashboard button for operators
-   with more than one bar. Hidden on desktop where the topbar variants are
-   visible instead. */
+/* Mobile-only multi-location slot at the top of the sidebar, for operators with more than one bar.
+   Hidden on desktop where the topbar variant is visible instead.
+   ⚠ IT USED TO SAY IT ALSO HOLDS A GROUP DASHBOARD BUTTON. That screen was deleted at T123
+   (2026-09-03) and `renderAccountSwitcher` keeps this slot EMPTY on every run anyway, so the
+   sentence named two things that are no longer true at once. Found only because the reference
+   sweep was widened past `*.js` — every narrowing of a file list is a place the thing hides
+   ([[the-loop]] #21). */
 .sidebar-multi-loc{
   display:none;
   padding:10px 12px;
@@ -2332,13 +2335,14 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .topbar-title{font-size:12px;letter-spacing:1.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
   .topbar-sub{display:none !important;}
 
-  /* Topbar account switcher + Group Dashboard button hide on mobile -- they
-     move into the sidebar (.sidebar-multi-loc slot) instead. The topbar
-     stays clean with just hamburger + bar name. */
+  /* Topbar account switcher hides on mobile: the topbar stays clean with just
+     hamburger + bar name.
+     ⚠ TWO SELECTORS CAME OFF THIS RULE WITH THE GROUP DASHBOARD (T123, 2026-09-03) AND THE OTHER
+     TWO ARE LIVE. `#topbar-account-switcher` and `#hub-topbar-account-switcher` still exist and
+     still have to be hidden here; cutting the whole rule because its comment named a dead feature
+     would have taken a live control's mobile behaviour with it. */
   #topbar-account-switcher,
-  #topbar-group-dashboard,
-  #hub-topbar-account-switcher,
-  #hub-topbar-group-dashboard{display:none !important;}
+  #hub-topbar-account-switcher{display:none !important;}
 
   /* Sidebar multi-loc slot stays hidden: the location lives in the top bar
      (desktop/tablet) and the mobile drawer's main screen (phones). */

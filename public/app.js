@@ -1955,7 +1955,13 @@ const App = {
         //    build every prospect looks at, and it must not be the one place the name survives.
         if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
       });
-      ['topbar-group-dashboard', 'hub-topbar-group-dashboard', 'sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
+      /* ⚠ THE TWO GROUP-DASHBOARD IDS CAME OFF THIS LIST WITH THE SCREEN (T123, 2026-09-03) AND THE
+         MULTI-LOC PAIR DID NOT. They shared one loop and they are two different retirements: the
+         group dashboard's slots are DELETED from the markup, so clearing them is clearing nothing,
+         while `sidebar-multi-loc` is a slot that still exists and is deliberately kept empty. A
+         blanket cut of the line would have taken a live behaviour with it ([[lessons-paid-for]]
+         #42/#137 — a name sharing a heading is not evidence about who owns it). */
+      ['sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
         const slot = document.getElementById(slotId);
         if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
       });
@@ -2016,11 +2022,12 @@ const App = {
         if (newId && newId !== active.id) DB.setActiveAccount(newId);
       });
     }
-    // Group Dashboard removed. Keep the slots empty so nothing renders.
-    ['topbar-group-dashboard', 'hub-topbar-group-dashboard'].forEach(slotId => {
-      const slot = document.getElementById(slotId);
-      if (slot) { slot.style.display = 'none'; slot.innerHTML = ''; }
-    });
+    /* ⚠ THE GROUP-DASHBOARD SLOT LOOP IS GONE WITH THE SCREEN (T123, Kyle 2026-09-03: *"there is no
+       more group dashboard on the app and it is not coming back so delete"*). It read *"keep the
+       slots empty so nothing renders"* — honest while the screen was merely unreachable, and
+       clearing nothing once the two divs left the markup. A hide for a node nobody renders is the
+       same leftover as a class that outlives its node ([[lessons-paid-for]] #105), and this file
+       says exactly that about a sibling rule elsewhere. */
     // Sidebar location slot is no longer used: the topbar handles desktop/tablet
     // and the mobile drawer's main screen handles phones. Keep it empty.
     ['sidebar-multi-loc', 'hub-sidebar-multi-loc'].forEach(slotId => {
@@ -3850,15 +3857,16 @@ const App = {
       this._markRailOpen();
     }
     /* ⛔ THE SWITCHER RELOCATION IS GONE (Kyle, 2026-08-23). This used to lift
-       `topbar-account-switcher` and `topbar-group-dashboard` out of the old hidden `.topbar` and
-       into `#tn-acct` in the visible bar, because a multi-bar picker had to live up here. It does
+       `topbar-account-switcher` (and, until T123 deleted it, a second slot beside it) out of the
+       old hidden `.topbar` and into `#tn-acct` in the visible bar, because a multi-bar picker had
+       to live up here. It does
        not any more: *"that needs moved out of the top bar and replace the bar name on the hub.. and
-       it only goes there."* `renderAccountSwitcher` now hides both of those slots at every unit
-       count and fills `hub-greet-account-switcher` instead, so there is nothing to relocate and
-       `#tn-acct` itself is deleted from index.html.
-       ⚠ THE OLD SLOTS ARE HIDDEN BY THE MEMBER, NOT LEFT TO THEIR PARENT. `.topbar` is only
+       it only goes there."* `renderAccountSwitcher` now hides that slot at every unit count and
+       fills `hub-greet-account-switcher` instead, so there is nothing to relocate and `#tn-acct`
+       itself is deleted from index.html.
+       ⚠ THE OLD SLOT IS HIDDEN BY THE MEMBER, NOT LEFT TO ITS PARENT. `.topbar` is only
        display:none under 768px and for `_CONVERTED` screens, so on a desktop non-converted page it
-       still paints — leaving those slots to "whatever their parent does" would put the picker back
+       still paints — leaving that slot to "whatever its parent does" would put the picker back
        on screen in the one place nobody would look for it. */
     /* THE RAIL — the one whole-bar read, reachable from every page.
        ⚠ WIRED ONCE, GUARDED BY A FLAG, because this function runs on every navigation and a second

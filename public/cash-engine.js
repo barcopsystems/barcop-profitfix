@@ -459,7 +459,7 @@ window.CashEngine = {
     // The AND guard here used to be `isNaN(bar) && isNaN(flo)`, so a week where the operator
     // TYPED 0 (a catering-only or closed week — confirm-week's save gate passes on catering
     // revenue alone) returned 0, and 0 != null won over the raw sum: that week vanished from the
-    // tax basis entirely. Matches how hub.js and hub-group-dashboard.js already treat these rows
+    // tax basis entirely. Matches how hub.js already treats these rows
     // (`(bar||0)+(floor||0) > 0`). If the week genuinely sold nothing, the raw sum is ~0 anyway.
     return tot > 0 ? tot : null;
   },
