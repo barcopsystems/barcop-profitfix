@@ -161,6 +161,9 @@ S.LaborLane = {
     const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
+      // T120 — where the report lives. ⚠ NOT a POS door: hours come out of the timeclock or
+      // scheduling system, so the directions name THAT menu, not Reports.
+      hint: 'Look under Labor or Payroll in your timeclock system for Time Clock or Punch Detail.',
       dropTitle: 'Drop your weekly timeclock export here',
       subject: 'Hours',
       dropSub: 'Needs Staff, Date, and Hours. Shift matched if present. One row per shift.',
@@ -181,6 +184,8 @@ S.LaborLane = {
     const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
+      // T120 — where the report lives, named by REPORT and never by brand.
+      hint: 'Look under Reports in your POS for Tips or Gratuity.',
       dropTitle: 'Drop your POS tips export here',
       subject: 'Tips',
       dropSub: 'Needs Staff and Date plus card and/or cash tips. Servers match your roster by name.',
