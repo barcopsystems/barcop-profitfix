@@ -1122,8 +1122,16 @@ S.HubUserAccounts = {
       // bartender back here goes red.
       const crew = [
         { name: 'You',       email: 'demo@barcop.com',       role: 'Owner', areas: 'Everything' },
-        { name: 'Carlos P.', email: 'carlos@anchorbar.test', role: 'Admin', areas: 'Inventory · Labor · Shift · Books' },
-        { name: 'Renee K.',  email: 'renee@anchorbar.test',  role: 'Staff', areas: 'Shift · Labor' }
+        /* ⛔⛔ THESE AREAS MUST BE SECTIONS THE APP HAS (T124, corrected 2026-09-03). They read
+           *"Inventory · Labor · Shift · Books"* and *"Shift · Labor"* — and Labor and Shift stopped
+           existing when The Floor replaced them at T67, so a prospect walking the LIVE DEMO read
+           the wrong app on the one screen that explains per-area access. Both retired names map to
+           The Floor, which is the whole of the translation; nothing else moved.
+           ⚠ K3c derived WHO is listed off the roster and never asked WHAT they hold, so it stayed
+           green over this for weeks — half a row derived is half a row certified. `K3d` now checks
+           every name here against the live rail table ([[lessons-paid-for]] #136/#139). */
+        { name: 'Carlos P.', email: 'carlos@anchorbar.test', role: 'Admin', areas: 'Inventory · The Floor · Books' },
+        { name: 'Renee K.',  email: 'renee@anchorbar.test',  role: 'Staff', areas: 'The Floor' }
       ];
       box.innerHTML = '<table class="pnl-list" style="width:100%;"><tbody>' + crew.map(m =>
         '<tr><td style="font-size:12px;color:var(--t1);">' + esc(m.name)

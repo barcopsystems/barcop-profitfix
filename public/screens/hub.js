@@ -578,8 +578,16 @@ S.Hub = {
      together. That is the compounding, and it is a fact about the code rather than a copy device.
      ⛔ STEP 2 DOES NOT SAY "your hours appear here". Measured: once a week closes, hours read
      `0 hrs` whether or not any were logged, because `sum()` returns null only when there is no
-     span. The true claim is that Close the Week GATES on `st.hours.length > 0`, so there is no
-     closing a week without them.
+     span. So that cell going live is not evidence anybody logged anything, and the payoff has to
+     be something else. What IS true is the line the step carries: an hours import only lands for
+     people already on the roster, which the note above step 2 measures in `PosIngest`.
+     ⛔⛔ IT USED TO NAME A GATE THAT DOES NOT EXIST (T31, corrected 2026-09-03): that the weekly
+     close refuses a week with nobody's time on it. MEASURED in `confirm-week.js` — it refuses
+     exactly two things, a negative figure and a zero revenue total. Nothing anywhere counts time
+     before closing. A false comment reads as HANDLED to every later reader ([[the-loop]] #53) and
+     this one was load-bearing, because it was the stated reason for step 2's wording.
+     🔧 `verify-hub-getting-started` F5a/F5b/F5c now watch both halves: the app has no such gate,
+     this card does not claim one, and the two real refusals are named so F5a cannot go vacuous.
      ⚠ RUN YOUR FIRST AUDIT IS GONE, by Kyle's call: *"the audit pages have their own steps to show
      what user needs to do for a full audit"*. The destination is the weekly loop now, which is what
      the four steps were always building toward.
@@ -625,7 +633,17 @@ S.Hub = {
     return [
       { label: 'Count your bar', screen: 'ic-vendors', mod: 'inventory',
         how: 'Add your vendors and products, set your pars, take one count.',
-        gain: 'Straight away: what to reorder, and the cash sitting on your shelves.',
+        /* ⛔ THE SECOND SENTENCE IS A PREREQUISITE, NOT A FLOURISH (T121, 2026-09-03). This read
+           *"what to reorder, and the cash sitting on your shelves"* — and one count does not
+           produce that figure. `CashEngine.trapped()` returns `hasData: !!usageBase()`, and
+           `usageBase()` is null below TWO counts, so the operator finished this step, looked at the
+           money band and found Trapped Cash reading **"No data" / "Count to surface this"**: the
+           card telling them to do the thing they had just done. Measured both ways in
+           `verify-hub-getting-started` F1/F2 (one count → no figure; two → $48 on the fixture).
+           ⭐ `lights` was right the whole time and only the prose overclaimed, which is why block C
+           stayed green — the code that ENUMERATES may count, the copy that describes it may not
+           ([[lessons-paid-for]] #82). F3 now holds the sentence to naming its own prerequisite. */
+        gain: 'Straight away: what to reorder. Your second count adds the cash tied up on your shelves.',
         lights: ['Below par'], done: n(I.ic_counts) },
       /* ⛔ REQUIRED EVEN WITH A PERFECT POS, and this is the opposite of registers. Measured in
          `PosIngest`: an hours row whose name is not on the roster is `noMatch` and `lands: false` —
