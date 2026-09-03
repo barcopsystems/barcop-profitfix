@@ -235,6 +235,8 @@ S.ShiftLane = {
     const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
+      // T120 — where the report lives, named by REPORT and never by brand.
+      hint: 'Look under Reports in your POS for a Sales Summary or Daily Sales, set to the week.',
       dropTitle: 'Drop your weekly POS sales-by-day report here',
       subject: 'Sales',
       dropSub: 'Needs a Date column plus your sales (bar and/or food). Covers optional. One row per day.',
@@ -1279,6 +1281,8 @@ S.ShiftLane = {
     const el = zone ? document.getElementById(zone) : null;
     if (!el || typeof CSVMapper === 'undefined' || typeof PosIngest === 'undefined') return;
     CSVMapper.mount(el, {
+      // T120 — where the report lives, named by REPORT and never by brand.
+      hint: 'Look under Reports in your POS for a Cash Drawer, Till, or Blind Close report.',
       dropTitle: 'Drop your POS cash or drawer report here',
       subject: 'Cash',
       dropSub: 'Needs a Date column plus Over/Short, or Expected and Counted cash. Register and cashier matched if present.',

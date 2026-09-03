@@ -743,6 +743,8 @@ S.ShiftVoidComp = {
     const el = document.getElementById('vc-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
+      // T120 — where the report lives, named by REPORT and never by brand.
+      hint: 'Look under Reports in your POS for Voids and Comps, or Discounts.',
       dropTitle: 'Drop your POS voids and comps export here',
       subject: 'Voids and Comps',
       dropSub: 'Needs an Amount column. Void-or-comp, item, server, reason, and date are matched if your export has them.',
