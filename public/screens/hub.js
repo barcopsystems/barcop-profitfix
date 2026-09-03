@@ -901,7 +901,14 @@ S.Hub = {
      the opposite thing — steps the operator marks; these are facts the app observes).
      ⭐ SPOT CHECK REPLACED COUNT DRAWERS, KYLE'S CALL: *"users may never reconcile drawers or drop a
      drawer pos.. more likely to spot check."* A row that most operators can never satisfy is a row
-     that makes the list look broken. */
+     that makes the list look broken.
+     ⭐⭐ AND THE SAME REASONING MOVED TWO MORE ROWS AT T72 (Kyle, 2026-09-03): *"change log hours to
+     received delivery and import sales to created order"*. Hours and a sales import are things a
+     bar may do fortnightly, through a POS export, or not in Bar Cop at all; **receiving a delivery
+     and placing an order are what an operator does every single week**, so the two rows can now be
+     satisfied by the ordinary run of the week rather than sitting unticked on a list that then
+     reads as broken. That is Spot Check's argument applied twice more, not a new one.
+     ⛔ THEY CHANGED SOURCE, NOT LABEL. See the rows themselves. */
   _doneThisWeek() {
     const end = App.nextSunday ? App.nextSunday() : null;
     const start = (end && App.weekStartFor) ? App.weekStartFor(end) : null;
@@ -920,11 +927,25 @@ S.Hub = {
     const firstIn = arr => (arr || []).filter(r => r && inWeek(r.date))
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
 
-    const INV = App.inventoryData || {}, LAB = App.laborData || {}, SH = App.shiftData || {};
+    /* ⚠ `LAB` AND `SH` WENT WITH THE TWO ROWS THAT READ THEM (T72). Once Received delivery and
+       Created order moved onto `ic_deliveries` / `ic_orders`, nothing in this member touched labor
+       or shift data, and a local that is declared and read nowhere is the same leftover as a helper
+       whose last caller went ([[the-loop]] #25 / [[lessons-paid-for]] #105). Measured before
+       cutting: `LAB.` and `SH.` both at zero uses in the body. */
+    const INV = App.inventoryData || {};
     const rows = [
       { label: 'Take inventory count', screen: 'ic-take-inventory', mod: 'inventory', hit: firstIn(INV.ic_counts) },
-      { label: 'Log hours',            screen: 'lc-log-hours',      mod: 'labor',     hit: firstIn(LAB.lc_actuals) },
-      { label: 'Import sales',         screen: 'sc-cash-control',   mod: 'shift',     hit: firstIn(SH.sc_shifts) },
+      /* ⛔⛔ THESE TWO CHANGED THEIR SOURCE, NOT THEIR LABEL (Kyle, 2026-09-03: *"change log hours to
+         received delivery and import sales to created order"*). They read `lc_actuals` and
+         `sc_shifts`; a rename alone would have printed an HOURS date under a delivery heading and a
+         SALES date under an order heading — a true-looking number about the wrong activity, which is
+         the most convincing kind of wrong ([[lessons-paid-for]] #104 — fix the seed, not the
+         sentence). `verify-hub-needs-all` D2/D3 seed the OLD stores and prove neither row ticks.
+         ⚠ THE DESTINATION MOVED WITH THE SOURCE. Every row on this card opens the page where the
+         operator DOES the thing, so these go to Receive Delivery and the Order Sheet, never to the
+         history pages that merely list them ([[lessons-paid-for]] #47/#83). */
+      { label: 'Received delivery',    screen: 'ic-receive-delivery', mod: 'inventory', hit: firstIn(INV.ic_deliveries) },
+      { label: 'Created order',        screen: 'ic-order-sheet',      mod: 'inventory', hit: firstIn(INV.ic_orders) },
       /* ⛔ THROUGH THE SHARED HELPER, NOT THE RAW STORE, AND THE SUITE CAUGHT ME. My first version
          read `ic_spot_checks` directly, which counts an IN-PROGRESS check as a completed one — so
          opening a spot check and walking away would have ticked the row. `App.completedSpotChecks()`
@@ -945,7 +966,11 @@ S.Hub = {
        operator confirmed it; nothing else in the app writes one ([[confirm-the-week]] — ONE popup
        writes both the profit `week` and the `revenue_week`). */
     const wk = ((App.data || {}).weeks || []).filter(w => w && String(w.period_end) === String(end))[0];
-    rows.push({ label: 'Close and confirm the week', screen: 'week-close', mod: '',
+    /* ⚠ LABEL ONLY (Kyle, 2026-09-03: *"close and confirm the week .. to just 'close the week'"*).
+       The source is untouched: a `week` record ending on this Sunday, which only Confirm the Week
+       writes. Shortened because the page it opens is called Close The Week and the row was the one
+       spelling in the app that said it twice. */
+    rows.push({ label: 'Close the week', screen: 'week-close', mod: '',
                 done: !!wk, when: wk ? dayOf(wk.period_end) : '' });
     return rows;
   },
@@ -986,6 +1011,83 @@ S.Hub = {
     const room = Math.max(0, (cap || 4) - red.length);
     const shown = red.concat(amber.slice(0, room));
     return { shown: shown, more: all.length - shown.length };
+  },
+
+  /* ── THE OVERFLOW LINK, AND THE HISTORY IT HAS TO CARRY (T72, Kyle 2026-09-03) ─────────────────
+     *"next to needs attention .. if more than 5 items.. put something like (5 of X) and make that a
+     clickable link that opens a modal with all listed and clickable with scrollbar if needed."*
+     ⛔⛔ THE COMMENT ABOVE `bandItems` READS AS A VETO OF EXACTLY THIS AND IS NOT ONE. Kyle killed a
+     count on this list twice: *"remove the '6 more' that has no meaning to a user"* and *"no links
+     to the ones not listed"*. **Both objections were to a count with NOWHERE TO GO** — first a link
+     to a page that did not hold the list, then a bare caption. This one opens the list itself, which
+     is the thing that was missing. Do not restore the old wording on the strength of that note.
+     ⛔ BOTH NUMBERS ARE DERIVED AND NEITHER IS A 5. `_needsCapped` shows EVERY red however many
+     there are, so seven reds render seven rows and the label must read "7 of 13". A hardcoded five
+     would be contradicted by the rows directly beneath it ([[output-honesty]]), and
+     `verify-hub-needs-all` B3 is that case. */
+  _needsMore(shown, total) {
+    const s = Number(shown) || 0, t = Number(total) || 0;
+    if (t <= s) return '';
+    return '<span onclick="S.Hub._openNeedsAll()" style="cursor:pointer;color:var(--gold);'
+      + 'text-decoration:underline;font-size:10px;font-weight:600;letter-spacing:0;'
+      + 'text-transform:none;margin-left:8px;">(' + s + ' of ' + t + ')</span>';
+  },
+
+  /* ⭐ ONE SPELLING OF "WHERE DOES AN ALERT ROW GO", so the card and the modal cannot drift. This was
+     a local inside `render`; the modal needs the identical rule, and a second copy of it is exactly
+     what this codebase keeps paying for ([[the-loop]] — grep for other IMPLEMENTATIONS, not callers).
+     ⚠ An item may carry its own `go` (the month-end Books row does), and that wins. */
+  _goOf(a) {
+    return (a && a.go) || ('S.Hub._enter(\'' + ((a && a.screen) || '') + '\',\'' + ((a && a.mod) || '') + '\')');
+  },
+
+  /* The month-end nudge, lifted out of `render` so the modal reads the SAME set the card does rather
+     than re-deriving a near-copy. Reads `App.data.weeks` directly, which is what the render local it
+     replaced was built from. */
+  _dueItems() {
+    const out = [];
+    const now = new Date();
+    if (now.getDate() <= 10) {
+      const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lmKey = App.ymdLocal(lm).slice(0, 7);
+      const weeks = ((App.data || {}).weeks) || [];
+      const hasLastMo = weeks.some(w => (((w.period_end || '') + '').slice(0, 7)) === lmKey);
+      if (hasLastMo) out.push({ sev: 'due', label: 'Close ' + lm.toLocaleDateString('en-US', { month: 'long' }) + ' in Books',
+                                value: 'month-end', go: 'S.HubBooks&&S.HubBooks.open()' });
+    }
+    return out;
+  },
+
+  // The one source both the card and the modal read.
+  _needsItems() {
+    return this.forwardAlerts().concat(this._dueItems());
+  },
+
+  /* The modal body: EVERY item, each a door, scrolling only when it needs to.
+     ⚠ `max-height` + `overflow-y:auto` rather than a fixed height, so a list of six does not open a
+     tall empty box and a list of forty does not run off the screen. Kyle removed the Hub's own
+     scrollboxes because a nested scroll area is painful on a phone; this one is inside a modal the
+     operator opened on purpose and closed the moment they are done, which is the case he asked for. */
+  _needsAllHtml(items) {
+    const all = items || [];
+    const rows = all.map(a =>
+      '<div class="hd-prow" onclick="App.closeModal(\'hub-needs-all\');' + this._goOf(a) + '" '
+      + 'style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;min-width:0;'
+      + 'border-bottom:1px solid var(--b-edge);">'
+      + '<span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:'
+      + (a.sev === 'bad' ? 'var(--red)' : 'var(--amber)') + ';"></span>'
+      + '<span style="flex:1;min-width:0;font-size:12px;color:var(--t1);">' + esc(a.label || a.text || '') + '</span>'
+      + (a.value ? '<span style="flex-shrink:0;font-size:11px;color:var(--t3);white-space:nowrap;">' + esc(a.value) + '</span>' : '')
+      + '<span style="flex-shrink:0;color:var(--t4);font-size:13px;">&rsaquo;</span></div>').join('');
+    return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:18px 20px;">'
+      + '<div class="sh" style="margin:0 0 12px;">Needs attention</div>'
+      + '<div style="max-height:60vh;overflow-y:auto;margin:0 -20px;padding:0 20px;">'
+      + (rows || '<div style="font-size:12px;color:var(--t2);">Nothing needs you right now.</div>')
+      + '</div></div>';
+  },
+
+  _openNeedsAll() {
+    App.openModal(this._needsAllHtml(this._needsItems()), { id: 'hub-needs-all', maxWidth: 520 });
   },
 
   /* One row, six cells, each a door into its section. ⚠ THROUGH `jumpToSection`, which lands on the
@@ -1448,17 +1550,11 @@ S.Hub = {
     // ── Needs Attention band: the fires (alerts) + section-less weekly nudges
     //    (month-end Books, etc.). Catches what does not belong to a weekly section
     //    card. Condition-gated, so it is never a nag; collapses to All Clear. ──
-    const dueItems = [];
-    (function () {
-      const now = new Date();
-      if (now.getDate() <= 10) {
-        const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lmKey = App.ymdLocal(lm).slice(0, 7);
-        const hasLastMo = (pWeeks || []).some(w => (((w.period_end || '') + '').slice(0, 7)) === lmKey);
-        if (hasLastMo) dueItems.push({ sev:'due', label:'Close ' + lm.toLocaleDateString('en-US',{month:'long'}) + ' in Books', value:'month-end', go:'S.HubBooks&&S.HubBooks.open()' });
-      }
-    })();
-    const goOf = a => a.go || ('S.Hub._enter(\'' + a.screen + '\',\'' + (a.mod || '') + '\')');
+    /* ⚠ THE MONTH-END NUDGE AND THE DESTINATION RULE BOTH MOVED TO MEMBERS (T72, 2026-09-03), so the
+       Needs attention MODAL reads the same set and sends a row to the same place as the card. They
+       were locals, and a modal cannot reach a local — copying either into it would have been a
+       second implementation of the thing this suite exists to keep single. */
+    const goOf = a => this._goOf(a);
     const rowDiv = (onclick, dot, label, value, valColor) =>
       '<div class="hd-prow" onclick="' + onclick + '" style="display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;min-width:0;">'
       + '<span style="width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0;"></span>'
@@ -1532,8 +1628,13 @@ S.Hub = {
        a LINK to a page that did not hold the list, then a caption, then nothing. Kyle: *"remove the
        '6 more' that has no meaning to a user"* and *"no links to the ones not listed.. they are
        listed in multiple places on the app."*
-       ⚠ `bandItems` SURVIVES — the new Needs You list reads it. Only the dead render went. */
-    const bandItems = this.forwardAlerts().concat(dueItems);
+       ⚠ `bandItems` SURVIVES — the new Needs You list reads it. Only the dead render went.
+       ⭐⭐ AND AT T72 (2026-09-03) A COUNT CAME BACK, WHICH IS NOT A REVERSAL OF THE ABOVE. Both of
+       Kyle's objections were to a count with NOWHERE TO GO: a link to a page that did not hold the
+       list, then a bare caption. *"if more than 5 items.. put something like (5 of X) and make that
+       a clickable link that opens a modal with all listed and clickable."* The destination IS the
+       list now, which is the thing that was missing both previous times. See `_needsMore`. */
+    const bandItems = this._needsItems();
 
     // ── Section cards: one per section, Control row + Recovery row. Each mirrors
     //    its section, a headline number/state + the weekly-close status + a jump
@@ -1651,7 +1752,10 @@ S.Hub = {
       + esc(text) + '</span>';
     const hbPanel = (inner, extra) => '<div style="background:var(--surface);border:1px solid var(--b-edge);'
       + 'border-radius:var(--r);padding:16px 18px;' + (extra || '') + '">' + inner + '</div>';
-    const hbSh = t => '<div class="sh" style="margin:0 0 10px;">' + esc(t) + '</div>';
+    /* ⚠ `right` IS RAW HTML AND THE TITLE IS STILL ESCAPED. The only caller passing one is the Needs
+       attention overflow link, which `_needsMore` builds from two numbers it computed itself, so
+       nothing operator-supplied reaches it. Escaping it would render the markup as text. */
+    const hbSh = (t, right) => '<div class="sh" style="margin:0 0 10px;">' + esc(t) + (right || '') + '</div>';
 
     // ── Band 1a: the climb, plus the three recovery audits underneath it ──
     const climb = this._auditClimb();
@@ -1845,7 +1949,10 @@ S.Hub = {
     const hbRow = (inner) => '<div class="hd-arow" style="display:flex;align-items:center;gap:10px;'
       + 'height:' + ROW_H + 'px;box-sizing:border-box;padding:0 12px;border-radius:2px;'
       + 'margin-bottom:6px;">' + inner + '</div>';
-    const needRows = this._needsCapped(bandItems, 5).shown.map(a => hbRow(
+    /* ⚠ CAPTURED ONCE. The heading's count reads `needCap.shown.length`, so it is the number of rows
+       actually rendered rather than the cap — with seven reds the card shows seven and says so. */
+    const needCap = this._needsCapped(bandItems, 5);
+    const needRows = needCap.shown.map(a => hbRow(
       '<span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:'
       + (a.sev === 'bad' ? 'var(--red)' : 'var(--amber)') + ';"></span>'
       + '<span style="flex:1;min-width:0;font-size:12px;color:' + hbGrey + ';white-space:nowrap;'
@@ -1913,7 +2020,7 @@ S.Hub = {
             ${bwCard('Your biggest gain', bw, 'gain', true)}${bwCard('Your worst drag', bw, 'drag', false)}
           </div>
           <div class="hub-grid-row" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch;">
-            ${hbPanel(hbSh('Needs attention') + (needRows || (bandHasANumber
+            ${hbPanel(hbSh('Needs attention', this._needsMore(needCap.shown.length, bandItems.length)) + (needRows || (bandHasANumber
               ? '<div style="font-size:12px;color:var(--t2);">All clear. Nothing needs you outside your weekly close.</div>'
               /* ⛔ AN EMPTY `needRows` HAS TWO CAUSES AND ONLY ONE OF THEM IS GOOD NEWS. On a bar
                  with no data at all nothing CAN be flagged, and the old single fallback printed a
