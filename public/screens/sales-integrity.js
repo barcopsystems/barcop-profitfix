@@ -1486,6 +1486,13 @@ S.SalesIntegrity = {
     const el = document.getElementById('si-csv');
     if (!el || typeof CSVMapper === 'undefined') return;
     CSVMapper.mount(el, {
+      /* T120 — where the report lives. ⛔ IT GOES IN `hint` AND NOT IN `dropSub`, AND THAT IS A
+         MEASUREMENT RATHER THAN A PREFERENCE: `verify-sales-integrity-import-door` P1 caps this
+         door's drop line at the longest of four sibling doors, because Kyle asked for it short.
+         Measured 2026-09-03, that ceiling is 175 and this line is 157, so a where-sentence of
+         about sixty characters cannot fit. Worse, two of the four siblings that SET the ceiling
+         are POS doors too, so growing them would have lifted the cap while P1 stayed green. */
+      hint: 'Look under Reports in your POS for Server Sales, Employee Sales, or Sales by Employee.',
       dropTitle: 'Drop your POS per-server sales report here',
       subject: 'Server Sales',
       // ⚠ NET SALES IS NAMED FIRST. It is the denominator for void %, comp %, refund %, average
