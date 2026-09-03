@@ -2024,7 +2024,6 @@ S.Hub = {
               <h1 class="topbar-title">${esc(barName)}</h1>
             </div>
             <div id="hub-topbar-account-switcher" style="display:none;"></div>
-            <div id="hub-topbar-group-dashboard" style="display:none;"></div>
             <div class="topbar-right"></div>
           </header>
           <main class="content">

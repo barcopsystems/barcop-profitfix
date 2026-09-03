@@ -401,8 +401,10 @@ S.WeekReview = {
     //      have, on a week with no labor data at all. ConfirmWeek is deliberately
     //      null-in/null-out here ("a percentage whose input was never entered is
     //      unknown, and it stays unknown all the way into the store") and every other
-    //      consumer honours it: hub.js, r-dashboard.js and hub-group-dashboard.js all
-    //      print '-'. This was the only site that invented a value.
+    //      consumer honours it: hub.js and r-dashboard.js both print '-'. This was the
+    //      only site that invented a value. (A third consumer was named here until T123
+    //      deleted it; a justification that cites a door which no longer exists leaves the
+    //      next reader keeping a phantom in step.)
     //   2. It divided bar+food labor by bar+food revenue, dropping catering from BOTH
     //      sides, so the same "Labor" label switched basis depending on whether a
     //      revenue_week happened to exist (measured 2.34 points high on a catering week).
