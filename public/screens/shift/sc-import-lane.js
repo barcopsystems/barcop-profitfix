@@ -861,7 +861,9 @@ S.ShiftLane = {
      `verify-manual-sales-grid` threw `this._weekTotalRow is not a function` and printed no summary
      at all. A constant a member reads becomes a method the moment anything needs to lift it
      ([[the-loop]] #16/#26/#120; the tell is writing `NAME:` at object level). */
-  _weekTotalType() { return 'Week Total'; },
+  // ⚠ Delegates to App, which is the one source: Week in Review has to ask the same question and a
+  // literal in both files is exactly the drift this suite exists to catch. Bare call on purpose.
+  _weekTotalType() { return App.weekTotalShiftType(); },
   _weekSalesRows(bar, food, covers) {
     const has = x => x != null && String(x).trim() !== '';
     const n = x => App.parseNum(x) ?? 0;
