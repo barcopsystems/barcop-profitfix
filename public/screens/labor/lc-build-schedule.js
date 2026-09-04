@@ -982,7 +982,11 @@ S.LaborBuildSchedule = {
     App.openModal('<div class="card form-card" style="margin:0;">'
       + '<div class="card-title" style="display:flex;align-items:baseline;gap:14px;">'
       +   '<span>' + esc(staff.name || 'Staff') + '</span>'
-      +   '<span id="bs-m-total" style="color:var(--t2);"></span>'
+      /* ⚠ THE TOTAL RESETS THE HEAD BAND'S TYPE, and it has to say so explicitly. `.card-title` is
+         9px, 700 weight, 2.5px letter-spacing and uppercase — fine for a label, unreadable for a
+         figure, which is what Kyle saw. This is the event row's own type (12px, `--t1`, normal
+         weight), so the two numbers on this card read the same way. */
+      +   '<span id="bs-m-total" style="font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--t1);"></span>'
       + '</div>'
       + '<div id="bs-m-body"></div></div>',
       { id: 'bs-shift-modal', maxWidth: 520, confirmDirty: true });
@@ -1014,7 +1018,22 @@ S.LaborBuildSchedule = {
       if (!sal) cost += h * n * App.wageForStaffPosition(staff, b.position_id || staff.position_id || '', this.draft.week_start);
     });
     if (!hrs) return '';
-    return hrs.toFixed(1) + ' hrs &middot; ' + (sal ? 'salaried (no hourly cost)' : App.fmtCurrency(cost));
+    const money = sal ? 'salaried (no hourly cost)' : App.fmtCurrency(cost);
+    /* ⛔⛔ THE OVERTIME READ IS THIS SCREEN'S OWN, NOT A 40 TYPED IN HERE. The warnings box under the
+       grid fires at `OT - 2` in two stages and paints them AMBER, because on this screen amber is an
+       overridable watch and red is a real conflict (an overlap, a shift on a day off). Overtime is
+       explicitly overridable — its own note says "schedule it on purpose" — so red would tell the
+       operator they cannot post something they can ([[the-loop]] #54: when two surfaces state one
+       fact, they state it the same way, or the operator has to work out which one to believe).
+       ⚠ AND IT STARTS AT 38, which is the half that matters: at 39.5 a shift can still be trimmed
+       for free, and a flag that waits for 40 stays quiet through the only window where it is cheap.
+       ⚠ SALARIED NEVER COLOURS. `computeTotals` builds its hours "hourly only; salaried get no OT",
+       so colouring them here would flag somebody the rule exempts. */
+    const OT = App.OT_THRESHOLD || 40;
+    if (sal || hrs < OT - 2) return hrs.toFixed(1) + ' hrs &middot; ' + money;
+    const tag = hrs > OT ? (hrs - OT).toFixed(1) + ' OT' : 'near OT';
+    return '<span style="color:var(--amber);font-weight:700;">' + hrs.toFixed(1) + ' hrs (' + tag + ')</span>'
+      + ' &middot; ' + money;
   },
 
   // The event rows for ONE block, one per selected day that has a booking. An event belongs to a
@@ -1327,7 +1346,7 @@ S.LaborBuildSchedule = {
     App.showHelpModal('How Build Schedule Works', [
       { p: ['Build Schedule is a weekly grid: your staff down the left, the seven days across the top. You fill it in by clicking, and Bar Cop costs it out live as you go.'] },
       { h: 'Picking the Week', p: ['Build Schedule opens on the current week. Use the week chips and the arrows above the grid to move between weeks, or This Week to snap back. A week you have already posted opens ready to edit; an empty week is ready to build. Worksheet prints a blank staff-by-day grid to pencil in before you enter it here.'] },
-      { h: 'Adding and Editing Shifts', p: ['Click any day cell to open that person\'s week. Set a start and end time, then tap a day chip for every day they work that shift and save once. Three days on the same shift is one trip, not three.', 'For a second shift time, or a double on the same day, use Add Another Shift Time and fill in the next block. Opening a shift shows every shift time that person already has with their days already ticked, so moving a start time by an hour moves all of them together.', 'Unticking a day removes that day\'s shift. The line above the button says what is about to be added and what is about to be removed, so you see it before you press. If you double-book someone on the same day, the block turns red so you can fix it.'] },
+      { h: 'Adding and Editing Shifts', p: ['Click any day cell to open that person\'s week. Set a start and end time, then tap a day chip for every day they work that shift and save once. Three days on the same shift is one trip, not three.', 'For a second shift time, or a double on the same day, use Add Another Shift Time and fill in the next block. Opening a shift shows every shift time that person already has with their days already ticked, so moving a start time by an hour moves all of them together.', 'Unticking a day removes that day\'s shift, and Delete removes a whole shift time. The line above the button says what is about to be added and what is about to be removed, so you see it before you press. If you double-book someone on the same day, the block turns red so you can fix it.', 'The hours and cost beside their name are the whole week you are about to save, every shift time added together. They turn amber as that person nears 40 hours and again once they pass it, so you can trim a shift while it is still free. Salaried staff never colour, since they are exempt from overtime.'] },
       { h: 'Days Off', p: ['A cell reads Off when that person requested the day off (logged on Time Off and approved) or has it as a regular day off (set on their Staff Roster profile). Drop a shift on an Off day and the block turns red; you also get a warning before the schedule posts, so you never accidentally schedule someone you already gave the day off. You can still override and post it.', 'In the shift pop-up the day chips for those days are greyed out, so you cannot put someone on one by accident while filling in the rest of the week. To do it on purpose, click that Off cell in the grid and the day comes up ready to save.'] },
       { h: 'The Labor Budget', p: ['Bar Cop projects the week\'s revenue automatically from your recent weeks and any events booked, and turns it into a labor budget (your target percent of the forecast). It shows the Target Hours that forecast can support at your RPLH target, and live what you have scheduled and how much budget is left, green when you are under and red when you are over. Tap Edit on the forecast to set your own number for a week the projection cannot see, like a holiday, then Use Bar Cop\'s Number to hand it back. No sales history yet? Type a number to get a budget; Bar Cop takes over once you have a few weeks logged.'] },
       { h: 'Scheduling Warnings', p: ['As you build, one warnings box under the grid gathers anything to look at before you post: anyone in or near overtime (hours over 40 pay at time and a half), anyone double-booked with overlapping shifts, and anyone scheduled on a requested or regular day off. Each is its own labelled note. Fix an issue and it drops out of the box; when there is nothing to flag, the box does not show at all. You can always post as is and override a warning on purpose. Salaried staff never show in overtime, since they are exempt.'] },
