@@ -105,7 +105,14 @@ const AuditUI = {
   stepNote(s) {
     const on = (s && s.lights) || [];
     if (on.length) {
-      const list = on.length === 1 ? on[0] : on.slice(0, -1).join(', ') + ' and ' + on[on.length - 1];
+      /* ⛔ "plus" WHEN A SECTION NAME CARRIES ITS OWN "and", AND READING THE LIVE RENDER IS THE ONLY
+         THING THAT CAUGHT IT. Two of these names are conjunctions already — "Pour and Bar Cost",
+         "Check Average and Revenue" — so an ordinary joiner printed "Turns on Pour and Bar Cost and
+         Food Cost", which reads as ONE section with a long name. Every assertion was green over it,
+         because a harness checks that the words are present and cannot hear them
+         ([[lessons-paid-for]] #28 — render the real thing and read your own diff aloud). */
+      const joiner = on.some(n => / and /.test(n)) ? ', plus ' : ' and ';
+      const list = on.length === 1 ? on[0] : on.slice(0, -1).join(', ') + joiner + on[on.length - 1];
       return 'Turns on ' + list + '.';
     }
     return (s && s.note) || '';
