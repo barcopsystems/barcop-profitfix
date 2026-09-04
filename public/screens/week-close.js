@@ -304,7 +304,7 @@ S.WeekClose = {
       ? 'From your counts'
       : (st.cogs.lastCount ? 'Type it on the confirm. Last count ' + this._shortDate(st.cogs.lastCount)
                            : this._promise('Take a count to get',
-                               ['Cost of goods', 'On the shelf', 'Still to order']));
+                               ['Cost of goods', 'Bar pour cost', 'Food cost']));
     return [
       /* ⛔⛔ NO `go` ON THIS ROW ANY MORE, AND THAT IS THE POINT OF THE WHOLE CHANGE. It pointed at
          `sc-dashboard` — one of the six cockpits being deleted — and it was the ONLY row on this page
@@ -329,13 +329,42 @@ S.WeekClose = {
            ⭐ AND SPLITTING THEM IS THE CONNECTION KYLE ASKED FOR, not a smaller claim: sales gives
            the sales numbers, hours turn them into the cost percentages. Read down the page the two
            rows now say that out loud. */
-        lights: ['Net sales', 'Bar pour cost', 'Food cost'],
+        /* ⛔⛔⛔ THIS ROW HAS NOW BEEN CORRECTED TWICE, AND KYLE FOUND IT BOTH TIMES. The first pass
+           claimed prime cost and labor, which need the HOURS. This pass claimed bar pour cost and
+           food cost, which need the COUNT: *"enter sales because that is what really goes with
+           inventory to get pour and food cost."* He is right, and the code says so in one line —
+           `confirm-week` computes `barPct` as `(bRev > 0 && bCogs != null)`, so revenue alone gives
+           nothing.
+           ⭐ MEASURED, not read: a week closed with sales and NO count and NO hours leaves The Week
+           card showing **Net sales and nothing else**, with Prime cost, Bar pour cost, Food cost and
+           Labor all still jobs. Sales is the base every percentage is worked out against, and that
+           is the whole of what it gives on its own ([[lessons-paid-for]] #64). */
+        lights: ['Net sales'],
         note: st.sales.length ? money(st.salesTotal) + ' in'
-          : this._promise('Enter your sales to get', ['Net sales', 'Bar pour cost', 'Food cost']) },
+          : 'Enter your sales to get net sales, and the base every cost percentage is worked out against' },
+      /* ⛔⛔ THE COUNT SITS SECOND NOW (Kyle, 2026-09-04: *"1) Sales.. because that is what really
+         goes with inventory to get pour and food cost.. then 2) is cost of goods"*). Sales and a
+         count are the pair that produce the two percentages a bar actually watches, so they belong
+         together at the top and everything after them is genuinely optional. */
+      { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', goLabel: 'Take Inventory', derived: true,
+        /* ⚠ IT OWNS BAR POUR COST AND FOOD COST because it is the step that FINISHES them: both are
+           cogs divided by revenue, and the sales are already in by the time an operator is on this
+           row. On the shelf and Still to order are the INVENTORY card's own step promise and are not
+           repeated here ([[the-loop]] #54 — one place says a thing). */
+        lights: ['Cost of goods', 'Bar pour cost', 'Food cost'],
+        note: cogsNote },
       /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
          week's hours are, so it is where the file goes in; a door whose answer appears on a
          different page is a signpost, not a door. `lane` is the key the host names a zone for. */
-      { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', goLabel: 'Log Hours', lane: 'hours',
+      /* ⛔⛔ OPTIONAL, AND IT ALWAYS WAS — THE FLAG WAS THE THING THAT WAS WRONG (Kyle, 2026-09-04:
+         *"isn't hours technically optional too? everything is really optional other than inventory
+         and entering sales"*). MEASURED: `required` is read in exactly two places and both of them
+         feed the BANNER that counts how many are in. Nothing has ever blocked a confirm on it, so
+         calling hours required was a claim about importance dressed as a claim about capability, and
+         it told an operator with no timeclock export that they could not close their week.
+         ⚠ WHAT IS TRUE STAYS TRUE AND IS IN THE NOTE INSTEAD: without hours there is no prime cost
+         and no labor percentage. That is a consequence to state, not a door to bar. */
+      { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', goLabel: 'Log Hours', optional: true, lane: 'hours',
         /* ⛔⛔⛔ THE FIRST VERSION OF THIS WAS CIRCULAR AND KYLE CAUGHT IT: *"they log hours to get
            hours logged? why would they drop an hours file from their pos to get hours logged.. they
            would already have hours logged."* He is right. Naming the cell the data lands in tells an
@@ -382,9 +411,6 @@ S.WeekClose = {
            finding. */
         note: st.cash.length ? st.cash.length + ' drawer' + (st.cash.length === 1 ? '' : 's') + ' in'
           : 'Drop a drawer file or count one to get over and short, and let the audit catch who is short again and again' },
-      { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', goLabel: 'Take Inventory', derived: true,
-        lights: ['Cost of goods', 'On the shelf', 'Still to order'],
-        note: cogsNote },
       { key: 'catering', label: 'Catering', ready: st.catering.length > 0, go: 'ev-bookings', goLabel: 'Event Bookings', optional: true, derived: true,
         /* ⚠ NO `lights` HERE EITHER, AND FOR A SHARPER REASON THAN TIPS. Emptying `bookings` DOES
            take `Booked ahead` off the Events card, which reads exactly like the payoff — and it is a
