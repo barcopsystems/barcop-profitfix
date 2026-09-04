@@ -937,7 +937,13 @@ async function sendWelcomeEmail(email, barName) {
          hours report only lands for names already on the roster (`PosIngest`: an unmatched name is
          a roster fix, never a new person). Block C checks the steps AND their order against the
          Hub card, because the card compounds and an email that reorders it teaches a wasted week. */
-      +     '<p style="margin:0 0 18px;"><b>Where to start:</b> open Bar Cop and work the Get Started steps on your Hub. Count your bar first: vendors, products, pars, one count. Then add your people, positions before staff. Registers are optional, only if you reconcile drawers in Bar Cop. Then close your first week. Step one pays off straight away, before any week closes: what is below par, and the cash sitting on your shelves.</p>'
+      /* ⛔ "the Get Started steps on your Hub" NAMED A CARD THAT NO LONGER EXISTS (T138, 2026-09-03).
+         The Hub is one card per rail section now, and each card carries its own remaining jobs, so
+         there is no separate Get Started card to work. This is the first thing a paying customer
+         reads, and copy describing a deleted mechanism is FALSE rather than a wording preference
+         ([[lessons-paid-for]] #116). Only the false clause moved; the order it teaches is unchanged
+         and still matches the cards' own jobs. The replacement wording is Kyle's to veto. */
+      +     '<p style="margin:0 0 18px;"><b>Where to start:</b> open Bar Cop and work down your Hub, section by section. Count your bar first: vendors, products, pars, one count. Then add your people, positions before staff. Registers are optional, only if you reconcile drawers in Bar Cop. Then close your first week. Step one pays off straight away, before any week closes: what is below par, and the cash sitting on your shelves.</p>'
       +     '<div style="margin:0 0 22px;"><a href="' + appUrl + '" style="display:inline-block;background:' + gold + ';color:#14222A;font-weight:800;font-size:14px;text-decoration:none;padding:13px 26px;border-radius:6px;">Open Bar Cop</a></div>'
       +     '<p style="margin:0 0 8px;font-weight:700;color:#14222A;">A few things worth knowing:</p>'
       +     '<ul style="margin:0 0 18px;padding-left:20px;">'
