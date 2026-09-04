@@ -87,6 +87,30 @@ const AuditUI = {
   // so there is no lock and no run-without-data warning. The screen wires the jump
   // via wireFirstAudit and the Generate via #<pfx>-gen-btn.
   //   cfg: { pfx, title, desc, steps:[{label, done, go}], sectionsReady:[bool], hasLatest }
+  /* ⭐⭐⭐ WHAT A STEP IS WORTH, BUILT FROM A DECLARED LIST RATHER THAN TYPED (Kyle, 2026-09-04:
+     *"these make it seem like a lot of work.. when it doesn't have to be.. it needs to be do this in
+     the fastest, easiest step possible.. and you get this in the report.. not just 'two weeks of pos
+     sales imported'"*). The label is the fastest way to do it; this is the other half.
+     ⛔ `lights` NAMES THE SECTIONS THE STEP TURNS ON, AND THE SENTENCE IS COMPOSED FROM IT — the same
+     contract Close The Week's rows carry, for the same reason: a claim about what the app will do is
+     a MEASUREMENT, and hand-writing it means it drifts the first time anyone reshuffles the words
+     ([[lessons-paid-for]] #64/#174). `verify-audit-readiness-payoff` checks every name against that
+     audit's real section list and refuses a section claimed by two steps.
+     ⚠ A STEP THAT FINISHES NO SECTION CARRIES A PLAIN `note` INSTEAD, and it must not say "turns on"
+     — three of these are alternatives to a neighbour (either one lights the section) and two are
+     feeders that the section needs but does not complete. A promise kept by neither step is the
+     defect Kyle caught twice on Close The Week's Sales row ([[lessons-paid-for]] #177/#180).
+     ⚠ HIDDEN ONCE THE STEP IS DONE: the row already says "Have it", and "Turns on X" reads as a
+     future promise about work that is finished. */
+  stepNote(s) {
+    const on = (s && s.lights) || [];
+    if (on.length) {
+      const list = on.length === 1 ? on[0] : on.slice(0, -1).join(', ') + ' and ' + on[on.length - 1];
+      return 'Turns on ' + list + '.';
+    }
+    return (s && s.note) || '';
+  },
+
   readinessCard(cfg) {
     const steps = cfg.steps || [];
     const doneCount = steps.filter(s => s.done).length;
@@ -113,7 +137,12 @@ const AuditUI = {
       + (s.done
           ? '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--green);color:var(--bg);font-size:13px;font-weight:800;">&#10003;</span>'
           : '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--sel-active-bg);color:var(--gold);font-size:11px;font-weight:800;">' + (i + 1) + '</span>')
-      + '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">' + esc(s.label) + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="font-size:13px;font-weight:600;color:' + (s.done ? 'var(--t3)' : 'var(--t1)') + ';">' + esc(s.label) + '</div>'
+      +   (s.done ? '' : (AuditUI.stepNote(s)
+            ? '<div class="au-fa-note" style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:3px;">' + esc(AuditUI.stepNote(s)) + '</div>'
+            : ''))
+      + '</div>'
       + (s.done ? '<span style="font-size:11px;color:var(--green);font-weight:700;flex-shrink:0;">Have it</span>'
                 : (s.go ? '<span style="color:var(--t4);font-size:13px;flex-shrink:0;">&rsaquo;</span>' : ''))
       + '</div>').join('');

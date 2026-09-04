@@ -33,12 +33,33 @@ S.AuditTracker = {
   _readinessSteps() {
     const cd = this.buildControlData() || {};
     return [
-      { label: 'Inventory count taken',                done: (cd.inventory_counts || 0) > 0, go: 'ic-take-inventory' },
-      { label: 'Hours logged in Labor',                done: (cd.labor_hours || 0) > 0, go: 'lc-log-hours' },
-      { label: 'Deliveries logged',                    done: (cd.deliveries_logged || 0) > 0, go: 'ic-receive-delivery' },
-      { label: 'Voids and comps logged',               done: (cd.void_comp_count || 0) > 0, go: 'sc-void-comp' },
-      { label: 'Cash reconciled',                      done: (cd.cash_reconciliations || 0) > 0, go: 'sc-cash-control' },
-      { label: 'Confirm the week',                     done: cd.bar_cost_pct != null || cd.prime_cost_pct != null, go: 'week-close' }
+      /* ⛔ EVERY `lights` BELOW WAS MEASURED, NOT REASONED (2026-09-04): the world was emptied and
+         rebuilt one step at a time against the real `_sectionsReady`, because reading a seeded
+         account back shows every section ready whatever you remove — the gates are OR chains and the
+         confirmed weeks already carry what the steps produce ([[lessons-paid-for]] #180). */
+      { label: 'Count one section on your phone',      done: (cd.inventory_counts || 0) > 0, go: 'ic-take-inventory',
+        lights: ['Shrink and Waste'] },
+      /* ⛔⛔ POINTS AT CLOSE THE WEEK, NOT `lc-log-hours`, ON KYLE'S CALL. That screen has no drop
+         zone at all — the timeclock file lands on Close The Week's Hours row — so the old
+         destination sent an operator away from the fast path the step is describing.
+         ⚠ AND IT FINISHES NO SCORED SECTION, WHICH HE CHALLENGED AND WAS RIGHT TO. Measured properly
+         (hours removed AND the labor they put in the week stripped): prime cost goes 51.1 -> null.
+         The Profit audit's five scored sections are all cost and loss; prime is the context line
+         under them, so this row states the consequence rather than claiming a section. */
+      { label: 'Drop your timeclock file on Close The Week', done: (cd.labor_hours || 0) > 0, go: 'week-close',
+        note: 'Without hours the audit has no prime cost line.' },
+      { label: 'Log a delivery as it lands',           done: (cd.deliveries_logged || 0) > 0, go: 'ic-receive-delivery',
+        lights: ['Vendor Cost Control'] },
+      { label: 'Drop your POS void and comp report',   done: (cd.void_comp_count || 0) > 0, go: 'sc-void-comp',
+        lights: ['Theft and Cash Loss'] },
+      /* ⚠ AN ALTERNATIVE, NOT A SECOND GATE. S4 is an OR — voids OR cash reconciles OR walked tabs —
+         so whichever the operator does first turns it on. Measured: with voids emptied, a drawer
+         count alone still scores it. Claiming it here as well would put one section on two rows and
+         a promise neither of them keeps ([[lessons-paid-for]] #177). */
+      { label: 'Count a drawer at close',              done: (cd.cash_reconciliations || 0) > 0, go: 'sc-cash-control',
+        note: 'Adds a second signal to Theft and Cash Loss.' },
+      { label: 'Enter your bar and food sales for the week', done: cd.bar_cost_pct != null || cd.prime_cost_pct != null, go: 'week-close',
+        lights: ['Pour and Bar Cost', 'Food Cost'] }
     ];
   },
 

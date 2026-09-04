@@ -913,11 +913,23 @@ S.HubBarCopAudit = {
     const laborDone = _spanDays((App.laborData && App.laborData.lc_actuals) || []) >= 13;
     const shiftDone = _spanDays((App.shiftData && App.shiftData.sc_shifts) || []) >= 13;
     return [
-      { label: 'Two inventory counts taken',  done: invDone,   go: 'ic-take-inventory' },
-      { label: 'Two weeks of labor hours logged', done: laborDone, go: 'lc-log-hours' },
-      { label: 'Two weeks of POS sales imported', done: shiftDone, go: 'week-close' },
-      { label: 'Profit Audit run',            done: pAud,      go: 'audit-tracker' },
-      { label: 'Revenue Audit run',           done: rAud,      go: 'r-audit' }
+      /* ⛔ MEASURED FROM AN EMPTY ACCOUNT, which is who reads this card ("No data in Bar Cop yet").
+         On a working account these two sections survive on other data, so removing counts costs
+         nothing — both answers are true and they answer different questions. The reader here has
+         nothing, so the from-empty measurement is the honest one ([[lessons-paid-for]] #180). */
+      { label: 'Count your inventory twice, a week apart', done: invDone, go: 'ic-take-inventory',
+        lights: ['Operational Discipline', 'Inventory Execution'] },
+      /* ⛔ CLOSE THE WEEK, NOT `lc-log-hours` (Kyle's call) — the timeclock file drops there. */
+      { label: 'Drop two weeks of timeclock files on Close The Week', done: laborDone, go: 'week-close',
+        lights: ['Labor Hygiene'] },
+      { label: 'Enter two weeks of bar and food sales', done: shiftDone, go: 'week-close',
+        lights: ['Cash Integrity'] },
+      { label: 'Run your Profit Audit',       done: pAud,      go: 'audit-tracker',
+        lights: ['Recovery Action'] },
+      /* ⚠ AN ALTERNATIVE AGAIN: Recovery Action reads any of the audits, so the Profit run above
+         already turns it on and this one cannot claim it a second time. */
+      { label: 'Run your Revenue Audit',      done: rAud,      go: 'r-audit',
+        note: 'Adds a second audit to Recovery Action.' }
     ];
   },
 
