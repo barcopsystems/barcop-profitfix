@@ -1907,6 +1907,23 @@ S.Hub = {
      A stray value of any other type reads as the default rather than as "all closed", because a
      Hub that lands with nothing open is a page of headings ([[empty-is-not-an-answer]] — an empty
      control is not an answer, and neither is a value nobody wrote). */
+  /* ⭐ ONE PLACE-KEEPER, USED BY EVERY CONTROL THAT REPAINTS THE PAGE UNDER THE OPERATOR'S THUMB.
+     Hand the selector of something that survives the repaint and the viewport y it had before, and
+     this puts it back where it was. Written once because two controls need it and a second copy is
+     how they start disagreeing ([[the-loop]] #54).
+     ⚠ IT RE-QUERIES BOTH THE SCROLLER AND THE ANCHOR, and that is the whole point: the render
+     replaces `main.content`, so a reference captured before it is pointing at a detached node.
+     ⚠ AND IT IS SILENT WHEN IT CANNOT FIND THEM. A card that was just hidden has no head to return
+     to, and a page that scrolled somewhere arbitrary because the anchor went missing would be worse
+     than one that did not move at all. */
+  _keepPlace(sel, yBefore) {
+    if (typeof document === 'undefined' || yBefore == null) return;
+    const sc = document.querySelector('.hub-app .content');
+    const el = document.querySelector(sel);
+    if (!sc || !el) return;
+    sc.scrollTop += (el.getBoundingClientRect().top - yBefore);
+  },
+
   _openCard() {
     const v = ((App.data || {}).settings || {}).hub_open_card;
     if (typeof v !== 'string') return 'inventory';
@@ -1946,14 +1963,30 @@ S.Hub = {
       try { await App.saveKey('settings'); }
       catch (e) { console.error('hidden-card save failed', e); }
     }
+    /* ⛔⛔ A CARD VANISHING WITH NO EXPLANATION IS THE HALF KYLE COULD NOT RESOLVE (2026-09-04: *"if
+       a user clicks hide.. the card is gone but they can't see what happened to it unless they
+       scroll all the way down"*). The way back has always been there and on a phone it is several
+       screens below the fold, so the operator sees a section disappear and nothing else.
+       ⭐ NO NEW UI FOR IT. The restore line already says exactly what happened and offers the way
+       back; it just was not where the operator was looking. Bringing it to them turns a vanishing
+       act into a visible outcome, using the same place-keeper the toggle uses.
+       ⚠ ON A RESTORE THERE IS NOTHING TO SCROLL TO — the card is back and the foot may be gone
+       entirely — so this only fires when something was hidden. */
     if (App.showHub) App.showHub();
+    if (hidden && typeof document !== 'undefined') {
+      const foot = document.getElementById('hub-hidden-foot');
+      if (foot && foot.scrollIntoView) foot.scrollIntoView({ block: 'center' });
+    }
   },
   /* The way back. It renders only when something is hidden, so a Hub with every section on shows
      nothing at all here ([[empty-state-day1]] — a block with nothing to say does not draw a heading). */
   _hiddenFootHTML(plan, hidden) {
     const rows = plan.filter(r => hidden.has(r.key));
     if (!rows.length) return '';
-    return '<div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;'
+    /* ⚠ THE ID IS LOAD-BEARING, not decoration: `_setCardHidden` scrolls to this line so an operator
+       who has just hidden a card can see where it went. Renaming it silently turns that into a
+       no-op, which is the dead-control class this project ships most. */
+    return '<div id="hub-hidden-foot" style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;'
       + 'font-size:11px;color:var(--t3);">'
       + '<span>Hidden:</span>'
       + rows.map(r => '<span onclick="S.Hub._setCardHidden(\'' + esc(r.key) + '\',false)" '
@@ -2216,10 +2249,26 @@ S.Hub = {
        ([[lessons-paid-for]] #120/#126). `verify-hub-section-cards` parses this selector out of the
        source and the class out of the markup and asserts the two against each other.
        ⚠ ONE OPEN AT A TIME, and clicking the open one closes it. */
+    /* ⛔⛔⛔ THE PAGE JUMPED BACK TO THE TOP ON EVERY TOGGLE, AND ON A PHONE THAT IS THE WHOLE
+       FEATURE (Kyle, 2026-09-04: *"say i am scrolling down and click the floor header to open that
+       card.. it jumps back up to the top of the page and then i have to scroll back down to that
+       section.. super annoying"*). Reproduced at 375px: scrollTop 900 before the click, 0 after,
+       and The Floor's own header moved from y=467 to y=989, off the bottom of the screen.
+       ⛔ AND THE OBVIOUS FIX DOES NOT WORK, WHICH IS WHY THIS IS NOT THREE LINES. Saving `scrollTop`
+       and putting it back is a no-op: `render` rebuilds the shell, so the scroll container after the
+       re-render is a DIFFERENT ELEMENT than the one measured. Measured directly — the node before
+       and the node after are not the same object.
+       ⭐⭐ AND RESTORING THE NUMBER WOULD STILL BE WRONG. Opening a card ABOVE the one you pressed
+       pushes everything below it down, so the same scrollTop lands on different content. What Kyle
+       asked for is that the section he pressed stays put, so that is what is held: measure the
+       head's distance from the top of the viewport, re-render, find the same head by its own
+       `data-sec`, and close the gap. Height changes anywhere above it are absorbed by construction. */
     container.querySelectorAll('.hub-sec-head').forEach(h => h.addEventListener('click', () => {
       const k = h.getAttribute('data-sec');
+      const yBefore = h.getBoundingClientRect().top;
       this._setOpenCard(this._openCard() === k ? '' : k);
       this.render(this._stage || container);
+      this._keepPlace('.hub-sec-head[data-sec="' + k + '"]', yBefore);
     }));
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
