@@ -1628,8 +1628,8 @@ S.InventoryTakeInventory = {
            and starts the next, and a week confirmed early can share a pair with the week before it),
            so a singular "that week" would send the operator to fix one of three. */
         this._setDoneNote('Bar Cop could not check which of your confirmed weeks this count prices. '
-          + 'Open Week History, edit any week this count falls in or beside, and press Refresh from '
-          + 'Control to pull the corrected cost of goods in.');
+          + 'Open Week History, edit any week this count falls in or beside, and press Use '
+          + 'Calculated Numbers to pull the corrected cost of goods in.');
       } else if (updateWeeks) {
         const res = await ConfirmWeek.applyCogsImpact(impacts);
         // Say which weeks did NOT move rather than reporting a clean save over a partial one.
@@ -1639,7 +1639,7 @@ S.InventoryTakeInventory = {
           this._setDoneNote('The count was saved, but the week' + (n > 1 ? 's' : '') + ' ending '
             + (n > 1 ? res.failed.slice(0, -1).join(', ') + ' and ' + res.failed[n - 1] : res.failed[0])
             + ' could not be updated. Open Week History, edit ' + (n > 1 ? 'those weeks' : 'that week')
-            + ' and press Refresh from Control to pull the new figures in.');
+            + ' and press Use Calculated Numbers to pull the new figures in.');
         }
       }
     } else {
