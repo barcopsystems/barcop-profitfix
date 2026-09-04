@@ -931,7 +931,18 @@ async function sendWelcomeEmail(email, barName) {
          sections each week (Inventory, Labor, Shift)" — the per-section cockpits Close the Week
          replaced. Closing a week is ONE page whose rows are lifted and checked by
          `verify-welcome-email` block B, so this sentence cannot drift from the page again. */
-      +     '<p style="margin:0 0 14px;">The loop is one page. Each week you open Close the Week and work down its rows: sales, hours, tips, cash over and short, cost of goods and catering. Drop your POS report on a row, or use the button beside it to enter that piece by hand. Cost of goods comes off your inventory count on its own. Once the week is closed, Profit, Revenue and Cash Recovery show you what it cost you, and your audits put real dollars on your biggest leaks.</p>'
+      /* ⛔ TWO FIXES HERE, AND THE GATE FOUND THE FIRST ONE. `verify-welcome-email` B1 derives the
+         Close the Week rows out of `week-close.js` and demands the email name each — so renaming a
+         row to "Drawer counts" turned it red, which is the pin doing exactly its job.
+         ⛔⛔ THE SECOND WAS SITTING UNDER IT: "Profit, Revenue and Cash RECOVERY" names three
+         sections an operator cannot find. Their navs are marked support-only in `nav.js` and their
+         rail rows went with the Recovery table; the live rail is Inventory, The Week, Run Audit, The
+         Floor, Menus, Events, Books. Profit, Revenue and Cash survive as the names of three AUDITS,
+         which is the same words in a different ROLE and is exactly what no vocabulary sweep can see
+         ([[lessons-paid-for]] #150). It is the first email a paying customer gets.
+         ⚠ The sentence also said "and your audits" straight after naming them, so the repair is
+         shorter than what it replaces rather than longer. */
+      +     '<p style="margin:0 0 14px;">The loop is one page. Each week you open Close the Week and work down its rows: sales, hours, tips, drawer counts, cost of goods and catering. Drop your POS report on a row, or use the button beside it to enter that piece by hand. Cost of goods comes off your inventory count on its own. Once the week is closed, your Profit, Revenue and Cash audits put real dollars on your biggest leaks.</p>'
       /* ⛔ AND THIS ONE SKIPPED PEOPLE. "Add your products, take a count, close a week" leaves out
          the one step a good POS export tempts an operator to skip and which is REQUIRED anyway: an
          hours report only lands for names already on the roster (`PosIngest`: an unmatched name is
@@ -943,7 +954,7 @@ async function sendWelcomeEmail(email, barName) {
          reads, and copy describing a deleted mechanism is FALSE rather than a wording preference
          ([[lessons-paid-for]] #116). Only the false clause moved; the order it teaches is unchanged
          and still matches the cards' own jobs. The replacement wording is Kyle's to veto. */
-      +     '<p style="margin:0 0 18px;"><b>Where to start:</b> open Bar Cop and work down your Hub, section by section. Count your bar first: vendors, products, pars, one count. Then add your people, positions before staff. Registers are optional, only if you reconcile drawers in Bar Cop. Then close your first week. Step one pays off straight away, before any week closes: what is below par, and the cash sitting on your shelves.</p>'
+      +     '<p style="margin:0 0 18px;"><b>Where to start:</b> open Bar Cop and work down your Hub, section by section. Count your bar first: vendors, products, pars, one count. Then add your people, positions before staff. Registers are optional, only if you reconcile drawers in Bar Cop. Then close your first week. Step one pays off straight away, before any week closes: what you still need to order, and what you are holding over par.</p>'
       +     '<div style="margin:0 0 22px;"><a href="' + appUrl + '" style="display:inline-block;background:' + gold + ';color:#14222A;font-weight:800;font-size:14px;text-decoration:none;padding:13px 26px;border-radius:6px;">Open Bar Cop</a></div>'
       +     '<p style="margin:0 0 8px;font-weight:700;color:#14222A;">A few things worth knowing:</p>'
       +     '<ul style="margin:0 0 18px;padding-left:20px;">'
