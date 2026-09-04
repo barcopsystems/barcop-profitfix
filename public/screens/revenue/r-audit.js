@@ -72,14 +72,25 @@ S.RevenueAudit = {
     const cd = this.buildControlData() || {};
     const costedMenu = this._costedMenu();
     return [
-      { label: 'Hours logged in Labor',                done: cd.labor_pct_blended != null || cd.rplh_blended != null, go: 'lc-log-hours' },
-      { label: 'Menu items priced with units sold',        done: costedMenu.length >= 4, go: 'r-menu-items' },
-      { label: 'Server checks logged',                 done: this._windowedServerCount() >= 3, go: 'r-server-check' },
+      /* ⛔⛔ CLOSE THE WEEK, NOT `lc-log-hours` (Kyle's call, 2026-09-04) — that screen has no drop
+         zone, so the old destination pointed away from the file drop this row now names.
+         ⚠ IT FEEDS Labor Efficiency RATHER THAN FINISHING IT, and the difference is measured: that
+         section is labor against sales, so removing EITHER the hours or the sales loses it. The row
+         that finishes it is the sales row below, which is the last of the two an operator does
+         ([[lessons-paid-for]] #177 — a cell belongs to the step that FINISHES it). */
+      { label: 'Drop your timeclock file on Close The Week', done: cd.labor_pct_blended != null || cd.rplh_blended != null, go: 'week-close',
+        note: 'Labor Efficiency is labor against sales, so it needs this and your sales.' },
+      { label: 'Price four menu items and add units sold', done: costedMenu.length >= 4, go: 'r-menu-items',
+        lights: ['Menu Performance'] },
+      { label: 'Drop your POS server report',          done: this._windowedServerCount() >= 3, go: 'r-server-check',
+        lights: ['Server Performance'] },
       /* `ev-bookings`, not the deleted Events dashboard (2026-08-12). This row is a live control an
          operator clicks to go and DO the thing it names, and completing an event happens on the
          bookings pipeline, so the destination is now closer to the work than the dashboard was. */
-      { label: 'Events completed',                     done: this._windowedCompletedEvents().length > 0, go: 'ev-bookings' },
-      { label: 'Confirm the week',                     done: cd.check_average != null, go: 'week-close' }
+      { label: 'Mark a booking complete',              done: this._windowedCompletedEvents().length > 0, go: 'ev-bookings',
+        lights: ['Events and Private Dining'] },
+      { label: 'Enter your bar and food sales for the week', done: cd.check_average != null, go: 'week-close',
+        lights: ['Check Average and Revenue', 'Labor Efficiency'] }
     ];
   },
 
