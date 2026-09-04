@@ -2823,7 +2823,18 @@ const App = {
          would be the exact defect this rule exists for; the row itself says where they do go.
          Pinned by `verify-week-close` block P, which proves every named cell is real and that the
          rows lighting nothing promise nothing. */
-      { h: 'What each row gives you', p: ['Every row on this page turns into something on your Hub, and each one says so before you fill it in. Sales gives you net sales, prime cost, bar pour cost, food cost and labor on The Week card. Hours gives you hours logged and overtime on The Floor. Drawer counts give you over and short. A count gives you cost of goods here, and what is on your shelf and what to reorder on Inventory.', 'Tips are the exception: they do not show on the Hub. They feed Tip Tracking and Labor Reports, which is what that row says. Catering adds an event\'s revenue to the week you are closing rather than lighting a figure of its own.'] },
+      { h: 'What each row gives you', p: ['Every row on this page turns into something, and each one says what before you fill it in. Sales gives you net sales, bar pour cost and food cost. Hours turn those sales into prime cost and labor, which is why hours are not optional: without them a closed week has no prime cost at all. A count gives you cost of goods here, plus what is on your shelf and what to reorder on Inventory. Catering adds an event\'s revenue to the week you are closing.'] },
+      /* ⛔⛔⛔ THIS SECTION EXISTS BECAUSE KYLE ASKED THE QUESTION AND WAS RIGHT TO: *"if they are
+         dropping a tip file from their pos they already have their tip totals.. so what is the point
+         of dropping a file?"* and *"if they have a pos drawer count, wouldn't that already have
+         their over/short.. curious really don't know?"* Three rows on this page take a report the
+         operator already has, and the first version of the copy handed it straight back to them.
+         ⭐ BOTH ANSWERS WERE MEASURED, NOT REMEMBERED. `App.tipMakeupForRows` on the seeded week
+         returns $45.90 owed to one person; the Operations audit's `_recurringPatterns` names people
+         by name across ninety days (*"Recurring cash variance: Jake T., 14 variance events"*), and
+         `_scoreCashIntegrity` scores the variance trend as a share of the cash handled
+         ([[the-loop]] #122 — answer a "why does this exist" question by enumerating what READS it). */
+      { h: 'Why drop a file you already have', p: ['Three of these rows take a report your POS already prints, and the point is never the total. It is what Bar Cop does with it after.', 'Tips decide whether each tipped employee cleared minimum wage once their tips are counted with their wage. Anyone who did not is owed makeup pay before payroll runs, and Pay Periods names them and the amount. Your POS tip report cannot tell you that.', 'Drawer counts are the same shape. Your POS gives you tonight\'s over and short; what it cannot do is look across ninety days, and that is where the Operations audit catches the same person coming up short again and again. One night is a number. The pattern is the finding.'] },
       /* ⛔ THIS SECTION DID NOT EXIST, AND SALES IS THE FIRST ROW ON THE PAGE. The help explained how
          to get HOURS in and said nothing about how to get SALES in beyond one clause in "What the
          week needs" — so the row an operator meets first was the one with no directions. Added with
