@@ -933,7 +933,11 @@ S.ShiftLane = {
       +   '<div class="f" style="flex:0 0 auto;align-self:stretch;">'
       +     '<label aria-hidden="true" style="visibility:hidden;">Save</label>'
       +     '<div style="flex:1;display:flex;align-items:center;">'
-      +       '<button class="btn btn-primary btn-sm wc-saveweek" data-saveweek="1">Save the Week</button>'
+      /* ⚠ "SAVE SALES", NOT "SAVE THE WEEK" (Kyle, 2026-09-04). This button saves the week's SALES;
+         the week is closed by the confirm at the foot of the page, several rows further down. A
+         button promising more than it does is the shape that makes an operator think they are
+         finished. Its sibling on the by-day grid has said "Save Sales" since it shipped. */
+      +       '<button class="btn btn-primary btn-sm wc-saveweek" data-saveweek="1">Save Sales</button>'
       +     '</div>'
       +   '</div>'
       + '</div>';
