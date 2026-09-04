@@ -223,6 +223,43 @@ S.InventoryOrderSheet = {
     if (open.length === 0) return null;
     return open.slice().sort(App.cmpNewest)[0];
   },
+  /* ⭐⭐⭐ ONE DOOR FOR "STILL TO ORDER", AND IT EXISTS BECAUSE THE HUB AND THIS PAGE WERE ANSWERING
+     THE SAME QUESTION WITH DIFFERENT NUMBERS. Measured on the live demo 2026-09-03: the Hub's
+     Below par cell read **$3,409.25 / 82 items** off `belowParByVendor()` while the Order Status
+     card two clicks away read **$1,964.45 / 44 items**, because this screen drops any vendor that
+     already has an order in flight. Both were right about their own question and nothing on either
+     screen said which question it was asking. 82 - 10 - 28 = 44 and $3,409.25 - $997.80 - $447.00
+     = $1,964.45, the two vendors being Glazer's (Open) and Sysco (Submitted) — read out of the
+     code, not inferred from the arithmetic matching ([[the-loop]] #54: the moment a number appears
+     on two screens, the test is the AGREEMENT).
+     ⛔ SO THE SPLIT LIVES HERE, ONCE. The Hub card reads this member and so does the Order Status
+     card below, which means the two cannot drift however either page is edited. Every other reader
+     of `belowParByVendor` is asking the WIDER question (what is below par at all) and is
+     deliberately untouched: Week in Review's Below Par cell, `_stripMetrics`, and the cash engine.
+     Different quantities are allowed to differ; the fix is the LABEL ([[the-loop]] #57).
+     ⚠ `skipVendor` IS A RENDER CONCERN AND STAYS OPTIONAL. This screen pulls a vendor out for
+     editing and draws it as its own card, so its own call passes that name; the Hub has no such
+     state and must not inherit one. A member that read `this._editVendor` itself would carry this
+     screen's render state into every borrower, which is exactly how a borrowed member once took a
+     whole screen to the error boundary ([[lessons-paid-for]] #135).
+     ⚠ NULL WHEN THERE IS NO COUNT, matching `belowParByVendor`: no count is no basis, and a zero
+     here would say "nothing to order" about a shelf nobody has looked at ([[lessons-paid-for]]
+     #158 — a zero meaning "no basis" and a zero meaning "nothing" have opposite fixes). */
+  stillToOrder(opts) {
+    const data = this.belowParByVendor();
+    if (!data) return null;
+    const skip = (opts && opts.skipVendor) || null;
+    const vendors = [], ordered = [];
+    Object.keys(data.groups).sort().forEach(v => {
+      if (v === skip) return;
+      if (this.openOrderForVendor(v)) ordered.push(v); else vendors.push(v);
+    });
+    let items = 0, total = 0;
+    vendors.forEach(v => (data.groups[v] || []).forEach(l => {
+      items++; total += (l.suggested || 0) * (l.unit_cost || 0);
+    }));
+    return { vendors: vendors, ordered: ordered, items: items, total: total, data: data };
+  },
 
   renderMain() {
     this.actions.innerHTML = '';
@@ -246,14 +283,13 @@ S.InventoryOrderSheet = {
     const editOrder = this._editVendor ? this.openOrderForVendor(this._editVendor) : null;
     if (this._editVendor && !editOrder) this._editVendor = null;
 
-    // Split vendors into "needs ordering" vs "already has an open order".
-    const visibleVendors = [];
-    const hiddenVendors  = [];
-    allVendors.forEach(v => {
-      if (v === this._editVendor) return;            // handled as the edit card below
-      if (this.openOrderForVendor(v)) hiddenVendors.push(v);
-      else visibleVendors.push(v);
-    });
+    /* Split vendors into "needs ordering" vs "already has an open order" — through the member, so
+       the headline below and the Hub's Still to order cell cannot answer this differently. The
+       vendor being edited is skipped here and drawn as its own card; that is this screen's layout,
+       not part of the question. */
+    const still = this.stillToOrder({ skipVendor: this._editVendor });
+    const visibleVendors = still.vendors;
+    const hiddenVendors  = still.ordered;
 
     const editHtml = editOrder
       ? '<div class="sh" style="margin:24px 0 10px;">Editing Order</div>' + this.editVendorCardHTML(editOrder)
@@ -268,7 +304,7 @@ S.InventoryOrderSheet = {
         + ' count are below their par level. Nothing to order.</div></div>'
         + this.customToggleRow(data.latest) + '</div>';
     } else {
-      statusHtml = this.statusCardHTML(visibleVendors, hiddenVendors, data);
+      statusHtml = this.statusCardHTML(visibleVendors, hiddenVendors, data, still);
       // Just-received lines ride INSIDE their vendor's card when that vendor already has one, so a
       // vendor never renders twice with two Create Order buttons. Only vendors with nothing below
       // par get their own strip card below.
@@ -359,11 +395,15 @@ S.InventoryOrderSheet = {
   },
 
   // ── Combined Order Status card (still to order + already ordered + age) ──────
-  statusCardHTML(visibleVendors, hiddenVendors, data) {
-    let stillCount = 0, stillTotal = 0, underMin = 0;
-    visibleVendors.forEach(v => (data.groups[v] || []).forEach(l => {
-      stillCount++; stillTotal += (l.suggested || 0) * (l.unit_cost || 0);
-    }));
+  /* ⚠ THE TWO NUMBERS COME IN, THEY ARE NOT RE-SUMMED. This member had its own loop over the same
+     vendors, which agreed with `stillToOrder` by construction today and would have stopped agreeing
+     the first time either changed — the shape this codebase pays for over and over
+     ([[lessons-paid-for]] #87: grep for everything that computes the same number by hand, not just
+     for everything that reads yours). `underMin` below is a DIFFERENT question (does each vendor
+     clear its own minimum) and keeps its own pass. */
+  statusCardHTML(visibleVendors, hiddenVendors, data, still) {
+    const stillCount = still.items, stillTotal = still.total;
+    let underMin = 0;
     // How many suggested orders fall under their vendor's minimum right now.
     visibleVendors.forEach(v => {
       const info = this._vendorInfo(v);
