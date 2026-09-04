@@ -353,7 +353,7 @@ const ConfirmWeek = {
     if (!edited) { apply(); return; }
     App.confirm({
       title: 'Use the calculated numbers?',
-      message: 'This replaces the numbers you manually entered with the latest calculated numbers from your Control data.',
+      message: 'This replaces the numbers you manually entered with the latest numbers Bar Cop calculated from your counts, hours and sales.',
       confirmText: 'Use Calculated Numbers',
       cancelText: 'Keep My Numbers',
       /* ⛔ THE RENAME PUSHED THE BUTTON ROW ONTO TWO LINES, AND THE FIX BELONGS AT THIS CALL. The
