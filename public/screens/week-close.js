@@ -320,31 +320,68 @@ S.WeekClose = {
            `sc_shifts` rows — which is right for a file or the daily grid and WRONG the moment a
            week can arrive as one row, where it would read "1 day in" about a full week. The count
            was never the fact the operator wanted; the week's takings is. */
-        lights: ['Net sales', 'Prime cost', 'Bar pour cost', 'Food cost', 'Labor'],
+        /* ⛔⛔ THIS ROW OVER-CLAIMED BY TWO AND ONLY RUNNING IT SAID SO. It named prime cost and
+           labor, and neither exists on sales alone: MEASURED by closing a week with sales and no
+           hours, The Week card comes back with Net sales, Bar pour cost, Food cost and Cost of goods
+           as figures while Prime cost and Labor stay a JOB. They belong to the row that finishes
+           them ([[lessons-paid-for]] #64 — the promise is what this step is the LAST unmet gate for,
+           not everything it touches).
+           ⭐ AND SPLITTING THEM IS THE CONNECTION KYLE ASKED FOR, not a smaller claim: sales gives
+           the sales numbers, hours turn them into the cost percentages. Read down the page the two
+           rows now say that out loud. */
+        lights: ['Net sales', 'Bar pour cost', 'Food cost'],
         note: st.sales.length ? money(st.salesTotal) + ' in'
-          : this._promise('Enter your sales to get', ['Net sales', 'Prime cost', 'Bar pour cost', 'Food cost', 'Labor']) },
+          : this._promise('Enter your sales to get', ['Net sales', 'Bar pour cost', 'Food cost']) },
       /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
          week's hours are, so it is where the file goes in; a door whose answer appears on a
          different page is a signpost, not a door. `lane` is the key the host names a zone for. */
       { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', goLabel: 'Log Hours', lane: 'hours',
-        lights: ['Hours logged', 'Overtime'],
+        /* ⛔⛔⛔ THE FIRST VERSION OF THIS WAS CIRCULAR AND KYLE CAUGHT IT: *"they log hours to get
+           hours logged? why would they drop an hours file from their pos to get hours logged.. they
+           would already have hours logged."* He is right. Naming the cell the data lands in tells an
+           operator nothing about why they would bother; the payoff is what Bar Cop TURNS the hours
+           INTO ([[the-loop]] #122 — answer a "why does this exist" question by enumerating what
+           READS it).
+           ⭐ MEASURED ON THE LIVE DEMO, and it is also the answer to his second question, why this
+           row is required at all: `S.ThisWeek.laborCost` for the week ending 2026-08-30 returns
+           $2,088 bar + $2,526 food WITH the hours and $0 bar + $1,308 food WITHOUT them, because
+           only salaried pay survives. Labor cost is what prime cost is built from, so a week closed
+           with no hours carries a prime cost that is wrong rather than absent. That is why it is not
+           optional, and the note now says so instead of leaving it to be guessed. */
+        lights: ['Prime cost', 'Labor', 'Overtime'],
         note: st.hours.length ? st.hoursTotal.toFixed(1) + ' hours across ' + st.hours.length + ' row' + (st.hours.length === 1 ? '' : 's')
-          : this._promise('Log your hours to get', ['Hours logged', 'Overtime']) },
+          : 'Log your hours to turn those sales into prime cost and labor, plus overtime' },
       { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', goLabel: 'Tip Tracking', optional: true, lane: 'tips',
-        /* ⚠ NO `lights`, AND THAT IS THE MEASUREMENT TALKING. Emptying `lc_tips` changes nothing on
-           any of the seven Hub cards. `lc-tip-log` and `lc-reports` are what read it, so those are
-           what the row names — a promise about a cell that does not exist is the defect
-           [[lessons-paid-for]] #64 is about, and it would have been easy to write. */
+        /* ⛔⛔ NO `lights`: emptying `lc_tips` changes nothing on any of the seven Hub cards. But the
+           first version then named the screens the figure lands ON, which Kyle read as just as
+           circular: *"if they are dropping a tip file from their pos they already have their tip
+           totals.. so what is the point of dropping a file?"*
+           ⭐ THE POINT IS MEASURED AND IT IS MONEY THE POS REPORT CANNOT TELL THEM. Tips plus the
+           cash wage decide whether a tipped employee cleared minimum wage, and the shortfall is
+           makeup pay the business owes. Run on the seed, `App.tipMakeupForRows` returns **$45.90**
+           owed to one person for a single week. Pay Periods already says it in the app's own plain
+           words (*"N tipped employees fell below state minimum wage this week, $X owed in makeup pay
+           before payroll runs"*), so this reuses that sentence rather than inventing a third
+           spelling ([[lessons-paid-for]] #148's neighbour).
+           ⚠ IT SAYS WHAT BAR COP CATCHES, NOT WHAT THE OPERATOR MUST PAY. Bar Cop is not payroll or
+           legal software and does not tell anybody what they owe in law ([[payroll-legal-posture]]). */
         note: st.tips.length ? money(st.tipsTotal) + ' logged'
-          : 'Log your tips to get tip totals in Tip Tracking and Labor Reports' },
+          : 'Log your tips so Bar Cop can catch a tipped employee below minimum wage, and the makeup pay owed' },
       /* ⛔ "DRAWER COUNTS", NOT "CASH OVER AND SHORT" (Kyle, 2026-09-04). The old label named the
          OUTPUT and the old note named the harder of two doors: over and short is what you GET, and a
          dropped file writes the same `sc_variances` rows a hand count does ([[two-doors-same-data]]).
          Named that way the row read as a chore only typing could finish. */
       { key: 'cash', label: 'Drawer counts', ready: st.cash.length > 0, go: 'sc-cash-control', goLabel: 'Cash Control', optional: true, lane: 'cash',
         lights: ['Over and short'],
+        /* ⭐ KYLE ASKED THE HONEST VERSION OF THIS ONE: *"if they have a pos drawer count, wouldn't
+           that already have their over/short.. curious really don't know?"* It does, for that night.
+           What it cannot do is look across ninety days, and that is the payoff: measured on the seed,
+           the Operations audit's `_recurringPatterns` names people — *"Recurring cash variance:
+           Jake T., 14 variance events in last 90 days"* — and `_scoreCashIntegrity` scores the
+           variance trend as a share of the cash handled. One night is a number; the pattern is the
+           finding. */
         note: st.cash.length ? st.cash.length + ' drawer' + (st.cash.length === 1 ? '' : 's') + ' in'
-          : this._promise('Drop a drawer file or count one to get', ['Over and short']) },
+          : 'Drop a drawer file or count one to get over and short, and let the audit catch who is short again and again' },
       { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', goLabel: 'Take Inventory', derived: true,
         lights: ['Cost of goods', 'On the shelf', 'Still to order'],
         note: cogsNote },
