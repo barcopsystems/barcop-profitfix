@@ -176,7 +176,13 @@ S.LaborBuildSchedule = {
       this.editId = posted.id;
       this.draft = {
         week_start: posted.week_start || wk,
-        shifts: (posted.shifts || []).map(sh => ({ staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end, event: sh.event || '' })),
+        /* ⛔⛔ `position_id` USED TO BE DROPPED HERE, AND IT IS A COST DEFECT, NOT A DISPLAY ONE
+           (found 2026-09-04 while grouping shifts by role). `save` writes it, the grid reads it for
+           the role tag, and `wageForStaffPosition` PRICES from it — so re-opening a posted week
+           silently re-costed a cross-trained bartender's floor shift at her bartender rate, which
+           is the exact variance the role picker was added to stop. A field a save writes and a
+           reload discards is invisible until somebody compares two costs for one week. */
+        shifts: (posted.shifts || []).map(sh => ({ staff_id: sh.staff_id, day: sh.day, start: sh.start, end: sh.end, event: sh.event || '', position_id: sh.position_id || '' })),
         notes: posted.notes || ''
       };
     } else {
@@ -370,6 +376,81 @@ S.LaborBuildSchedule = {
     const out = [];
     this.draft.shifts.forEach((sh, i) => { if (sh.staff_id === staffId && sh.day === day) out.push({ sh, i }); });
     return out;
+  },
+
+  /* ═══ THE SHIFT MODAL'S MODEL: ONE PERSON'S WEEK AS BLOCKS OF TIME ═══════════════════════════
+     Kyle, 2026-09-04: *"the time modal has '+ Add Another Shift Time'... so a user can easily add a
+     double shift on the same day in one click.. but also different shift times on different days on
+     the same screen.. then if a shift is opened to edit that has different shift times on different
+     days.. it is all on that box with the day pills selected for each shift time."*
+     ⭐⭐⭐ THE MONEY IS HERE AND IT IS DELIBERATELY DOM-FREE. Three pure members — group, plan,
+     summarise — so the reconcile can be pinned by running it, not by rendering it. Every defect this
+     feature can have is a wrong SET of shifts, and a harness cannot click ([[the-loop]] #8).
+     ⛔ AND THE SUMMARY READS THE SAME PLAN THE SAVE WRITES. The "removes 1" line an operator reads
+     before pressing must be produced by the function that does the work, or the sentence and the
+     write drift and the screen lies about what it is about to do ([[the-loop]] #54). */
+
+  // The key that decides "these two shifts are the same kind of shift" and therefore share a block.
+  // Role is IN it: the same hours worked in a different role is a different shift, priced differently.
+  _blockKey(sh) { return [sh.start || '', sh.end || '', sh.position_id || ''].join('|'); },
+
+  /* One person's draft shifts folded into blocks, in the order the week reads. Every shift lands in
+     exactly one block, so the modal shows the whole week and nothing of theirs is off-screen. */
+  _blocksFor(staffId) {
+    const byKey = {}, order = [];
+    this.DAYS.forEach(day => {
+      this.shiftsFor(staffId, day).forEach(({ sh }) => {
+        const k = this._blockKey(sh);
+        if (!byKey[k]) { byKey[k] = { start: sh.start || '', end: sh.end || '', position_id: sh.position_id || '', days: [], events: {} }; order.push(k); }
+        if (byKey[k].days.indexOf(day) < 0) byKey[k].days.push(day);
+        if (sh.event) byKey[k].events[day] = sh.event;
+      });
+    });
+    return order.map(k => byKey[k]);
+  },
+
+  /* What the blocks describe, as shift records. Returns errors rather than dropping a block: a block
+     carrying a time and no days is a half-finished thought, and silently ignoring it is how an
+     operator presses Save, sees nothing appear, and cannot tell why ([[the-loop]] #53 — a refusal
+     must say why). An untouched empty block is not an error; it is just empty. */
+  _planShifts(staffId, blocks) {
+    const shifts = [], errors = [];
+    (blocks || []).forEach(b => {
+      const days = (b.days || []).filter(d => this.DAYS.indexOf(d) >= 0);
+      const timed = !!(b.start && b.end);
+      if (!timed && !days.length) return;
+      if (!timed) { errors.push('Set a start and end time for every shift.'); return; }
+      if (!days.length) { errors.push('Pick at least one day for the ' + this._fmtTime(b.start) + ' shift.'); return; }
+      days.forEach(day => shifts.push({
+        staff_id: staffId, day: day, start: b.start, end: b.end,
+        event: (b.events && b.events[day]) || '', position_id: b.position_id || ''
+      }));
+    });
+    return { shifts: shifts, errors: errors };
+  },
+
+  /* What pressing Save will actually do, counted against what is already there. This is the sentence
+     the operator reads, and it exists because unticking a day REMOVES that day's shift — the one
+     thing about this modal that is destructive, so it may never be silent. */
+  _planSummary(staffId, planned) {
+    const key = s => [s.day, s.start, s.end, s.position_id || ''].join('|');
+    const tally = arr => arr.reduce((m, s) => { const k = key(s); m[k] = (m[k] || 0) + 1; return m; }, {});
+    const before = tally((this.draft.shifts || []).filter(s => s.staff_id === staffId));
+    const after = tally(planned || []);
+    let added = 0, removed = 0, kept = 0;
+    Object.keys(after).forEach(k => { const b = before[k] || 0; kept += Math.min(b, after[k]); added += Math.max(0, after[k] - b); });
+    Object.keys(before).forEach(k => { const a = after[k] || 0; removed += Math.max(0, before[k] - a); });
+    return { added: added, removed: removed, kept: kept, total: (planned || []).length };
+  },
+
+  /* ⛔ ONE STAFF MEMBER ONLY. The modal owns this person's week and nothing else, so the rebuild
+     drops their rows and re-adds the planned ones while every other row is carried across
+     untouched. A reconcile that rebuilt the whole array would put one person's edit in a position to
+     lose somebody else's shift, which no assertion about counts would notice. */
+  _applyPlan(staffId, planned) {
+    const others = (this.draft.shifts || []).filter(s => s.staff_id !== staffId);
+    this.draft.shifts = others.concat(planned || []);
+    return this.draft.shifts;
   },
 
   // ONE box for every scheduling issue in the current draft: overtime, overlapping
@@ -848,90 +929,209 @@ S.LaborBuildSchedule = {
   },
 
   // ── Shift add/edit modal (standard App.openModal + form-card) ───────────────
+  /* ═══ THE SHIFT MODAL — ONE PERSON'S WEEK, NOT ONE DAY ═════════════════════════════════════
+     Kyle, 2026-09-04: *"the time modal has '+ Add Another Shift Time'... so a user can easily add a
+     double shift on the same day in one click.. but also different shift times on different days on
+     the same screen.. then if a shift is opened to edit that has different shift times on different
+     days.. it is all on that box with the day pills selected for each shift time.. the only thing
+     that is unclickable is the same days off/time off."*
+     ⭐⭐⭐ THE DESIGN THAT REMOVED A RULE RATHER THAN ADDING ONE. An earlier draft made a day
+     carrying a DIFFERENT shift time unclickable, purely to stop a hidden overwrite. Once every one
+     of the person's shift times is on screen as its own block there is nothing hidden, so that rule
+     went and every day is clickable except a real day off.
+     ⛔⛔ THE ONE DESTRUCTIVE THING IT CAN DO IS UNTICK, and it may never be quiet about it: the net
+     line above the button counts what will be added and REMOVED, read from the same plan the save
+     writes, so the sentence cannot drift from the write ([[the-loop]] #54).
+     ⚠ AN OFF DAY THAT ALREADY CARRIES A SHIFT STAYS CLICKABLE. You may not ADD to a day off here,
+     but a shift already sitting on one has to be removable or the operator is stuck with a mistake
+     the single-day path let them make ([[lessons-paid-for]] #106 — a control that tells you to
+     ignore it cannot be the safety net).
+     ⚠ STATE LIVES ON THE SCREEN OBJECT, and the body is re-rendered whole on every structural
+     change. Anything captured before that repaint is a detached node ([[lessons-paid-for]] #178). */
   openShiftModal(staffId, day, idx) {
     const staff = this.staffById(staffId);
     if (!staff) return;
-    const editing = idx != null && this.draft.shifts[idx];
-    const sh = editing ? this.draft.shifts[idx] : { staff_id: staffId, day, start: '', end: '', event: '' };
-    const sal = App.isSalaried(staff);
-    // Event tagging: only when a confirmed booking falls on this day. Checking it
-    // sends this person's hours to that event's P&L (and nobody else's).
-    const evs = this.bookingsOnDate(this.dayIso(this.draft.week_start, this.DAYS.indexOf(day)));
-    let eventField = '';
-    if (evs.length === 1) {
-      eventField = '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--t1);margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);">'
-        + '<input type="checkbox" class="bc-check" id="bs-m-event" data-eid="' + esc(evs[0].id) + '"' + (sh.event === evs[0].id ? ' checked' : '') + '/> Working ' + esc(this.bookingName(evs[0])) + '</label>';
-    } else if (evs.length > 1) {
-      eventField = '<div class="f" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--b2);"><label>Working an Event?</label><select id="bs-m-event-sel"><option value="">No</option>'
-        + evs.map(e => '<option value="' + esc(e.id) + '"' + (sh.event === e.id ? ' selected' : '') + '>' + esc(this.bookingName(e)) + '</option>').join('') + '</select></div>';
+    this._mStaff = staffId;
+    this._mBlocks = this._blocksFor(staffId);
+    /* Clicking an EMPTY cell opens a fresh block with that day already ticked, so the one-day path
+       an operator has always used still takes the same number of presses. Clicking a day that
+       already has a shift opens the week as it stands, that shift's block among them. */
+    /* ⚠ A NEW BLOCK CARRIES THE PRIMARY ROLE, not a blank. The old save stamped
+       `staff.position_id` whenever there was no picker, and its comment says why: an absent role
+       means the primary, and a blank would cost the shift at $0 for single-role staff. */
+    if (!this.shiftsFor(staffId, day).length) {
+      this._mBlocks.push({ start: '', end: '', position_id: staff.position_id || '', days: [day], events: {} });
     }
-    const offReason = this.offReasonFor(staffId, day);
-    const offBanner = offReason
-      ? '<div style="border:1px solid var(--red);border-radius:6px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--red);font-weight:600;">' + esc(offReason) + '. Scheduling a shift here will flag it.</div>'
-      : '';
-    /* ⭐ THE ROLE PICKER, and only for someone who actually has a second role. A cross-trained
-       bartender covering the floor is scheduled AS a server here, so the shift is costed at her
-       server rate and Schedule History stops showing a variance she did not cause. Single-role
-       staff see nothing new — the same rule Log Hours uses to decide whether to show its own
-       Role picker, so a role offered here is always one Log Hours will accept. */
-    const roleField = (!sal && this._hasSecondary(staffId))
-      ? '<div class="f" style="margin-bottom:14px;"><label>Role</label><select id="bs-m-role">'
-          + this.roleOptionsFor(staffId, sh.position_id) + '</select></div>'
-      : '';
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">' + esc(staff.name || 'Staff') + ' &middot; ' + esc(day) + '</div>'
-      + offBanner
-      + roleField
-      + '<div class="form-row" style="margin-bottom:14px;">'
-      + this._timeSelectFields('bs-m-start', sh.start, 'Start')
+    App.openModal('<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title">' + esc(staff.name || 'Staff') + '</div>'
+      + '<div id="bs-m-body"></div></div>',
+      { id: 'bs-shift-modal', maxWidth: 520, confirmDirty: true });
+    this._renderShiftModal();
+  },
+
+  _renderShiftModal() {
+    const host = document.getElementById('bs-m-body');
+    if (!host) return;
+    host.innerHTML = this._shiftModalHTML(this._mStaff);
+    this._wireShiftModal();
+  },
+
+  // The event rows for ONE block, one per selected day that has a booking. An event belongs to a
+  // DAY, so a block spanning Mon and Fri with a booking on Fri names Fri and says nothing about Mon.
+  _eventRowsFor(staffId, bi, b) {
+    return (b.days || []).map(d => {
+      const evs = this.bookingsOnDate(this.dayIso(this.draft.week_start, this.DAYS.indexOf(d)));
+      if (!evs.length) return '';
+      const cur = (b.events && b.events[d]) || '';
+      if (evs.length === 1) {
+        return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--t1);margin-top:8px;">'
+          + '<input type="checkbox" class="bc-check bs-m-ev" data-b="' + bi + '" data-day="' + esc(d) + '" data-eid="' + esc(evs[0].id) + '"'
+          + (cur === evs[0].id ? ' checked' : '') + '/> Working ' + esc(this.bookingName(evs[0])) + ' (' + esc(d) + ')</label>';
+      }
+      /* More than one booking on that day keeps the picker this screen already used, rather than
+         inventing a third shape for the same question ([[the-loop]] #95 — the existing callers are
+         the spec). */
+      return '<div class="f" style="margin-top:8px;"><label>Working an event on ' + esc(d) + '?</label>'
+        + '<select class="bs-m-evsel" data-b="' + bi + '" data-day="' + esc(d) + '"><option value="">No</option>'
+        + evs.map(e => '<option value="' + esc(e.id) + '"' + (cur === e.id ? ' selected' : '') + '>' + esc(this.bookingName(e)) + '</option>').join('')
+        + '</select></div>';
+    }).join('');
+  },
+
+  _shiftModalHTML(staffId) {
+    const staff = this.staffById(staffId);
+    if (!staff) return '';
+    const sal = App.isSalaried(staff);
+    const roleable = !sal && this._hasSecondary(staffId);
+    const blocks = this._mBlocks || [];
+
+    const body = blocks.map((b, i) => {
+      const role = roleable
+        ? '<div class="f" style="margin-bottom:12px;"><label>Role</label>'
+          + '<select class="bs-m-role" data-b="' + i + '">' + this.roleOptionsFor(staffId, b.position_id) + '</select></div>'
+        : '';
+      let calc = '';
+      if (b.start && b.end) {
+        const hrs = this.hoursOf(b.start, b.end);
+        if (sal) calc = hrs.toFixed(1) + ' hrs &middot; salaried (no hourly cost)';
+        else {
+          const wage = App.wageForStaffPosition(staff, b.position_id || staff.position_id || '', this.draft.week_start);
+          const per = hrs * wage;
+          const n = (b.days || []).length;
+          /* The WEEK total when the block covers more than one day, because that is the number the
+             operator is actually about to commit and the per-day figure alone understates it. */
+          calc = hrs.toFixed(1) + ' hrs &middot; ' + App.fmtCurrency(per) + (wage ? ' @ ' + App.fmtCurrency(wage) + '/hr' : '')
+            + (n > 1 ? ' &middot; ' + App.fmtCurrency(per * n) + ' across ' + n + ' days' : '');
+        }
+      }
+      const pills = this.DAYS.map(d => {
+        const off = this.offReasonFor(staffId, d);
+        const on = (b.days || []).indexOf(d) >= 0;
+        const locked = !!off && !on;
+        return '<button type="button" class="bs-m-day btn btn-sm" data-b="' + i + '" data-day="' + esc(d) + '"'
+          + (locked ? ' disabled title="' + esc(off) + '"' : (off ? ' title="' + esc(off) + '"' : ''))
+          + ' style="' + (locked ? 'background:transparent;border:1px solid var(--b2);color:var(--t4);opacity:0.45;cursor:not-allowed;'
+              : on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
+                   : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(d) + '</button>';
+      }).join('');
+      const drop = blocks.length > 1
+        ? '<button type="button" class="bs-m-drop" data-b="' + i + '" style="background:none;border:0;padding:0;color:var(--t3);font-size:11px;cursor:pointer;">Remove this shift time</button>'
+        : '';
+      return '<div class="bs-m-block" style="padding:14px 0;' + (i < blocks.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
+        + role
+        + '<div class="form-row" style="margin-bottom:12px;">' + this._timeSelectFields('bs-m-start-' + i, b.start, 'Start') + '</div>'
+        + '<div class="form-row" style="margin-bottom:0;">' + this._timeSelectFields('bs-m-end-' + i, b.end, 'End') + '</div>'
+        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;min-height:14px;">' + calc + '</div>'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:12px 0 7px;">Days</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + pills + '</div>'
+        + this._eventRowsFor(staffId, i, b)
+        + (drop ? '<div style="margin-top:10px;">' + drop + '</div>' : '')
+        + '</div>';
+    }).join('');
+
+    const plan = this._planShifts(staffId, blocks);
+    const sum = this._planSummary(staffId, plan.shifts);
+    /* ⛔ THE REMOVAL IS NAMED AND IT IS RED. Everything else about this modal is additive; unticking
+       is the one thing that destroys work, so it is the one thing the sentence leads with when it
+       happens ([[output-honesty]] — the operator sees what is about to be true). */
+    const bits = [];
+    if (sum.added) bits.push(sum.added + ' to add');
+    if (sum.removed) bits.push('<span style="color:var(--red);font-weight:700;">' + sum.removed + ' to remove</span>');
+    const net = bits.length ? bits.join(', ') + '.' : (sum.total ? 'No changes.' : 'No shifts set.');
+    const label = plan.shifts.length === 1 ? 'Save Shift' : 'Save ' + plan.shifts.length + ' Shifts';
+
+    return body
+      + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
+      +   '<button type="button" id="bs-m-add" style="background:none;border:0;padding:0;color:var(--gold);font-weight:700;font-size:12px;cursor:pointer;">+ Add Another Shift Time</button>'
       + '</div>'
-      + '<div class="form-row" style="margin-bottom:0;">'
-      + this._timeSelectFields('bs-m-end', sh.end, 'End')
-      + '</div>'
-      + '<div id="bs-m-calc" style="font-size:11px;color:var(--t3);margin-top:14px;min-height:14px;"></div>'
-      + eventField
+      + '<div id="bs-m-net" style="font-size:12px;color:var(--t2);margin-top:14px;">' + net + '</div>'
       + '<div class="card-actions">'
-      + '<button class="btn btn-primary" id="bs-m-save">Save Shift</button>'
-      + '<span id="bs-m-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + (editing ? '<button class="btn btn-danger" id="bs-m-remove" style="margin-left:auto;">Remove</button>' : '')
-      + '</div></div>';
-    App.openModal(html, { id: 'bs-shift-modal', maxWidth: 460, confirmDirty: true });
-    const calcEl = document.getElementById('bs-m-calc');
+      +   '<button class="btn btn-primary" id="bs-m-save">' + esc(label) + '</button>'
+      +   '<span id="bs-m-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
+      + '</div>';
+  },
+
+  /* Read the DOM back into the blocks before any structural change, or a time typed just before
+     pressing a pill is lost when the body re-renders. */
+  _readModalBlocks() {
+    const staff = this.staffById(this._mStaff) || {};
+    (this._mBlocks || []).forEach((b, i) => {
+      b.start = this._readTime('bs-m-start-' + i) || '';
+      b.end = this._readTime('bs-m-end-' + i) || '';
+      const r = document.querySelector('.bs-m-role[data-b="' + i + '"]');
+      // `|| staff.position_id` is the old save's rule verbatim: an empty picker means the primary.
+      if (r) b.position_id = r.value || staff.position_id || '';
+      b.events = b.events || {};
+      document.querySelectorAll('.bs-m-ev[data-b="' + i + '"]').forEach(cb => {
+        if (cb.checked) b.events[cb.dataset.day] = cb.dataset.eid; else delete b.events[cb.dataset.day];
+      });
+      document.querySelectorAll('.bs-m-evsel[data-b="' + i + '"]').forEach(sel => {
+        if (sel.value) b.events[sel.dataset.day] = sel.value; else delete b.events[sel.dataset.day];
+      });
+      /* An event only survives while its day is still selected — a booking tagged on Friday must not
+         ride along after Friday is unticked ([[lessons-paid-for]] #15 — a companion field is cleared
+         by whoever clears its principal). */
+      Object.keys(b.events).forEach(d => { if ((b.days || []).indexOf(d) < 0) delete b.events[d]; });
+    });
+  },
+
+  _wireShiftModal() {
+    const staffId = this._mStaff;
     const errEl = document.getElementById('bs-m-err');
-    const updateCalc = () => {
-      const start = this._readTime('bs-m-start'), end = this._readTime('bs-m-end');
-      if (!start || !end) { calcEl.textContent = ''; return; }
-      const h = this.hoursOf(start, end);
-      if (sal) { calcEl.textContent = h.toFixed(1) + ' hrs · salaried (no hourly cost)'; return; }
-      /* Price the ROLE that is currently picked, not the person's primary — otherwise the
-         operator changes Role, watches the figure sit still, and saves a shift that costs
-         something other than what the pop-up told them. The `change` listener below is bound
-         to every select in the modal, so the picker re-runs this for free. */
-      const roleEl = document.getElementById('bs-m-role');
-      const posId = roleEl ? (roleEl.value || staff.position_id || '') : (sh.position_id || staff.position_id || '');
-      const wage = App.wageForStaffPosition(staff, posId, this.draft.week_start);
-      calcEl.textContent = h.toFixed(1) + ' hrs · ' + App.fmtCurrency(h * wage) + (wage ? ' @ ' + App.fmtCurrency(wage) + '/hr' : '');
-    };
-    updateCalc();
-    document.querySelectorAll('#bs-shift-modal select').forEach(el => el.addEventListener('change', updateCalc));
-    document.getElementById('bs-m-remove')?.addEventListener('click', () => {
-      if (editing) { this.draft.shifts.splice(idx, 1); this.saveDraft(); }
-      App.closeModal('bs-shift-modal'); this.draw();
+    const redraw = () => { this._readModalBlocks(); this._renderShiftModal(); };
+
+    document.querySelectorAll('#bs-m-body select').forEach(el => el.addEventListener('change', redraw));
+    document.querySelectorAll('#bs-m-body .bs-m-day').forEach(el => el.addEventListener('click', () => {
+      this._readModalBlocks();
+      const b = this._mBlocks[Number(el.dataset.b)];
+      if (!b) return;
+      const d = el.dataset.day;
+      const at = (b.days || []).indexOf(d);
+      if (at >= 0) b.days.splice(at, 1); else b.days.push(d);
+      b.days.sort((x, y) => this.DAYS.indexOf(x) - this.DAYS.indexOf(y));
+      this._renderShiftModal();
+    }));
+    document.querySelectorAll('#bs-m-body .bs-m-drop').forEach(el => el.addEventListener('click', () => {
+      this._readModalBlocks();
+      this._mBlocks.splice(Number(el.dataset.b), 1);
+      this._renderShiftModal();
+    }));
+    document.getElementById('bs-m-add')?.addEventListener('click', () => {
+      this._readModalBlocks();
+      this._mBlocks.push({ start: '', end: '', position_id: '', days: [], events: {} });
+      this._renderShiftModal();
     });
     document.getElementById('bs-m-save')?.addEventListener('click', () => {
-      const start = this._readTime('bs-m-start'), end = this._readTime('bs-m-end');
-      if (!start || !end) { errEl.textContent = 'Set a start and end time.'; errEl.style.display = 'inline'; return; }
-      let event = sh.event || '';
-      const cb = document.getElementById('bs-m-event'), sel = document.getElementById('bs-m-event-sel');
-      if (cb) event = cb.checked ? cb.dataset.eid : '';
-      else if (sel) event = sel.value || '';
-      /* The role the shift is worked in. Absent picker (single-role staff, or salaried) means
-         the primary, which is what every shift written before this field existed also means —
-         so an old draft reads identically rather than costing at $0. */
-      const roleEl = document.getElementById('bs-m-role');
-      const position_id = roleEl ? (roleEl.value || staff.position_id || '') : (sh.position_id || staff.position_id || '');
-      if (editing) { this.draft.shifts[idx] = { staff_id: staffId, day, start, end, event, position_id }; }
-      else { this.draft.shifts.push({ staff_id: staffId, day, start, end, event, position_id }); }
-      this.saveDraft(); App.closeModal('bs-shift-modal'); this.draw();
+      this._readModalBlocks();
+      const plan = this._planShifts(staffId, this._mBlocks);
+      if (plan.errors.length) {
+        if (errEl) { errEl.textContent = plan.errors[0]; errEl.style.display = 'inline'; }
+        return;
+      }
+      this._applyPlan(staffId, plan.shifts);
+      this.saveDraft();
+      App.closeModal('bs-shift-modal');
+      this.draw();
     });
   },
 
@@ -1078,13 +1278,13 @@ S.LaborBuildSchedule = {
     App.showHelpModal('How Build Schedule Works', [
       { p: ['Build Schedule is a weekly grid: your staff down the left, the seven days across the top. You fill it in by clicking, and Bar Cop costs it out live as you go.'] },
       { h: 'Picking the Week', p: ['Build Schedule opens on the current week. Use the week chips and the arrows above the grid to move between weeks, or This Week to snap back. A week you have already posted opens ready to edit; an empty week is ready to build. Worksheet prints a blank staff-by-day grid to pencil in before you enter it here.'] },
-      { h: 'Adding and Editing Shifts', p: ['Click any empty day cell to add a shift for that person, then set a start and end time. Click an existing shift block to change its time or remove it. If you double-book someone on the same day, the block turns red so you can fix it.'] },
-      { h: 'Days Off', p: ['A cell reads Off when that person requested the day off (logged on Time Off and approved) or has it as a regular day off (set on their Staff Roster profile). Drop a shift on an Off day and the block turns red; you also get a warning before the schedule posts, so you never accidentally schedule someone you already gave the day off. You can still override and post it.'] },
+      { h: 'Adding and Editing Shifts', p: ['Click any day cell to open that person\'s week. Set a start and end time, then tap a day chip for every day they work that shift and save once. Three days on the same shift is one trip, not three.', 'For a second shift time, or a double on the same day, use Add Another Shift Time and fill in the next block. Opening a shift shows every shift time that person already has with their days already ticked, so moving a start time by an hour moves all of them together.', 'Unticking a day removes that day\'s shift. The line above the button says what is about to be added and what is about to be removed, so you see it before you press. If you double-book someone on the same day, the block turns red so you can fix it.'] },
+      { h: 'Days Off', p: ['A cell reads Off when that person requested the day off (logged on Time Off and approved) or has it as a regular day off (set on their Staff Roster profile). Drop a shift on an Off day and the block turns red; you also get a warning before the schedule posts, so you never accidentally schedule someone you already gave the day off. You can still override and post it.', 'In the shift pop-up the day chips for those days are greyed out, so you cannot put someone on one by accident while filling in the rest of the week. To do it on purpose, click that Off cell in the grid and the day comes up ready to save.'] },
       { h: 'The Labor Budget', p: ['Bar Cop projects the week\'s revenue automatically from your recent weeks and any events booked, and turns it into a labor budget (your target percent of the forecast). It shows the Target Hours that forecast can support at your RPLH target, and live what you have scheduled and how much budget is left, green when you are under and red when you are over. Tap Edit on the forecast to set your own number for a week the projection cannot see, like a holiday, then Use Bar Cop\'s Number to hand it back. No sales history yet? Type a number to get a budget; Bar Cop takes over once you have a few weeks logged.'] },
       { h: 'Scheduling Warnings', p: ['As you build, one warnings box under the grid gathers anything to look at before you post: anyone in or near overtime (hours over 40 pay at time and a half), anyone double-booked with overlapping shifts, and anyone scheduled on a requested or regular day off. Each is its own labelled note. Fix an issue and it drops out of the box; when there is nothing to flag, the box does not show at all. You can always post as is and override a warning on purpose. Salaried staff never show in overtime, since they are exempt.'] },
       { h: 'Templates', p: ['To start from a typical week, Load one of your Saved Templates listed at the bottom of this page. To save the current grid as a reusable template, put a name in the Template Name box before you save, and it saves with the schedule. Loaded a template? Its name is already there: keep it to update that template, or change it to save a new one.'] },
       { h: 'New Schedule', p: ['New Schedule clears the grid so you can build a fresh week. Your saved schedules and templates are not touched. On an empty week that follows a posted one, a Start from last week button drops your most recent posted schedule onto the grid so you pencil in the changes instead of rebuilding a typical week shift by shift.'] },
-      { h: 'Working an Event', p: ['When a booked event falls on a day, that day gets an EVENT tag in the header. Open anyone working it and check the "Working [event name]" box in the shift pop-up (a picker when more than one event lands that day) so only that person\'s logged hours flow to the booking\'s Event P&L. Leave it unchecked for staff covering the regular floor that night.'] },
+      { h: 'Working an Event', p: ['When a booked event falls on a day, that day gets an EVENT tag in the header. Open anyone working it and check the "Working [event name]" box under that shift\'s day chips (a picker when more than one event lands that day) so only that person\'s logged hours flow to the booking\'s Event P&L. The box names the day it belongs to, so a shift covering several days only tags the one the event is on. Leave it unchecked for staff covering the regular floor that night.'] },
       { h: 'Salaried Staff', p: ['Salaried managers show their shift times in the grid, but their pay is a fixed weekly salary, not an hourly cost, so it counts toward the budget as a flat amount no matter how many hours you schedule.'] }
     ]);
   },
