@@ -846,6 +846,115 @@ S.Hub = {
                               : due.length + ' bookings are still owed their deposit',
       value: App.fmtCurrency(EB.depositsDueTotal(), 0)
     });
+
+    /* ⛔⛔⛔ THE SEVEN THAT WEEK IN REVIEW WAS THE ONLY HOME FOR (Kyle, 2026-09-04: *"those items
+       should all be on the hub cards"*, then *"ok go"*). That sentence is a MEASUREMENT, not a
+       fact, and measured it was short: the carrying band prints 15 items on the live demo and
+       ELEVEN of the 28 it can print had no Hub equivalent at all. Four were live that day, one of
+       them a red (safe to spend negative). Taking the band out without this first would have
+       removed them from the app, which is exactly how the Hub nearly lost bar pour cost the day
+       before ([[lessons-paid-for]] #168 — a retirement's premise is a measurement, so enumerate
+       what the dying surface COULD print off its own source and tick each one off).
+       ⭐⭐ AND IT IS #169's CURE, NOT A NEW ONE. Four cards said "nothing needs you here this week"
+       last chat because the shared feed covered two sections of seven; the answer then was to widen
+       the feed from helpers that already own the question, and it is the answer now. Not one number
+       below is re-derived: `_inventoryFigures`, `_computeState` and `CashEngine.position` are the
+       members those pages already read.
+       ⛔ WHAT DID *NOT* COME ACROSS, AND WHY, because a silent omission is the thing to avoid: four
+       of the eleven are facts about the WEEK YOU SELECTED rather than about today. Cash was never
+       reconciled THAT week, walked tabs THAT week, that week was never confirmed, no bills logged
+       for THAT month. Rule 3 for this page is overall standing, so those have no honest home here
+       and they leave with the band. "Below par and no order placed all week" is the same shape, and
+       its current half is already the Inventory card's Still to order CELL.
+       ⚠ EVERY `screen` BELOW WAS CHECKED AGAINST THE REAL NAV RATHER THAN ASSUMED:
+       `ic-par-suggestions` is an Inventory row, `lc-time-off` and `lc-build-schedule` are The
+       Floor's, `ev-bookings` is Events', `c-position` is Books'. `_sectionIndex` files each row on
+       the card whose nav holds the page it opens, so not one of them names a section here
+       ([[lessons-paid-for]] #167 — the nav is the only structure that has moved with the product). */
+
+    /* INVENTORY. As-of-now by construction: `_inventoryFigures` measures parOff against the newest
+       count PAIR and its own header says the figure is as-of-now, which is what makes it readable
+       here at all. Bare, like the two card builders that already call it — a guarded fallback would
+       print nothing on a load where the file is late, and a missing alert is a silent under-report
+       ([[the-loop]] #147). */
+    const invFig = S.WeekReview._inventoryFigures();
+    if (invFig.parOff > 0) out.push({
+      sev: 'warn', screen: 'ic-par-suggestions',
+      label: 'Pars off versus real usage',
+      value: invFig.parOff + ' product' + (invFig.parOff === 1 ? '' : 's')
+    });
+
+    /* THE FLOOR. A request's STATUS is a current fact and never a week's, so this one needed no
+       translation at all. */
+    const lab = App.laborData || {};
+    const toPending = (lab.lc_time_off || []).filter(r => r && r.status === 'Requested').length;
+    if (toPending > 0) out.push({
+      sev: 'warn', screen: 'lc-time-off',
+      label: 'Time off to review',
+      value: toPending + ' request' + (toPending === 1 ? '' : 's')
+    });
+    /* ⚠ NEXT WEEK IS MEASURED FROM TODAY, NOT FROM A REVIEWED WEEK. Week in Review asks whether a
+       schedule exists for the week after the one on screen; the only version of that question the
+       Hub can answer honestly is the one about the week actually coming.
+       ⚠ AND IT IS GATED ON THE ROSTER EXISTING. A brand new account has no staff, so this would
+       otherwise be the first thing it said, about work it cannot do yet — a prerequisite wearing a
+       finding's clothes, which is the thing the card's own step list is for. */
+    const nextMon = App.ymdLocal(new Date(new Date(App.weekStartFor(App.todayLocal()) + 'T00:00:00')
+      .getTime() + 7 * 86400000));
+    if ((lab.lc_staff || []).length
+        && !(lab.lc_schedules || []).some(s => s && s.week_start === nextMon)) out.push({
+      sev: 'bad', screen: 'lc-build-schedule',
+      label: 'Next week has no schedule',
+      value: 'week of ' + this._shortDate(nextMon)
+    });
+
+    /* EVENTS. ONE call answers all three: `_computeState` is the bookings page's own reader and
+       already publishes open leads, the stale subset, the run-sheet gap and the completed-but-not
+       -closed list. Guarded exactly like the deposits row above it, for the reason that row's pin
+       (Y4) records: with the Events screen not loaded this says nothing rather than throwing. */
+    let est = null;
+    if (EB && EB._computeState) { try { est = EB._computeState(); } catch (e) { est = null; } }
+    if (est) {
+      /* ⚠ STALE IS WHAT MAKES IT RED, which is the rule the bookings page already applies to this
+         same list. A lead nobody has touched in three days is the one worth the colour. */
+      if (est.open.length) out.push({
+        sev: est.stale.length ? 'bad' : 'warn', screen: 'ev-bookings',
+        label: 'Open leads to follow up',
+        value: est.open.length + (est.stale.length ? ', ' + est.stale.length + ' stale' : '')
+      });
+      if (est.noRunSheet.length) out.push({
+        sev: 'warn', screen: 'ev-bookings',
+        label: 'Events with no run sheet',
+        value: est.noRunSheet.length + ' in 14 days'
+      });
+      if (est.completedOpen.length) out.push({
+        sev: 'warn', screen: 'ev-bookings',
+        label: 'Events to close out',
+        value: est.completedOpen.length + ' completed'
+      });
+    }
+
+    /* BOOKS. ⛔ THE RED THAT HAD NO HOME ANYWHERE ELSE. Safe to spend is the cushion minus the
+       reserve target, so a negative one means the operator is into money already spoken for. It was
+       the most serious line on the carrying band and the Hub had nothing like it: `forwardAlerts`
+       warns about RUNWAY and about dipping under the reserve, which are two questions about the
+       weeks ahead, not this one about today.
+       ⚠ GATED ON `hasOpening`, or an account that has never entered an opening balance reads as
+       overdrawn on its first load. */
+    const pos = CashEngine.position();
+    /* ⛔⛔ `fmtBal`, NOT `fmtCurrency`, AND THE PIN CAUGHT ME WRITING THE WRONG ONE. `fmtCurrency` is
+       literally a dollar sign glued to the number, so a negative comes out as `$-2,894` with the
+       minus INSIDE the money mark — the exact shape `verify-signed-zero-display` exists to sweep for
+       and which shipped a `$-312.00/wk` on the pricing log once ([[lessons-paid-for]] #99).
+       ⭐ AND THE DECIDING REASON IS NOT THE GLYPH, IT IS AGREEMENT: `c-position` prints this same
+       figure with `App.fmtBal`, and it is the page this row opens. One quantity, two screens, one
+       spelling ([[the-loop]] #54). */
+    if (pos.hasOpening && pos.safe != null && pos.safe < 0) out.push({
+      sev: 'bad', screen: 'c-position',
+      label: 'Safe to spend is negative',
+      value: App.fmtBal(pos.safe, 0)
+    });
+
     return out;
   },
 

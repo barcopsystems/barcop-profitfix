@@ -3,9 +3,20 @@
 /* ── Week in Review — the recap of a week that has finished ────────────────────
    For a FINISHED week it reads every section's real activity (counts taken, spot
    checks run, deliveries received, orders placed, hours and tips logged, logs
-   filed) and lays out per section: what was DONE, what it turned up, and what is
-   carrying into next week. Three bands, every one of them derived from records
-   that exist. Monday-based weeks. Opened from the Week ▸ Review rail row.
+   filed) and lays out per section: what was DONE and what it turned up, both
+   derived from records that exist. Monday-based weeks. Opened from the Week ▸
+   Review rail row.
+
+   ⛔⛔ THE THIRD BAND IS GONE (2026-09-04). Every section used to end with what it
+   was leaving open, and the Hub's seven section cards hold that now: they answer
+   "what needs you today" and this page answers "what happened that week". The
+   seven items the band was the only home for were given a home on those cards
+   FIRST; the four that were facts about the SELECTED WEEK rather than about today
+   (cash never reconciled that week, walked tabs that week, that week unconfirmed,
+   no bills for that month) have no honest place on a page of overall standing and
+   went with it ([[lessons-paid-for]] #168 — a retirement's premise is a
+   measurement, so what the dying surface COULD print gets enumerated off its own
+   source and ticked off one at a time).
 
    ⛔⛔⛔ IT NO LONGER ACCUSES THE OPERATOR, AND IT NO LONGER SHOWS A LIVE WEEK.
    Kyle, 2026-08-11: *"a recap of the PREVIOUS week only.. i don't think it should
@@ -23,9 +34,11 @@
    the work happened. The one derived fact SURVIVES, re-derived here straight from
    `savedWeek`, so "the week was never confirmed" is still said — it just no
    longer needs a checkbox to say it.
-   ⚠ AND EVERY "Carrying Into Next Week" ITEM GATED ON A TICK HAD TO BE RE-DERIVED
-   OR REMOVED, never simply un-gated: an item is only allowed here if a record can
-   prove it. Pinned by verify-week-review-recap.js. */
+   ⚠ AND EVERY OPEN ITEM GATED ON A TICK HAD TO BE RE-DERIVED OR REMOVED, never
+   simply un-gated: an item was only allowed on this page if a record could prove
+   it. The band those items lived in left on 2026-09-04, but the rule it was
+   written under still governs every figure and every sentence here.
+   Pinned by verify-week-review-recap.js. */
 
 S.WeekReview = {
   container: null,
@@ -192,36 +205,6 @@ S.WeekReview = {
     const vdiv = '<div class="wr-vdiv" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 24px;"></div>';
     return '<div class="wr-statrow" style="display:flex;align-items:flex-start;flex-wrap:wrap;row-gap:16px;">' + items.join(vdiv) + '</div>';
   },
-  _openItem(text, sev) {
-    const col = sev === 'red' ? 'var(--red)' : 'var(--amber)';
-    return '<div style="display:flex;align-items:center;gap:11px;padding:10px 13px;background:var(--gold-tint);border-radius:5px;">'
-      + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' + col + ';"></span>'
-      + '<span style="font-size:12.5px;color:var(--t2);line-height:1.5;">' + text + '</span></div>';
-  },
-  /* ⛔ URGENT FIRST, ON EVERY CARD (Kyle, 2026-07-31: "the carrying into next week sections on
-     each card are not consistent with the red urgent dot items all listed above the amber dot
-     items"). This rendered in PUSH ORDER, so whether a red sat above an amber depended on which
-     check happened to run first. Measured off the rendered dots, two of six populated cards were
-     out of order — and on the Cash card the single most urgent line, "Safe-to-spend is negative",
-     sat SECOND, under a merely-amber one.
-     ⚠⚠ AND THE ORDER DECIDES WHAT SURVIVES: the 5-item cap below truncates whatever is last, so
-     unsorted it could drop a RED while showing five ambers. The Labor card already pushes six.
-     Sorting fixes the ordering and the truncation together.
-     ⚠ STABLE within a band — the authored order inside red (and inside amber) is roughly
-     worst-first and must not be shuffled. Pinned by verify-week-review-urgency-and-period.js. */
-  /* ⚠ `emptyMsg` EXISTS FOR BOOKS, AND IT IS THE KIND OF THING A DELETION CREATES. Books' band is
-     headed "To Close" and it closes a MONTH, so the shared "Clean week." line was wrong there the
-     moment the permits row came off and the band could actually render empty on real data. A default
-     that was never reached is not a default that was right. */
-  _openList(items, emptyMsg) {
-    const rank = o => (o && o.sev === 'red') ? 0 : 1;
-    const ranked = items.map((o, i) => ({ o, i }))
-      .sort((a, b) => (rank(a.o) - rank(b.o)) || (a.i - b.i))
-      .map(x => x.o);
-    return ranked.length
-      ? '<div style="display:flex;flex-direction:column;gap:8px;">' + ranked.slice(0, 5).map(o => this._openItem(o.t, o.sev)).join('') + '</div>'
-      : '<div style="font-size:12.5px;color:var(--green);padding:2px 0;">&#10003; ' + (emptyMsg || 'Nothing open. Clean week.') + '</div>';
-  },
   /* ⭐ AUDIT FRESHNESS, ASKED AT THE WEEK'S END, NOT AGAINST THE WALL CLOCK. The cockpits' own
      `_auditState` measures days since the newest audit against `Date.now()`, so on a recap of a week
      in March it would print "153 days old" — a fact about today wearing a past week's heading. The
@@ -257,36 +240,46 @@ S.WeekReview = {
      second accordion being invented here ([[the-loop]] #95: grep for the mechanism before building
      one).
      ⚠ ONE DELIBERATE DIFFERENCE FROM CLOSE THE WEEK, AND IT IS THE POINT OF THE PAGE. Close numbers
-     its rows because they are things still OWED; nothing on a recap is owed. So the mark is a
-     COUNT of what is carrying into next week, or a green check when nothing is — the same red /
-     amber vocabulary the Carrying band inside already uses, hoisted so a collapsed page can be
-     scanned for the rows worth opening.
-     ⚠ THE HEAD NOTE IS DERIVED, NEVER TYPED. Three states and each is a fact the card already has:
-     something carrying over, nothing carrying over, or nothing logged at all. A section that did no
-     work says so once and is not accused of anything ([[the-loop]] #61 — this page had its
-     accusations removed and they must not come back in a summary line). */
+     its rows because they are things still OWED; nothing on a recap is owed, so these rows carry no
+     number at all.
+     ⛔⛔ THE MARK USED TO BE A COUNT OF THE CARRYING BAND, and it left with the band on 2026-09-04.
+     Kept, it would have put a number on the head with nothing on the page to open, and at zero it
+     drew a green check, which is a confident all-clear about a list this page no longer keeps.
+     ⚠ THE HEAD NOTE IS DERIVED, NEVER TYPED, and what it summarises now is ACTIVITY: how many things
+     the section logged, or that it logged nothing. A section that did no work says so once and is
+     not accused of anything ([[the-loop]] #61 — this page had its accusations removed and they must
+     not come back in a summary line). */
   _sectionCard(key, name, blocks, meta) {
     const m = meta || {};
-    const items = m.open || [], did = m.did || [];
-    const reds = items.filter(o => o && o.sev === 'red').length;
+    const did = m.did || [];
     const isOpen = this._openSec === key;
-    const dot = (col, txt) => '<span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;'
-      + 'display:flex;align-items:center;justify-content:center;background:' + col + ';color:var(--bg);'
-      + 'font-size:12px;font-weight:800;">' + txt + '</span>';
-    const mark = items.length
-      ? dot(reds ? 'var(--red)' : 'var(--amber)', String(items.length))
-      : dot('var(--green)', '&#10003;');
-    /* ⛔⛔ THE THIRD STATE MUST NOT REPEAT THE BAND'S OWN SENTENCE, AND MY FIRST VERSION DID. It read
-       "Nothing logged this week" — byte for byte what `_didList` prints inside the card when a
-       section logged nothing — so the same fact appeared twice on one row, and it silently made
-       `verify-week-review-recap` G5 VACUOUS: that assertion searches the card for that phrase, and
-       the head satisfied it whether or not the band still said anything at all. Only the mutation
-       run found it, by going inert ([[the-loop]] integrity #32 — an assertion anchored on a phrase
-       the file already contains is green before you start, and here I added the phrase).
-       ⚠ THE HEAD SUMMARISES, THE BAND STATES. Different words for different jobs. */
-    const note = m.note || (items.length
-      ? items.length + ' carrying into next week'
-      : (did.length ? 'Nothing open' : 'No activity this week'));
+    /* ⛔⛔⛔ THE CARRYING BAND CAME OFF THIS PAGE, AND WITH IT EVERYTHING THAT WAS DERIVED FROM IT
+       (Kyle, 2026-09-04: *"i don't think the week in review needs the 'Carrying into next week'
+       section.. those items should all be on the hub cards and the week in review does not have any
+       of the carrying into next week rows.. because they will already be on the current week on the
+       hub cards"*). The seven Hub section cards hold what is open NOW; a recap holds what HAPPENED.
+       ⭐ IT WAS SAFE ONLY BECAUSE THE HUB WAS WIDENED FIRST. Measured before cutting: the band could
+       print 28 items and ELEVEN had no Hub equivalent at all, four of them live on the demo that day
+       including the safe-to-spend red. Seven were current facts and moved to `_sectionAlerts`; four
+       were facts about the SELECTED WEEK (cash never reconciled THAT week, walked tabs THAT week,
+       that week unconfirmed, no bills for THAT month) and have no honest home on a page whose rule
+       is overall standing, so they went with the band ([[lessons-paid-for]] #168 — enumerate what
+       the dying surface COULD print off its own source, and tick each one off).
+       ⛔ THE MARK WENT WITH IT AND HAD TO. It was a count of the carrying list, with a green check at
+       zero. Left behind it would have put a number on the head with nothing on the page to open, and
+       at zero it would have printed a confident all-clear about a list this page no longer keeps.
+       ⚠ SO THE NOTE SUMMARISES ACTIVITY NOW, which is the only thing left the head can honestly say
+       about a section. "Nothing open" went for the same reason as the mark: it is a verdict on a
+       list that is gone. A section that did no work says so once and is not accused of anything
+       ([[the-loop]] #61 — this page had its accusations removed and they must not come back in a
+       summary line).
+       ⚠ AND IT STILL MUST NOT REPEAT THE BAND BELOW IT. `_didList` prints "Nothing logged this week."
+       inside the card; the head says "No activity this week", which is a different sentence for a
+       different job. The last time these two agreed byte for byte it made an existing assertion
+       VACUOUS and only a mutation found it ([[the-loop]] integrity #32). */
+    const note = m.note || (did.length
+      ? did.length + ' logged this week'
+      : 'No activity this week');
     const idiv = '<div class="wr-idiv"></div>';
     const body = blocks.map(b => '<div class="wr-block">' + this._eyebrow(b.label) + b.html + '</div>').join(idiv);
     /* ⚠ THE CLASS AND THE SELECTOR MOVE TOGETHER OR EVERY ROW IS DEAD ON CLICK. `wr-step-head` is
@@ -300,11 +293,10 @@ S.WeekReview = {
        21px of the wrong colour below its band. Here the head IS the whole box when closed, by
        construction, so there is nothing that can sit under it ([[lessons-paid-for]] #106 — when a
        reference implementation exists, copy its RENDER, not just its mechanism). */
-    const bg = isOpen ? 'var(--step-open)' : (items.length ? 'var(--surface)' : 'var(--input)');
+    const bg = isOpen ? 'var(--step-open)' : (did.length ? 'var(--surface)' : 'var(--input)');
     return '<div style="border:1px solid var(--b-edge);border-radius:var(--r);background:' + bg + ';overflow:hidden;margin-bottom:10px;">'
       + '<div class="wr-step-head' + (isOpen ? '' : ' collapsed') + '" data-sec="' + esc(key) + '"'
       +   ' style="display:flex;align-items:center;gap:13px;padding:14px 20px;cursor:pointer;">'
-      +   mark
       +   '<div style="flex:1;min-width:0;">'
       +     '<div style="font-size:14px;font-weight:700;color:var(--t1);">' + esc(name) + '</div>'
       +     '<div style="font-size:11px;color:var(--t3);margin-top:2px;">' + esc(note) + '</div>'
@@ -503,7 +495,6 @@ S.WeekReview = {
     const cOrders = (inv.ic_orders || []).filter(o => this._inWeek(o.date));
     const cAdj    = (inv.ic_adjustments || []).filter(a => this._inWeek(a.date_time || a.created_at));
     const cXfer   = (inv.ic_transfers || []).filter(t => this._inWeek(t.date_time || t.created_at));
-    const wkOrders = cOrders.length;
     // Inventory ▸ Logs and Inventory ▸ Vendors, read the same way every other line on this card is.
     const cVC     = (shf.sc_void_comps || []).filter(r => this._inWeek(r.date));
     const cWaste  = (shf.sc_waste || []).filter(r => this._inWeek(r.date));
@@ -634,28 +625,11 @@ S.WeekReview = {
       this._res('Trapped Cash', trap.hasData ? App.fmtCurrency(trap.total, 0) : '-',
         (trap.hasData && trap.total > 0) ? 'var(--amber)' : 'var(--t1)')
     ]);
-    /* ⛔ "Variance flags never reviewed this week" is GONE, not un-gated: its only evidence was the
-       `review` checkbox, and nothing in the app records that a human looked at a flag. An item with
-       no record behind it does not belong on a page whose whole claim is that it reads real logs.
-       ⭐ "below par, no order placed" KEPT, re-derived: the order records for the week are right
-       here, so the sentence can be proved instead of asserted. */
-    const open = [];
-    if (st.reorderCount > 0 && wkOrders === 0) open.push({ t: '<b>' + st.reorderCount + '</b> item' + (st.reorderCount === 1 ? '' : 's') + ' below par and no order placed all week', sev: 'red' });
-    if (st.deadAll > 0) open.push({ t: '<b>' + st.deadAll + '</b> dead-stock item' + (st.deadAll === 1 ? '' : 's') + ' tying up cash', sev: 'amber' });
-    if (st.parOff > 0) open.push({ t: '<b>' + st.parOff + '</b> par' + (st.parOff === 1 ? '' : 's') + ' off versus real usage', sev: 'amber' });
-    /* ⛔ "N menu items over cost target" LEFT THIS CARD FOR MENUS (2026-08-25). `menuItemsOverTarget`
-       is a MENU fact — it compares an item's price against its cost target — and Menus is a section
-       with its own rail row and its own five pages. It was here because Inventory owns the product
-       COSTS that feed it, which is a reason to link the two, not a reason to file the finding under
-       the wrong door. `_inventoryFigures().menuOver` still computes it; the Menus card reads it.
-       ⭐ TRAPPED CASH ARRIVES IN ITS PLACE, off the Cash card, for the mirror reason. */
-    if (trap.hasData && trap.total > 0) open.push({ t: '<b>' + App.fmtCurrency(trap.total, 0) + '</b> still trapped on the shelf', sev: 'amber' });
 
     // The PDF carries the same sentences the screen shows. Paper and page say one thing.
     (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
       // ⛔ W3: the PDF is the artefact that leaves the building, so it names the basis too.
-      results: 'Current stock: Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Dead Stock ' + st.deadAll + ', Trapped Cash ' + (trap.hasData ? App.fmtCurrency(trap.total, 0) : '-') + '; Ordered this week ' + App.fmtCurrency(ordTot, 0),
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+      results: 'Current stock: Used ' + (st.periodCost != null ? App.fmtCurrency(st.periodCost, 0) : '-') + ', Below Par ' + App.fmtCurrency(st.reorderTotal, 0) + ', Dead Stock ' + st.deadAll + ', Trapped Cash ' + (trap.hasData ? App.fmtCurrency(trap.total, 0) : '-') + '; Ordered this week ' + App.fmtCurrency(ordTot, 0) });
     /* ⛔ W3: EVERY CELL NAMES ITS OWN BASIS NOW. Three of these four are figures about TODAY —
        `Below Par` is the Order Sheet's plan as it stands, `Dead Stock` is what is tying up cash
        right now, and `Used This Period` is the newest count PAIR, whenever those counts happened.
@@ -666,9 +640,8 @@ S.WeekReview = {
        genuinely week-true cell says so in its own label rather than being tarred by the suffix. */
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up &middot; Current Stock', html: results },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ], { open: open, did: did });
+      { label: 'What It Turned Up &middot; Current Stock', html: results }
+    ], { did: did });
   },
 
   /* ── THE FLOOR ────────────────────────────────────────────────────────────────────────────────
@@ -708,7 +681,6 @@ S.WeekReview = {
 
     const target = App.laborTargetPct ? App.laborTargetPct() : 29;
     const today = App.todayLocal();
-    const cutoff30 = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return App.ymdLocal(d); })();
 
     /* ⭐⭐ THE WEEK IS A PARAMETER NOW, NOT A FIELD ON SOMEBODY ELSE'S SCREEN. This is the only one
        of the five borrows that was doing real work: `weekStart` / `weekEnd` / `inWeek` /
@@ -737,16 +709,15 @@ S.WeekReview = {
     const cOuts = (lab.lc_callouts || []).filter(c => this._inWeek(c.date));
     const calloutN = cOuts.length;
     const calloutUncov = cOuts.filter(c => !c.covered).length;
-    const toPending = (lab.lc_time_off || []).filter(t => t.status === 'Requested').length;
-    /* ⛔ THE OLD STRIP PRINTED `toPending` UNDER "DONE THIS WEEK", AND IT IS NOT A WEEK FIGURE. It
-       counts every request still sitting unanswered, whenever it was made, so a request typed in
-       March was being reported as something the crew did last week. The pending count is a real
-       fact and it stays in Carrying Into Next Week, where it is true. What belongs in a recap is
-       requests RAISED in the week, off `created_at`. */
+    /* ⛔ THE OLD STRIP PRINTED THE PENDING COUNT UNDER "DONE THIS WEEK", AND IT IS NOT A WEEK
+       FIGURE. It counts every request still sitting unanswered, whenever it was made, so a request
+       typed in March was being reported as something the crew did last week. What belongs in a
+       recap is requests RAISED in the week, off `created_at`, which is what this reads.
+       ⭐ AND THE PENDING COUNT ITSELF LEFT THIS FILE on 2026-09-04 with the carrying band. It was
+       always a fact about TODAY rather than about the week on screen, which is precisely why it
+       could move: the Hub's Floor card reports it now, off the same one-line read of the same
+       store. A figure that describes the present belongs on the page about the present. */
     const toNew = (lab.lc_time_off || []).filter(t => this._inWeek(t.created_at)).length;
-    const activeIds = new Set((lab.lc_staff || []).filter(s => s.status !== 'Inactive').map(s => s.id));
-    const expired = (lab.lc_certs || []).filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date < today).length;
-    const expiring = (lab.lc_certs || []).filter(c => activeIds.has(c.staff_id) && c.expiration_date && c.expiration_date >= today && c.expiration_date <= cutoff30).length;
     const schedBuilt = (lab.lc_schedules || []).some(s => s.week_start === this._addDays(wkStart, 7));
 
     const otRisk = (proj.over || 0) + (proj.approaching || 0);
@@ -788,19 +759,9 @@ S.WeekReview = {
       this._res('RPLH', rplh != null ? App.fmtCurrency(rplh) : '-'),
       this._res('OT Risk', String(otRisk), otRisk > 0 ? 'var(--amber)' : 'var(--t1)')
     ];
-    /* ⭐ THE SCHEDULE ITEM ALREADY HAD A DATA HALF, so dropping the tick half cost nothing:
-       `schedBuilt` asks the store whether a schedule exists for the week AFTER the one under
-       review, which is the actual fact the sentence claims. */
-    const open = [];
-    if (!schedBuilt) open.push({ t: "Next week's schedule was never built", sev: 'red' });
-    if (proj.over > 0) open.push({ t: '<b>' + proj.over + '</b> staff projected over ' + App.OT_THRESHOLD + ' hrs (~' + App.fmtCurrency(proj.otPremium, 0) + ' premium)', sev: 'red' });
-    if (calloutUncov > 0) open.push({ t: '<b>' + calloutUncov + '</b> uncovered call-out' + (calloutUncov === 1 ? '' : 's') + ' this week', sev: 'red' });
-    if (toPending > 0) open.push({ t: '<b>' + toPending + '</b> time-off request' + (toPending === 1 ? '' : 's') + ' to review', sev: 'amber' });
-    if (expired > 0) open.push({ t: '<b>' + expired + '</b> certification' + (expired === 1 ? '' : 's') + ' expired', sev: 'red' });
-    if (expiring > 0) open.push({ t: '<b>' + expiring + '</b> certification' + (expiring === 1 ? '' : 's') + ' expiring within 30 days', sev: 'amber' });
 
     // The paper says what the screen says, including the qualifier on the labor percentage.
-    return { did: did, open: open, cells: cells,
+    return { did: did, cells: cells,
       plain: 'Labor Cost ' + App.fmtCurrency(wkCost, 0) + ', Labor % (floor sales) ' + (laborPct != null ? laborPct.toFixed(1) + '%' : '-') + ', Hours ' + wkHours.toFixed(1) + ', RPLH ' + (rplh != null ? App.fmtCurrency(rplh) : '-') + ', OT Risk ' + otRisk };
   },
 
@@ -895,20 +856,11 @@ S.WeekReview = {
       /* ⛔ VOIDS + COMPS IS NOT A CELL HERE ANY MORE. Same move as the sentence above it — the log is
          an Inventory row — and it was also the second place this page printed that total. */
     ];
-    /* ⛔ "Loss flags never reviewed this week" is GONE — its only evidence was the `review` tick.
-       ⭐ "Cash not reconciled" KEPT, on its data half alone, plus the guard the tick used to supply
-       by accident: a week the bar never traded has nothing to reconcile, and accusing it of a
-       missed reconcile is the same false accusation in a new costume. */
-    const open = [];
-    if (shorts > 0) open.push({ t: '<b>' + shorts + '</b> cash-short shift' + (shorts === 1 ? '' : 's') + ' to chase', sev: 'red' });
-    if (days > 0 && reconN === 0) open.push({ t: 'Cash was never reconciled this week', sev: 'amber' });
-    if (walkedN > 0) open.push({ t: '<b>' + walkedN + '</b> walked tab' + (walkedN === 1 ? '' : 's') + ' this week', sev: 'amber' });
-    if (permDue > 0) open.push({ t: '<b>' + permDue + '</b> permit/license item' + (permDue === 1 ? '' : 's') + ' need attention', sev: permExpired > 0 ? 'red' : 'amber' });
 
     // ⚠ THE PDF SAYS WHAT THE SCREEN SAYS. Same guard, same rounded sign — this line is the one
     // that gets handed to somebody, so a "$0.00" here for an uncounted week is the same lie in a
     // document ([[the-loop]] #54: the moment a quantity is printed twice, the test is that they agree).
-    return { did: did, open: open, cells: cells,
+    return { did: did, cells: cells,
       plain: 'Over/Short ' + (reconN ? (App.fmtSigned(netVar, 0).sign > 0 ? '+' : '') + App.fmtBal(netVar, 0) : 'Not counted') };
   },
 
@@ -943,37 +895,30 @@ S.WeekReview = {
             + (s.flagged || 0) + ' flagged' + (s.high ? ', ' + s.high + ' high risk' : '')
             + (s.exposure ? ', ' + this._amt(s.exposure) + ' exposed' : '') + '.' : ''));
     });
-    /* ⭐ THE CARRY-OVER IS THE EXPOSURE, AND IT IS DERIVED FROM THE FILED REPORT rather than
-       re-scored here. A second implementation of the integrity engine on a recap page is exactly the
-       drift this codebase keeps paying for. */
-    const high = revWk.reduce((t, r) => t + ((r.summary || {}).high || 0), 0);
-    const exposure = revWk.reduce((t, r) => t + ((r.summary || {}).exposure || 0), 0);
-    const open = [];
-    if (high > 0) open.push({ t: '<b>' + high + '</b> server' + (high === 1 ? '' : 's') + ' flagged high risk'
-      + (exposure ? ', ' + this._m0(exposure) + ' exposed' : ''), sev: 'red' });
-    return { did: did, open: open, cells: [], plain: '' };
+    return { did: did, cells: [], plain: '' };
   },
 
   /* ── THE FLOOR, composed ──────────────────────────────────────────────────────────────────────
      ⚠ THE ORDER OF THE HALVES IS THE SECTION'S OWN BAR ORDER — Schedules and Pay, then The Safe and
      the Records, then Sales — so the card reads the way the top bar reads. There is no ranking in
-     it; `_openList` still sorts the carry-over items red first across all three
-     ([[lessons-paid-for]] #70's neighbour: the order decides what survives the five-item cap). */
+     it and nothing sorts the halves against each other: the activity rows come out in the order the
+     three parts produce them, which is the bar's order.
+     ⚠ THIS NOTE USED TO CITE THE CARRY-OVER SORTER AS THE REASON NO RANKING WAS NEEDED. That sorter
+     left with the band on 2026-09-04, so the sentence became false the moment the code changed. A
+     comment that has outlived its mechanism is worse than none, because the next reader acts on it
+     ([[the-loop]] #61's third grep — the render call, the orphaned helpers, and the words). */
   _floorSection(key, name) {
     const parts = [this._floorLabor(), this._floorShift(), this._floorSales()].filter(Boolean);
     if (!parts.length) return null;
     const did = parts.flatMap(p => p.did || []);
-    const open = parts.flatMap(p => p.open || []);
     const cells = parts.flatMap(p => p.cells || []);
     const activity = this._didList(did);
     (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
-      results: parts.map(p => p.plain).filter(Boolean).join(', ') || 'Nothing measured',
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+      results: parts.map(p => p.plain).filter(Boolean).join(', ') || 'Nothing measured' });
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up', html: this._resRow(cells) },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ], { open: open, did: did });
+      { label: 'What It Turned Up', html: this._resRow(cells) }
+    ], { did: did });
   },
 
   /* ── The six inventory figures this card prints ───────────────────────────────────────────────
@@ -1181,7 +1126,6 @@ S.WeekReview = {
     if (!w && !rw && !wkS.length) return null;
 
     const costRows = w ? this._costRows(w) : null;
-    const overCount = costRows ? costRows.filter(r => r.over).length : 0;
     const metrics = this._metricsRows(rw || {});
     const metric = lab => metrics.find(m => m.label === lab) || null;
     const rev = wkS.reduce((t, s) => t + (parseFloat(s.total_revenue) || 0), 0);
@@ -1231,27 +1175,16 @@ S.WeekReview = {
       mCell('Revenue / Labor Hour', 'Rev / Labor Hr')
     ];
 
-    /* ⭐ "the week was never confirmed" IS THE ONE DERIVED FACT THAT SURVIVED THE TICK REMOVAL, and
-       it belongs here rather than on two other cards. It used to be pushed by BOTH the Profit and
-       the Revenue card, so an unconfirmed week said the same thing twice in two places. */
-    const open = [];
-    if (!w) open.push({ t: 'This week was never confirmed, so its cost numbers stayed blank', sev: 'red' });
-    if (w && overCount > 0) {
-      const names = costRows.filter(r => r.over).map(r => r.label.toLowerCase());
-      open.push({ t: '<b>' + overCount + '</b> of 3 costs over target (' + names.join(', ') + ')', sev: overCount >= 2 ? 'red' : 'amber' });
-    }
 
     const pcv = i => (costRows && costRows[i] && costRows[i].val != null) ? (costRows[i].val.toFixed(1) + '%') : '-';
     (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
       results: 'Covers ' + covers + ', Check Avg ' + ((metric('Check Average') || {}).value || '-')
         + ', Bar Pour ' + pcv(0) + ', Food ' + pcv(1)
-        + ', Rev/Labor Hr ' + ((metric('Revenue / Labor Hour') || {}).value || '-'),
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+        + ', Rev/Labor Hr ' + ((metric('Revenue / Labor Hour') || {}).value || '-') });
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up', html: this._resRow(cells) },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ], { open: open, did: did });
+      { label: 'What It Turned Up', html: this._resRow(cells) }
+    ], { did: did });
   },
 
   /* ── RUN AUDIT ────────────────────────────────────────────────────────────────────────────────
@@ -1305,21 +1238,13 @@ S.WeekReview = {
     const cells = reads.map(r => this._res(r.label,
       (r.gap.rec && r.gap.rec.overall_score != null) ? String(r.gap.rec.overall_score) : '-'));
 
-    const open = [];
-    reads.forEach(r => {
-      if (!r.rows.length) return;
-      if (!r.gap.ever) open.push({ t: 'No ' + r.label + ' audit had been run by the end of this week', sev: 'amber' });
-      else if (r.gap.stale) open.push({ t: r.label + ' audit was <b>' + r.gap.days + '</b> days old when this week closed', sev: 'amber' });
-    });
 
     (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
-      results: reads.map(r => r.label + ' ' + ((r.gap.rec && r.gap.rec.overall_score != null) ? r.gap.rec.overall_score : '-')).join(', '),
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+      results: reads.map(r => r.label + ' ' + ((r.gap.rec && r.gap.rec.overall_score != null) ? r.gap.rec.overall_score : '-')).join(', ') });
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up &middot; Scores At Week End', html: this._resRow(cells) },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ], { open: open, did: did });
+      { label: 'What It Turned Up &middot; Scores At Week End', html: this._resRow(cells) }
+    ], { did: did });
   },
 
   /* ── MENUS ────────────────────────────────────────────────────────────────────────────────────
@@ -1369,19 +1294,15 @@ S.WeekReview = {
       this._res('Price Changes', String(priceWk.length))
     ];
 
-    const open = [];
-    if (over > 0) open.push({ t: '<b>' + over + '</b> menu item' + (over === 1 ? '' : 's') + ' over cost target', sev: 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
       // ⚠ The paper says what the screen says, down to the noun — see the cell's own note.
       results: 'Current menu: ' + items.length + ' menu items, ' + over + ' over cost target; '
-        + priceWk.length + ' price change' + (priceWk.length === 1 ? '' : 's') + ' this week',
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+        + priceWk.length + ' price change' + (priceWk.length === 1 ? '' : 's') + ' this week' });
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up &middot; Current Menu', html: this._resRow(cells) },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ], { open: open, did: did });
+      { label: 'What It Turned Up &middot; Current Menu', html: this._resRow(cells) }
+    ], { did: did });
   },
   // ── Events (pipeline, not a weekly close) ───────────────────────────────────
   _eventsSection(key, name) {
@@ -1441,20 +1362,13 @@ S.WeekReview = {
       this._res('Win Rate, 90d', st.conv)
     ]);
 
-    const open = [];
-    if (st.open.length) open.push({ t: '<b>' + st.open.length + '</b> open lead' + (st.open.length === 1 ? '' : 's') + ' to follow up', sev: st.stale.length ? 'red' : 'amber' });
-    if (st.depositsDue > 0) open.push({ t: '<b>' + ED._money(st.depositsDue) + '</b> in deposits still due', sev: 'amber' });
-    if (st.noRunSheet.length) open.push({ t: '<b>' + st.noRunSheet.length + '</b> upcoming event' + (st.noRunSheet.length === 1 ? '' : 's') + ' need a run sheet', sev: 'amber' });
-    if (st.completedOpen.length) open.push({ t: '<b>' + st.completedOpen.length + '</b> completed event' + (st.completedOpen.length === 1 ? '' : 's') + ' to close out', sev: 'amber' });
 
     (this._pdf || (this._pdf = [])).push({ name: name, activity: this._didPlain(did),
-      results: 'Booked ' + ED._money(st.bookedRev) + ', Pipeline ' + ED._money(st.pipeline) + ', Deposits Due ' + ED._money(st.depositsDue) + ', Win Rate ' + st.conv,
-      open: open.length ? open.map(o => this._stripTags(o.t)).join('; ') : 'Nothing open' });
+      results: 'Booked ' + ED._money(st.bookedRev) + ', Pipeline ' + ED._money(st.pipeline) + ', Deposits Due ' + ED._money(st.depositsDue) + ', Win Rate ' + st.conv });
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
-      { label: 'What It Turned Up &middot; Current Pipeline', html: results },
-      { label: 'Carrying Into Next Week', html: this._openList(open) }
-    ], { open: open, did: did });
+      { label: 'What It Turned Up &middot; Current Pipeline', html: results }
+    ], { did: did });
   },
 
   // ── Books (monthly close) ───────────────────────────────────────────────────
@@ -1534,7 +1448,6 @@ S.WeekReview = {
     // counting two different sets of records (the cutover — see CashEngine.cashOutflows).
     const outRows = (CashEngine.cashOutflows() || []).filter(o => this._inWeek(o.date || o.created_at));
     const outflowWk = outRows.length;
-    const billsMonth = opex.filter(r => r && String(r.date || '').slice(0, 7) === mKey).length;
     const rawRun = key => { try { return localStorage.getItem(key); } catch (e) { return null; } };
     const pnlRun = rawRun('books_report_run_weeklypnl');
     const meRun  = rawRun('books_report_run_monthend');
@@ -1593,7 +1506,11 @@ S.WeekReview = {
          is the whole reason it was written as a plain row rather than a pill.
          ⚠ AND IT LEAVES WITH THE FIGURES. Once the month is settled the band prints real numbers and
          there is nothing left to tell anybody to do, so the directive is simply absent rather than
-         hanging around advising work that is finished. */
+         hanging around advising work that is finished.
+         ⚠ THE BAND HE WAS POINTING AT NO LONGER EXISTS (2026-09-04). His words are kept verbatim
+         because they are the record of why this sits where it sits, and the reason still holds: a
+         monthly routine is not a finding and must not read as one. There is simply nothing below it
+         to be mistaken for any more. */
       : this._didList([
           missingWks > 0
             ? esc(mLabel) + ' has <b>' + missingWks + '</b> ' + this._plu(missingWks, 'week')
@@ -1624,31 +1541,7 @@ S.WeekReview = {
        plain row, deliberately: the dotted amber pills on every other card mean "something is wrong
        here", and a monthly routine is not a finding. Once the month IS settled the band goes back to
        reporting, and the only thing it can report is a month that never got a bill in it. */
-    const open = [];
-    if (settled && billsMonth === 0) open.push({ t: 'No bills were ever logged for ' + esc(mLabel), sev: 'amber' });
-    /* ⭐ THE CASH WARNINGS CAME ACROSS WITH THE FIGURES, worded exactly as they were. They belong in
-       the same list as the month's, because both answer "what does this week leave you owing". */
-    if (sf.hasOpening && sf.runway != null && sf.runway <= 4) open.push({ t: 'Cash runs thin, about ' + runwayLabel(sf.runway) + ' of runway', sev: 'red' });
-    else if (sf.hasData && sf.tightWeeks > 0) open.push({ t: '<b>' + sf.tightWeeks + '</b> tight week' + (sf.tightWeeks === 1 ? '' : 's') + ' in the next 13', sev: 'amber' });
-    if (pos.hasOpening && pos.safe != null && pos.safe < 0) open.push({ t: 'Safe-to-spend is negative, into money already spoken for', sev: 'red' });
 
-    /* ⛔⛔ THE BAND IS "CARRYING INTO NEXT WEEK", LIKE EVERY OTHER CARD (Kyle, 2026-08-25: *"on books
-       still the 'To Close' section.. shouldn't that be carrying into next week like the rest of
-       them.. the books card title says 2 carrying into next week"*). He is right and the card
-       contradicted itself out loud: the accordion head counts what is carrying over, and the band
-       holding those very items was headed something else. One fact, two names, six inches apart.
-       ⚠ THE BOOKS-SPECIFIC EMPTY LINE SURVIVES THE RENAME. `emptyMsg` exists because this card
-       closes a MONTH, so the shared "Clean week." would be wrong here whatever the band is called. */
-    /* ⛔⛔ AND THE EMPTY LINE HAD TO BECOME STATE-AWARE, WHICH THE RENAME EXPOSED. Unifying the band
-       meant the settled message reached the UNSETTLED case, where it reads "Nothing left to close on
-       August 2026" about a month that cannot be closed yet — a false all-clear, and exactly the kind
-       of sentence this page had its accusations removed for. Caught by H4 going red, not by reading.
-       ⭐ "Nothing carrying over." for a month still in flight, the month named only once it really is
-       closable. The shared default ("Clean week.") is wrong on this card either way: Books closes a
-       MONTH, which is why `emptyMsg` exists at all. */
-    const carrying = this._openList(open, settled
-      ? 'Nothing left to close on ' + esc(mLabel) + '.'
-      : 'Nothing carrying over.');
 
     /* ⚠ ITS OWN BAND, AND THE LABEL SAYS THE BASIS. Runway and safe-to-spend are a position as it
        stands TODAY, while the band above them reports a finished MONTH — two different clocks, and
@@ -1673,14 +1566,12 @@ S.WeekReview = {
             : ' is not over yet, so its figures are not in yet.'))
         + '  Current position: Runway ' + ((sf.hasData && sf.hasOpening) ? runwayLabel(sf.runway) : '-')
         + ', Safe to Spend ' + (pos.hasOpening ? App.fmtBal(pos.safe, 0) : '-')
-        + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-'),
-      open: this._stripTags(this._tidy(carrying)) });
+        + ', Tightest Week ' + ((sf.hasData && sf.lowPoint) ? App.fmtBal(sf.lowPoint.balance, 0) : '-') });
     return this._sectionCard(key, name, [
       { label: 'Done This Week', html: activity },
       { label: settled ? 'What It Turned Up &middot; ' + esc(mLabel) : 'What It Turned Up', html: results },
-      { label: 'Where The Cash Stands &middot; Today', html: cashCells },
-      { label: 'Carrying Into Next Week', html: carrying }
-    ], { open: open, did: did });
+      { label: 'Where The Cash Stands &middot; Today', html: cashCells }
+    ], { did: did });
   },
 
   render(mount) {
@@ -1816,7 +1707,6 @@ S.WeekReview = {
       b.sectionTitle(s.name);
       if (s.activity) b.paragraph('Done this week: ' + s.activity, { gray: 70 });
       b.paragraph('What it turned up: ' + s.results, { gray: 70 });
-      b.paragraph('Carrying over: ' + s.open, { gray: 70 });
     });
     /* ⛔ NAME IT FOR THE WEEK IT REVIEWS, NOT THE DAY IT WAS RUN. With no period this fell back
        to today, so three different weeks exported as one filename and each overwrote the last in
