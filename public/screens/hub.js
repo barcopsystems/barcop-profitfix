@@ -3,13 +3,6 @@
 S.Hub = {
 
   _sidebarCollapsed: false,
-  /* Which section card is open, or null for all closed — and ALL CLOSED IS THE DESIGN. Kyle's
-     spec: *"each card started out as the height of the money band closed... then can be expanded
-     open to see anything else."* The closed page is the thing he asked for; the body is what an
-     operator opens on purpose. One at a time, so the page cannot become the tall stack of
-     everything the six-card Hub was cut for being. */
-  _openSec: null,
-
   // ── Operations Audit context sidebar ─────────────────────────────────────────
   // The Hub shell's sidebar is context-aware. The Operations Audit pages get this
   // dedicated sidebar instead of the old grab-bag: Overall + quick-links into
@@ -1551,7 +1544,7 @@ S.Hub = {
        A node harness cannot click, so the class is parsed out of this markup and the selector out
        of the wiring and the two are asserted against each other — the defect that killed all six
        Close The Week rows under a green gate ([[the-loop]] integrity #11, [[lessons-paid-for]] #27). */
-    const open = this._openSec === card.key;
+    const open = this._openCard() === card.key;
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 18px 16px;">'
       /* ⭐ THE SECTION NAME IS THE PAGE'S ONE PIECE OF COLOUR (Kyle, 2026-09-03: *"it needs something
          design wise.. not a lot of color.. but a little somewhere at minimum the section names at
@@ -1559,11 +1552,46 @@ S.Hub = {
          reads down the page, so it lands on the seven words that structure the whole screen and
          nowhere else ([[color-system-locked]] — the token, never a hex). */
       + '<div class="hub-sec-head' + (open ? '' : ' collapsed') + '" data-sec="' + esc(card.key) + '" '
-      +   'style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:12px;">'
-      + '<span onclick="event.stopPropagation();App.jumpToSection(\'' + esc(card.key) + '\')" '
-      +   'style="font-size:13px;font-weight:700;color:var(--gold);">'
-      +   esc(card.name) + '</span>'
-      + '<span style="flex:1;"></span>'
+      /* ⛔ THE HEAD IS A BAND WITH A RULE UNDER IT AND IT BLEEDS TO THE CARD'S EDGES (Kyle,
+         2026-09-04, pointing at the Log Voids / Comps head: *"on each card put header divider line
+         and move the chevron next to the card section name and the hide button stays aligned right
+         side"*). The negative margin cancels the card's own 14px/18px padding so the rule runs edge
+         to edge the way every headed card in the app already draws it, and the top radius matches
+         the card's so the band cannot poke out of the corner. This is the shape of
+         `App.collapsibleCardTitle`, which is what the screen he sent is built from.
+         ⚠ THE FILL READS THE TOKEN, NEVER A COLOUR. `--card-head` and `--surface` hold the same
+         value today, so the band is visually inert until the day he splits them — which is exactly
+         the day a head that had hard-coded the body colour would silently stop matching every other
+         card in the app ([[color-system-locked]] — the token, never a hex).
+         ⚠ AND THE HEAD IS NEVER THE WHOLE BOX HERE, so it needs no collapsed special case. The stat
+         row renders whether the card is open or shut and only the BODY is gated, so there is always
+         something under the rule. `.card` had to give up its bottom padding for exactly the
+         opposite reason, and copying that here would cut a real card's real padding. */
+      +   'style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;'
+      +   'background:var(--card-head);margin:-14px -18px 12px;padding:13px 18px;'
+      +   'border-bottom:1px solid var(--b-edge);border-radius:var(--r) var(--r) 0 0;">'
+      /* ⭐ THE NAME AND THE CHEVRON ARE ONE GROUP, so the pair reads as one control on the left and
+         Hide owns the far right whatever the name's length. The flex spacer that used to sit
+         between them is gone: it pushed the chevron to the far edge, away from the word it belongs
+         to, which is the thing being fixed.
+         ⛔⛔ THE SHARED CHEVRON, NOT A SECOND ONE. This was a hand-rolled 11px span that rotated
+         180° when open, so it pointed the wrong way in BOTH states and had no hover, while every
+         other accordion in the app (Week in Review, Close The Week, Build Schedule, the import
+         confirm shell, Product Setup) uses `.card-chevron`: 14px, `--t3`, gold on hover, DOWN when
+         open and `rotate(-90deg)` when closed. Kyle caught all three ([[the-loop]] #95 — grep for
+         the mechanism before building one, the existing callers are the spec).
+         ⭐ AND IT TRAILS THE NAME FOR THE REASON THE APP'S OWN HEAD ALREADY GIVES:
+         `collapsibleCardTitle` says the caret trails the title so the title starts at the same left
+         edge on every card, and so the caret and the right-hand action are never adjacent.
+         ⚠ The two hub-specific chevron rules live in this file's own style block rather than in
+         `style.css`, because markup in a script plus layout in a stylesheet is a two-file atomic
+         unit and there is no such thing ([[lessons-paid-for]] #66). */
+      + '<span style="display:inline-flex;align-items:center;gap:8px;min-width:0;">'
+      +   '<span onclick="event.stopPropagation();App.jumpToSection(\'' + esc(card.key) + '\')" '
+      +     'style="font-size:13px;font-weight:700;color:var(--gold);">'
+      +     esc(card.name) + '</span>'
+      +   '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+      + '</span>'
       /* ⛔ THIRD JOB ON THE HEAD ROW, AND IT STOPS THE TOGGLE LIKE THE NAME DOES. The row toggles,
          the name navigates, this hides — three controls, three jobs, none of them firing each
          other. A hide that also opened the card would be the two-jobs-on-one-control mistake the
@@ -1574,17 +1602,8 @@ S.Hub = {
          LOOK like three controls, or the row reads as one label with a decoration. */
       + '<button type="button" class="btn btn-ghost btn-sm" '
       +   'onclick="event.stopPropagation();S.Hub._setCardHidden(\'' + esc(card.key) + '\',true)" '
-      +   'title="Hide this section from the Hub" style="font-size:10px;padding:3px 9px;">Hide</button>'
-      /* ⛔⛔ THE SHARED CHEVRON, NOT A SECOND ONE. This was a hand-rolled 11px span that rotated 180°
-         when open — so it pointed the wrong way in both states and had no hover, while every other
-         accordion in the app (Week in Review, Close The Week, Build Schedule, the import confirm
-         shell, Product Setup) uses `.card-chevron`: 14px, `--t3`, gold on hover, DOWN when open and
-         `rotate(-90deg)` when closed. Kyle caught all three ([[the-loop]] #95 — grep for the
-         mechanism before building one, the existing callers are the spec).
-         ⚠ The two hub-specific rules live in this file's own `<style>` block rather than in
-         `style.css`, because markup in a script plus layout in a stylesheet is a two-file atomic
-         unit and there is no such thing ([[lessons-paid-for]] #66). */
-      + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
+      +   'title="Hide this section from the Hub" '
+      +   'style="font-size:10px;padding:3px 9px;flex-shrink:0;">Hide</button>'
       + '</div>'
       /* ⛔⛔ THE ROW CARRIES NO CLASS, AND THE GATE CAUGHT THE FIRST VERSION THAT BORROWED THE MONEY
          BAND'S. Two things were wrong with renting it. It is that band's INNER PADDING (`style.css`,
@@ -1707,6 +1726,48 @@ S.Hub = {
      name sits at the foot of the list, and one press brings it back.
      ⚠ AN UNRECOGNISED VALUE READS AS "NOTHING HIDDEN". A card coming back is a nuisance; a card
      gone because a stray value looked like a hide is a section the operator cannot find. */
+  /* ⛔⛔ WHICH CARD IS OPEN IS REMEMBERED, AND IT DEFAULTS TO INVENTORY (Kyle, 2026-09-04: *"i
+     would make inventory card open by default on first landing on the hub both on empty state and
+     full state.... and only change once a user clicks/closes/opens one.. and then it remembers the
+     users last state... so if they close inventory and leave and come back then it is closed... but
+     for the demo and new user empty state it should always land with inventory card open."*)
+     ⭐ THIS REVERSES A DECISION, IT DOES NOT DRIFT FROM ONE. The page shipped all-closed by design
+     and `verify-hub-section-cards` N4 recorded that in writing. The pin was right about the old
+     rule; the rule changed, so the pin is re-pointed rather than loosened ([[the-loop]] #19 — when
+     a change turns a pin red, the first question is whether the pin was ever right, and here it
+     was, up to today).
+     ⛔ THERE IS NO FIELD ANY MORE, AND THAT IS THE POINT. The old in-memory one plus a stored
+     copy is two sources for one fact, and the render would race the save. One door: the account is
+     the value, both the render and the toggle read it through this member
+     ([[lessons-paid-for]] #14 — a default is decided by whoever assigns first, so leaving an
+     assignment anywhere else would make this accessor inert).
+     ⚠ THE THREE STATES ARE DISTINCT AND ONLY TWO OF THEM ARE STORED. Nothing stored at all is a
+     new account, the demo, or an operator who has never touched a head: Inventory opens. An empty
+     string is a REAL CHOICE the operator made (they closed the one that was open) and it survives.
+     A stray value of any other type reads as the default rather than as "all closed", because a
+     Hub that lands with nothing open is a page of headings ([[empty-is-not-an-answer]] — an empty
+     control is not an answer, and neither is a value nobody wrote). */
+  _openCard() {
+    const v = ((App.data || {}).settings || {}).hub_open_card;
+    if (typeof v !== 'string') return 'inventory';
+    return v || null;
+  },
+  /* ⚠ SYNCHRONOUS IN MEMORY, SAVED IN THE BACKGROUND, AND THAT IS DELIBERATELY NOT WHAT
+     `_setCardHidden` DOES. Hiding a card awaits the write before repainting, which is fine for a
+     decision an operator makes once. An accordion toggle is pressed constantly, and awaiting a
+     network round trip before the card opens would put a visible stall on the most-used control on
+     the page. The value is true in memory before `render` reads it, so the repaint cannot race it.
+     ⚠ THE DEMO CHANGES IN MEMORY AND SAVES NOTHING, exactly as every other demo write does
+     ([[live-demo-mode]]). A fresh load re-seeds, so the shop window always lands on Inventory,
+     which is the half of his rule the storage would otherwise break. */
+  _setOpenCard(key) {
+    const s = (App.data || {}).settings;
+    if (!s) return;
+    s.hub_open_card = key || '';
+    if (!App.demoMode) {
+      Promise.resolve(App.saveKey('settings')).catch(e => console.error('open-card save failed', e));
+    }
+  },
   _hiddenCards() {
     const v = ((App.data || {}).settings || {}).hub_hidden_cards;
     return new Set(Array.isArray(v) ? v.filter(k => typeof k === 'string') : []);
@@ -1997,7 +2058,7 @@ S.Hub = {
        ⚠ ONE OPEN AT A TIME, and clicking the open one closes it. */
     container.querySelectorAll('.hub-sec-head').forEach(h => h.addEventListener('click', () => {
       const k = h.getAttribute('data-sec');
-      this._openSec = (this._openSec === k) ? null : k;
+      this._setOpenCard(this._openCard() === k ? '' : k);
       this.render(this._stage || container);
     }));
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
