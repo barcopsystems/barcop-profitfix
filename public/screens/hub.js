@@ -683,15 +683,43 @@ S.Hub = {
       const dt = new Date(x + 'T00:00:00');
       return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
     };
-    const firstIn = arr => (arr || []).filter(r => r && inWeek(r.date))
-      .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0] || null;
+    /* ⚠ THE DATE FIELD IS NAMED PER STORE, because the stores do not agree and inventing one
+       spelling would have quietly reported every new row as never done. Measured on the real
+       records: `lc_schedules` keys on `week_start`, `menu_dog_tests` on `start_date`, `bookings` on
+       `created_at`, `event_regulars` on `last_visit`; everything else carries `date`. A stub of the
+       wrong shape certifies the bug exactly as a forgiving one does ([[lessons-paid-for]] #20). */
+    const firstIn = (arr, f) => {
+      const k = f || 'date';
+      return (arr || []).filter(r => r && inWeek(r[k]))
+        .sort((a, b) => String(a[k]).localeCompare(String(b[k])))[0] || null;
+    };
+    /* ⚠ BOOKS IS MONTHLY AND SAYS SO. Kyle: *"books could have a done this week.. or a done this
+       month since it is more monthly."* Money out is logged against a month, so a week window would
+       report a bar that logged its bills on the 2nd as having done nothing by the 10th. The ROW
+       carries its own window and the card heads the block to match, rather than one list quietly
+       meaning two different spans ([[output-honesty]] test 2 — correct for the timeframe its label
+       claims). */
+    const monthKey = App.todayLocal ? App.todayLocal().slice(0, 7) : '';
+    const inMonth = d => String(d || '').slice(0, 7) === monthKey;
+    const firstInMonth = (arr, f) => {
+      const k = f || 'date';
+      return (arr || []).filter(r => r && inMonth(r[k]))
+        .sort((a, b) => String(a[k]).localeCompare(String(b[k])))[0] || null;
+    };
 
     /* ⚠ `LAB` AND `SH` WENT WITH THE TWO ROWS THAT READ THEM (T72). Once Received delivery and
        Created order moved onto `ic_deliveries` / `ic_orders`, nothing in this member touched labor
        or shift data, and a local that is declared and read nowhere is the same leftover as a helper
        whose last caller went ([[the-loop]] #25 / [[lessons-paid-for]] #105). Measured before
        cutting: `LAB.` and `SH.` both at zero uses in the body. */
+    /* ⚠ `LAB` AND `SH` ARE BACK, AND SO IS `D`. They were cut at T72 when nothing in this member
+       read labor or shift data any more; the four sections Kyle asked for read all three again.
+       A local declared and read nowhere is a leftover, and one READ and not declared is a throw —
+       both directions are worth the one-line check ([[the-loop]] #25). */
     const INV = App.inventoryData || {};
+    const LAB = App.laborData || {};
+    const SH  = App.shiftData || {};
+    const D   = App.data || {};
     const rows = [
       { label: 'Take inventory count', screen: 'ic-take-inventory', mod: 'inventory', hit: firstIn(INV.ic_counts) },
       /* ⛔⛔ THESE TWO CHANGED THEIR SOURCE, NOT THEIR LABEL (Kyle, 2026-09-03: *"change log hours to
@@ -717,9 +745,44 @@ S.Hub = {
          required for CORRECTNESS is called bare so a missing one fails loudly instead of producing a
          silently wrong tick ([[the-loop]] #40). */
       { label: 'Spot check',           screen: 'ic-spot-check',     mod: 'inventory',
-        hit: firstIn(App.completedSpotChecks()) }
-    ].map(r => ({ label: r.label, screen: r.screen, mod: r.mod,
-                  done: !!r.hit, when: r.hit ? dayOf(r.hit.date) : '' }));
+        hit: firstIn(App.completedSpotChecks()) },
+
+      /* ⛔⛔ FOUR SECTIONS USED TO SAY "NOTHING NEEDS YOU HERE THIS WEEK" ON EVERY LOAD, and it was
+         this list that was thin, not their weeks. Kyle walked the pushed build and named all four:
+         *"the floor could have done this week.. build schedule, server check, etc."*, *"menus..
+         nothing needs you this week.. there are menu engineering items, recipes over target, a dog
+         test running"*, *"same with events"*, *"books could have a done this week."*
+         ⭐ EVERY ROW IS A DATED RECORD THE APP ALREADY WRITES, which is what keeps rule 4 true: there
+         is no tick anybody can fake, because the mark appears only when a record with a date on it
+         exists ([[hub-section-cards]] rule 4).
+         ⛔ AND EVERY `screen` BELOW IS A ROW IN ITS OWN SECTION'S NAV, measured off nav.js rather
+         than remembered — The Floor holds 27 rows including `lc-build-schedule`, `lc-log-hours`,
+         `sc-cash-control` and `r-server-check`; Menus holds 5 including `r-menu-engineering` and
+         `r-dog-test`; Events holds `ev-bookings` and `ev-regulars`; Books holds
+         `operating-expenses`. A screen its section's nav does not hold falls back to the section
+         landing with a console error, which is the dead-row class this project has shipped three
+         times ([[lessons-paid-for]] #18/#24/#126). */
+      { label: 'Logged hours',      screen: 'lc-log-hours',      mod: 'labor',
+        hit: firstIn(LAB.lc_actuals) },
+      { label: 'Built the schedule', screen: 'lc-build-schedule', mod: 'labor',
+        hit: firstIn(LAB.lc_schedules, 'week_start'), field: 'week_start' },
+      { label: 'Counted a drawer',  screen: 'sc-cash-control',   mod: 'shift',
+        hit: firstIn(SH.sc_variances) },
+      { label: 'Server check',      screen: 'r-server-check',    mod: 'revenue',
+        hit: firstIn(D.revenue_server_checks) },
+      { label: 'Repriced an item',  screen: 'r-menu-engineering', mod: 'revenue',
+        hit: firstIn(D.revenue_price_log) },
+      { label: 'Started a dog test', screen: 'r-dog-test',       mod: 'revenue',
+        hit: firstIn(D.menu_dog_tests, 'start_date'), field: 'start_date' },
+      { label: 'Took a booking',    screen: 'ev-bookings',       mod: 'events',
+        hit: firstIn(D.bookings, 'created_at'), field: 'created_at' },
+      { label: 'Logged a visit',    screen: 'ev-regulars',       mod: 'events',
+        hit: firstIn(D.event_regulars, 'last_visit'), field: 'last_visit' },
+      /* ⚠ THE ONE MONTHLY ROW. Its window is the calendar month and its caption says so on the card. */
+      { label: 'Logged money out',  screen: 'operating-expenses', mod: 'hub', span: 'month',
+        hit: firstInMonth(D.operating_expenses) }
+    ].map(r => ({ label: r.label, screen: r.screen, mod: r.mod, span: r.span || 'week',
+                  done: !!r.hit, when: r.hit ? dayOf(r.hit[r.field || 'date']) : '' }));
 
     /* The last row is the week itself. A `week` record ENDING on this week's Sunday means the
        operator confirmed it; nothing else in the app writes one ([[confirm-the-week]] — ONE popup
@@ -729,7 +792,7 @@ S.Hub = {
        The source is untouched: a `week` record ending on this Sunday, which only Confirm the Week
        writes. Shortened because the page it opens is called Close The Week and the row was the one
        spelling in the app that said it twice. */
-    rows.push({ label: 'Close the week', screen: 'week-close', mod: '',
+    rows.push({ label: 'Close the week', screen: 'week-close', mod: '', span: 'week',
                 done: !!wk, when: wk ? dayOf(wk.period_end) : '' });
     return rows;
   },
@@ -760,9 +823,42 @@ S.Hub = {
     return out;
   },
 
+  /* ⛔⛔ MENUS AND EVENTS HAD NO ALERT SOURCE AT ALL, so both cards said "Nothing needs you here this
+     week" on every load whatever the bar was doing. Kyle, walking the pushed build: *"menus.. nothing
+     needs you this week.. there are menu engineering items, recipes over target, a dog test running,
+     if items were missing recipes"* and *"same with events."*
+     ⭐ BOTH READ A HELPER THAT ALREADY OWNS THE QUESTION, never a re-derivation. `menuItemsUngradeable`
+     is the app's own answer to "what cannot be graded", and it exists precisely so a count of items
+     over target is not a green all-clear over a menu nobody has costed ([[the-loop]] #72 — a count of
+     problems is only an all-clear if it could have counted anything). `depositsDueList` is the ONE
+     definition of "a deposit is still due", written after two screens disagreed by $2,000.
+     ⚠ EACH CARRIES THE SCREEN IT OPENS AND NOTHING ELSE FILES IT. `_sectionIndex` puts an alert on
+     the card whose nav holds that page, so `r-menu-items` lands on Menus and `ev-bookings` on Events
+     without either being named here ([[lessons-paid-for]] #167).
+     ⚠ AND BOTH ARE CONDITION-GATED, so neither is a nag: no ungradeable item, no row. */
+  _sectionAlerts() {
+    const out = [];
+    const ung = (App.menuItemsUngradeable) ? App.menuItemsUngradeable() : [];
+    if (ung.length) out.push({
+      sev: 'warn', screen: 'r-menu-items',
+      label: ung.length === 1 ? 'One menu item has no cost or price'
+                              : ung.length + ' menu items have no cost or price',
+      value: 'cannot be graded'
+    });
+    const EB = (typeof S !== 'undefined') && S.EventsBookings;
+    const due = (EB && EB.depositsDueList) ? EB.depositsDueList() : [];
+    if (due.length) out.push({
+      sev: 'warn', screen: 'ev-bookings',
+      label: due.length === 1 ? 'One booking is still owed its deposit'
+                              : due.length + ' bookings are still owed their deposit',
+      value: App.fmtCurrency(EB.depositsDueTotal(), 0)
+    });
+    return out;
+  },
+
   // The one source both the card and the modal read.
   _needsItems() {
-    return this.forwardAlerts().concat(this._dueItems());
+    return this.forwardAlerts().concat(this._dueItems()).concat(this._sectionAlerts());
   },
 
 
@@ -971,7 +1067,12 @@ S.Hub = {
       steps.push({ label: g.label, screen: g.screen, from: g.from || null, gives: gives, note: g.note || '' });
     });
     steps.forEach(s => { s.sub = s.gives.length ? s.gives.join(', ') : s.note; });
-    return { key: key, name: name, stats: live, steps: steps };
+    /* ⚠ `extra` IS AN OPTIONAL FIFTH ARGUMENT, NOT A PER-KEY BRANCH IN THE BODY BUILDER. The Run
+       Audit card has something no other card has — four audits, each with a score, a last-run date
+       and its own recovered figure — and a card that renders a block nobody else does is a real
+       difference rather than a special case. Handing it in keeps `_cardBodyHTML` general, so a second
+       card that grows its own block tomorrow needs no edit to the assembler. */
+    return { key: key, name: name, stats: live, steps: steps, extra: arguments[4] || '' };
   },
 
   _inventoryCard(key, name) {
@@ -1110,9 +1211,12 @@ S.Hub = {
     /* ⚠ PRIME SITS BESIDE ITS OWN COMPONENTS AND IS NOT A TOTAL OF THEM. Prime is pour + food +
        labor; the three are shown side by side the way the old movement band showed them, never
        summed into one figure ([[output-honesty]] test 3 — never add a composite to its parts). */
+    /* ⛔ NO "WEEKS CLOSED" CELL. Kyle, 2026-09-03: *"get rid of the weeks closed 13 since you
+       started.. doesn't need to be there."* It counted the operator's own history back at them and
+       is not a reading on the bar; every other cell on this card is a figure from the week itself.
+       ⚠ `closed` STAYS AS A GATE. It is what the other cells wait on, and it is still what the one
+       closing job promises — only the cell went. */
     const cells = [
-      { label: 'Weeks closed', needs: ['closed'], screen: 'week-history',
-        value: String(closed), sub: closed === 1 ? 'the first one is in' : 'since you started' },
       { label: 'Net sales', needs: ['closed'], screen: 'week-review', value: m0(lw.netSales), sub: on },
       { label: 'Prime cost', needs: ['prime'], screen: 'week-review',
         value: App.fmtPct(lw.prime), sub: on },
@@ -1179,7 +1283,11 @@ S.Hub = {
       { label: 'Recovered', needs: ['fixed'], screen: 'bar-cop-audit',
         value: m0(rec.dollars), sub: rec.fixes + ' measured fix' + (rec.fixes === 1 ? '' : 'es') }
     ];
-    return this._cardFrom(key, name, gates, cells);
+    /* ⚠ THE RINGS ARE THE CARD'S OWN BLOCK and they render only when the card is OPENED, like every
+       other body block. Closed, this card is still three figures like the rest; opened, it is the
+       three recovery audits with their dates, their movement and what each has paid back — which is
+       the difference between a card that reads as a summary and the one Kyle called boring. */
+    return this._cardFrom(key, name, gates, cells, this._auditRingsHTML());
   },
 
   /* ── THE FLOOR ─────────────────────────────────────────────────────
@@ -1386,8 +1494,15 @@ S.Hub = {
       + '<span style="font-size:11px;color:var(--t3);white-space:nowrap;">'
       + (r.when ? 'Last done ' + esc(r.when) : 'Not yet') + '</span></div>').join('');
 
-    const body = block('Needs attention', needRows) + block('What moved', moved)
-              + block('Done this week', doneRows);
+    /* ⚠ THE HEADING FOLLOWS THE ROWS' OWN WINDOW. Books' one activity row is a calendar MONTH
+       (money out is logged against a month), so heading it "Done this week" would be a label that is
+       false about its own contents ([[output-honesty]] test 2). Read off the rows rather than
+       hard-coded per card, so a monthly row added to another section takes its heading with it. */
+    const doneSpans = new Set(lists.done.map(r => r.span || 'week'));
+    const doneHead = (doneSpans.size === 1 && doneSpans.has('month')) ? 'Done this month' : 'Done this week';
+    const body = block('Audit scores', card.extra || '')
+              + block('Needs attention', needRows) + block('What moved', moved)
+              + block(doneHead, doneRows);
     /* ⚠ A CARD WITH NOTHING TO OPEN SAYS SO RATHER THAN OPENING ON AN EMPTY BOX. It happens: a
        section with no alerts, no movement and no dated activity this week is a section running
        quietly, and that is a sentence, not a blank. */
@@ -1402,14 +1517,21 @@ S.Hub = {
        ([[hub-section-cards]]: *"the money band only matters if they are using the app to fill them..
        otherwise you have an almost empty band up there for no reason"*). Capped, every card's
        columns line up down the page whatever it holds. */
-    const cell = (inner, go) => '<div onclick="' + go + '" style="flex:1 1 132px;max-width:230px;'
-      + 'min-width:132px;cursor:pointer;">' + inner + '</div>';
+    /* ⛔⛔ A FIXED SIX-COLUMN GRID, NOT FLEX, AND THE REASON IS ALIGNMENT ACROSS CARDS. Kyle,
+       2026-09-03: *"all the columns in each card need to be aligned with each other from one card to
+       the next."* On `flex:1 1 132px` every card sized its own cells to its own count, so Inventory's
+       five and The Week's six landed on different x positions all the way down the page and the
+       stack read as six unrelated widths. Six fixed tracks means column 2 is column 2 on every card
+       whatever it holds, and a card with two cells simply leaves four empty.
+       ⚠ SIX BECAUSE THE WIDEST CARD HAS SIX. The Week is the ceiling now that Weeks closed is gone;
+       a seventh cell anywhere would need this number moved, which is why it is stated here and
+       asserted in the harness rather than left to be noticed on the page. */
+    const cell = (inner, go) => '<div class="hub-sec-cell" onclick="' + go + '">' + inner + '</div>';
     /* ⚠ `from` IS HOW A JOB THAT LIVES IN ANOTHER SECTION KEEPS A WORKING DOOR. Break-even needs a
        closed week, and Close The Week is THE WEEK's page — pointing a Books step at it through the
        Books nav would resolve nothing and land the operator on the section instead. The dependency
        is declared rather than fudged, so the census can read it. */
     const enter = c => 'S.Hub._goSectionRow(\'' + esc(c.from || card.key) + '\',\'' + esc(c.screen) + '\')';
-    const div = '<div class="hub-stat-div" style="align-self:stretch;width:1px;background:var(--b2);flex-shrink:0;margin:0 4px;"></div>';
     const stat = s => cell(
         '<div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">' + esc(s.label) + '</div>'
       + '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:28px;font-weight:600;letter-spacing:-0.3px;line-height:0.95;color:var(--t1);">' + esc(s.value) + '</div>'
@@ -1431,21 +1553,38 @@ S.Hub = {
        Close The Week rows under a green gate ([[the-loop]] integrity #11, [[lessons-paid-for]] #27). */
     const open = this._openSec === card.key;
     return '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:var(--r);padding:14px 18px 16px;">'
-      + '<div class="hub-sec-head" data-sec="' + esc(card.key) + '" style="display:flex;align-items:center;'
-      +   'gap:10px;cursor:pointer;margin-bottom:12px;">'
+      /* ⭐ THE SECTION NAME IS THE PAGE'S ONE PIECE OF COLOUR (Kyle, 2026-09-03: *"it needs something
+         design wise.. not a lot of color.. but a little somewhere at minimum the section names at
+         least in gold text"*). Gold is this product's accent and the names are what an operator
+         reads down the page, so it lands on the seven words that structure the whole screen and
+         nowhere else ([[color-system-locked]] — the token, never a hex). */
+      + '<div class="hub-sec-head' + (open ? '' : ' collapsed') + '" data-sec="' + esc(card.key) + '" '
+      +   'style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:12px;">'
       + '<span onclick="event.stopPropagation();App.jumpToSection(\'' + esc(card.key) + '\')" '
-      +   'style="font-size:13px;font-weight:700;color:var(--t1);">'
+      +   'style="font-size:13px;font-weight:700;color:var(--gold);">'
       +   esc(card.name) + '</span>'
       + '<span style="flex:1;"></span>'
       /* ⛔ THIRD JOB ON THE HEAD ROW, AND IT STOPS THE TOGGLE LIKE THE NAME DOES. The row toggles,
          the name navigates, this hides — three controls, three jobs, none of them firing each
          other. A hide that also opened the card would be the two-jobs-on-one-control mistake the
          section-links bar already refuses. */
-      + '<span onclick="event.stopPropagation();S.Hub._setCardHidden(\'' + esc(card.key) + '\',true)" '
-      +   'title="Hide this section from the Hub" '
-      +   'style="font-size:10px;color:var(--t4);cursor:pointer;padding:2px 4px;">Hide</span>'
-      + '<span style="font-size:11px;color:var(--t4);transition:transform .12s;'
-      +   (open ? 'transform:rotate(180deg);' : '') + '">&#9662;</span>'
+      /* ⚠ A GHOST BUTTON, NOT A WORD. Kyle: *"the hide needs to be a ghost button because just the
+         word next to the chevron is confusing on that they are two different things."* He is right
+         and it is the same reasoning as the section name: three controls sharing one row have to
+         LOOK like three controls, or the row reads as one label with a decoration. */
+      + '<button type="button" class="btn btn-ghost btn-sm" '
+      +   'onclick="event.stopPropagation();S.Hub._setCardHidden(\'' + esc(card.key) + '\',true)" '
+      +   'title="Hide this section from the Hub" style="font-size:10px;padding:3px 9px;">Hide</button>'
+      /* ⛔⛔ THE SHARED CHEVRON, NOT A SECOND ONE. This was a hand-rolled 11px span that rotated 180°
+         when open — so it pointed the wrong way in both states and had no hover, while every other
+         accordion in the app (Week in Review, Close The Week, Build Schedule, the import confirm
+         shell, Product Setup) uses `.card-chevron`: 14px, `--t3`, gold on hover, DOWN when open and
+         `rotate(-90deg)` when closed. Kyle caught all three ([[the-loop]] #95 — grep for the
+         mechanism before building one, the existing callers are the spec).
+         ⚠ The two hub-specific rules live in this file's own `<style>` block rather than in
+         `style.css`, because markup in a script plus layout in a stylesheet is a two-file atomic
+         unit and there is no such thing ([[lessons-paid-for]] #66). */
+      + '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
       + '</div>'
       /* ⛔⛔ THE ROW CARRIES NO CLASS, AND THE GATE CAUGHT THE FIRST VERSION THAT BORROWED THE MONEY
          BAND'S. Two things were wrong with renting it. It is that band's INNER PADDING (`style.css`,
@@ -1463,8 +1602,12 @@ S.Hub = {
          ([[lessons-paid-for]] #154/#161). The locator now de-comments; this stays indirect anyway.
          ⚠ `hub-stat-div` IS deliberately kept: it is the same divider object as the money band's, it
          carries the 768px hide rule from this file's own style block, and nothing locates by it. */
-      + '<div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">'
-      +   parts.join(div)
+      /* ⚠ THE DIVIDERS ARE A BORDER NOW, NOT ELEMENTS. As flex children they were grid items in the
+         wrong sense — a `<div>` between every pair would take its own track and knock the columns
+         out of line, which is the thing this row exists to fix. A left border on every cell but the
+         first of each row draws the same line and cannot affect the tracks. */
+      + '<div class="hub-sec-stats">'
+      +   parts.join('')
       + '</div>'
       + (open ? this._cardBodyHTML(card, this._sectionLists(card.key)) : '')
       + '</div>';
@@ -1476,6 +1619,81 @@ S.Hub = {
      while the other six are written. ⛔ AND THE WHOLE PAGE SHIPS AT ONCE — the Hub is the marketing
      screenshot and the live demo, and one section card beside six old bands must never reach
      production ([[lessons-paid-for]] #19). */
+  /* ── THE FOUR AUDITS, WITH THEIR SCORES, THEIR DATES AND WHAT EACH HAS PAID BACK ─────────────
+     Kyle, walking the pushed build: *"why is this so boring and not giving the operator anything..
+     it could have the 3 other audit scores.. in the color score rings with their last run date just
+     like on the other hub.. it could have their current score vs their last score.. and there is no
+     cash freed to date number for the cash audit."*
+     ⭐ THE RECOVERED FIGURE IS PER AUDIT, FROM THE ENGINE THAT ALREADY SPLITS IT. `Recovery
+     .moduleSummary(mod).recovered` is the same arithmetic as the cross-audit total the card's own
+     cell shows, asked one module at a time — so the Cash ring's figure IS the cash freed to date and
+     it cannot disagree with the headline above it ([[the-loop]] #54). No second loop, no new rule.
+     ⚠ BARE, like `Recovery.total()` twelve lines up and for the same reason: `recovery.js` assigns
+     `window.Recovery`, so the name resolves, and a guarded fallback would print a quiet $0 for a bar
+     that has recovered real money ([[the-loop]] #40).
+     ⚠ THE DELTA IS AGAINST THE PREVIOUS RUN OF THE SAME AUDIT, and it is null when there is only one
+     on file. A first audit has nothing to be up or down against, and printing +0 there would be a
+     measured-looking zero over an absence ([[lessons-paid-for]] #158). */
+  _auditReadings() {
+    const D = App.data || {};
+    const one = (arr, name, screen, mod) => {
+      const all = (D[arr] || []).filter(x => x && x.date && x.overall_score != null)
+        .sort((x, y) => String(y.date).localeCompare(String(x.date)));
+      const a = all[0], prev = all[1];
+      const sum = Recovery.moduleSummary(mod);
+      return { name: name, screen: screen, mod: mod,
+               score: a ? a.overall_score : null,
+               date:  a ? a.date : null,
+               delta: (a && prev) ? (a.overall_score - prev.overall_score) : null,
+               recovered: sum ? sum.recovered : 0 };
+    };
+    return [
+      one('audits',         'Profit',  'audit-tracker', 'profit'),
+      one('revenue_audits', 'Revenue', 'r-audit',       'revenue'),
+      one('cash_audits',    'Cash',    'c-audit',       'cash')
+    ];
+  },
+
+  /* ⭐ THE REAL RING, NOT A HAND-DRAWN ONE. `AuditUI.scoreRing` is the SVG arc every audit section
+     header already uses "so they read identically", and the last time this card was built I drew a
+     bordered div with my own colour ladder instead — a second implementation of a shared job that
+     looked nothing like the audits. `App.scoreColor` is that ladder, so the number under the ring
+     cannot drift from the ring's own fill ([[the-loop]] #95 — the existing callers are the spec). */
+  _auditRingsHTML() {
+    const rows = this._auditReadings();
+    const ring = m => {
+      const has = m.score != null;
+      const svg = has && typeof AuditUI !== 'undefined' && AuditUI.scoreRing
+        ? AuditUI.scoreRing(m.score, 44)
+        : '<div style="width:44px;height:44px;border-radius:50%;border:2px solid var(--b2);display:flex;'
+          + 'align-items:center;justify-content:center;font-size:13px;color:var(--t4);">-</div>';
+      /* ⚠ COLOUR ANSWERS GOOD OR BAD, NEVER UP OR DOWN, and a score rising is good for every one of
+         these three. The arrow is direction and the colour is judgement; conflating them is what
+         makes a generic dashboard unable to say anything useful. */
+      const d = m.delta;
+      const deltaTxt = d == null ? ''
+        : '<div style="font-size:10px;font-weight:700;margin-top:3px;color:'
+          + (d === 0 ? 'var(--t4)' : d > 0 ? 'var(--green)' : 'var(--red)') + ';">'
+          + (d === 0 ? 'no change' : (d > 0 ? '&#9650; +' : '&#9660; ') + d + ' pts') + '</div>';
+      return '<div onclick="S.Hub._goSectionRow(\'audit\',\'' + esc(m.screen) + '\')" '
+        + 'style="flex:1 1 140px;min-width:130px;cursor:pointer;display:flex;flex-direction:column;'
+        + 'align-items:center;text-align:center;">'
+        + svg
+        + '<div style="font-size:11px;color:var(--t1);margin-top:7px;font-weight:700;">' + esc(m.name) + '</div>'
+        + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">'
+        +   (m.date ? 'run ' + esc(this._shortDate(m.date) || m.date) : 'never run') + '</div>'
+        + deltaTxt
+        /* ⚠ THE RECOVERED LINE RENDERS ONLY WHEN THERE IS SOMETHING TO SAY. A `$0` under every ring
+           on a new account is three confident zeros where the honest answer is that nothing has been
+           measured yet, and the audit above it already says "never run". */
+        + (m.recovered > 0
+            ? '<div style="font-size:10px;color:var(--gold);margin-top:4px;">'
+              + esc(App.fmtCurrency(m.recovered, 0)) + ' back</div>' : '')
+        + '</div>';
+    };
+    return '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + rows.map(ring).join('') + '</div>';
+  },
+
   /* ── HIDING A CARD ──────────────────────────────────────────────────────────────────────────
      Kyle's spec, in his words: *"each card can be hidden if the user wants."* It is the answer to a
      bar that never books an event seeing an Events job on its Hub forever.
@@ -1643,6 +1861,32 @@ S.Hub = {
         .hub-app .nav-item.nav-disabled{cursor:default;opacity:0.45;}
         .hub-app .nav-item.nav-disabled:hover{background:transparent;}
         .hub-app .nav-item.nav-disabled .nav-icon{color:var(--t4);}
+        /* ── THE SECTION CARD'S STAT ROW ──────────────────────────────────────────────────────
+           ⚠ NO BACKTICKS IN THIS BLOCK, and it is not a style choice: this sits inside a TEMPLATE
+           LITERAL, so one backtick ends the string and takes the whole file with it. The rule was
+           already written twelve lines below and I broke it anyway on the first pass.
+           SIX FIXED TRACKS so column 2 is column 2 on every card down the page, whatever that card
+           holds. A card with two cells leaves four empty rather than stretching its two across the
+           width, which is what made the stack read as six unrelated layouts.
+           The divider is a LEFT BORDER on every cell but the first of a row, so it cannot take a
+           track of its own; nth-child(6n+1) is the first of each row at six columns. */
+        .hub-app .hub-sec-stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));row-gap:16px;}
+        .hub-app .hub-sec-cell{cursor:pointer;min-width:0;padding:0 14px;border-left:1px solid var(--b2);}
+        .hub-app .hub-sec-cell:nth-child(6n+1){border-left:0;padding-left:0;}
+        /* THE CHEVRON, on the app's shared rules. The shared card-chevron class supplies the glyph
+           size, the colour and the transition in style.css; these two say what a HUB card head does
+           with it, and they are the same pair every other accordion in the app declares. */
+        .hub-app .hub-sec-head:hover .card-chevron{color:var(--gold);}
+        .hub-app .hub-sec-head.collapsed .card-chevron{transform:rotate(-90deg);}
+        /* ⚠ THE PHONE GETS TWO TRACKS, NOT SIX. Kyle on the mobile view: *"that just looks pretty
+           bad."* Six 1fr tracks on a 375px screen is a 60px column, so a 28px figure wrapped and
+           every label stacked into a ragged column. Two keeps the pairs readable and the cards the
+           same shape as each other; the borders re-key to the first of each PAIR. */
+        @media (max-width:768px){
+          .hub-app .hub-sec-stats{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:0;}
+          .hub-app .hub-sec-cell:nth-child(6n+1){border-left:1px solid var(--b2);padding-left:14px;}
+          .hub-app .hub-sec-cell:nth-child(2n+1){border-left:0;padding-left:0;}
+        }
         .hub-app .hd-metric{background:var(--surface);padding:8px 10px;border:1px solid var(--b-edge);border-radius:var(--r);cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:3px;transition:border-color 0.12s;}
         .hub-app .hd-metric:hover{border-color:var(--b-edge);}
         .hub-app .hd-row{cursor:pointer;}
