@@ -956,15 +956,21 @@ S.LaborBuildSchedule = {
     /* Clicking an EMPTY cell opens a fresh block with that day already ticked, so the one-day path
        an operator has always used still takes the same number of presses. Clicking a day that
        already has a shift opens the week as it stands, that shift's block among them. */
-    /* ⚠ A NEW BLOCK CARRIES THE PRIMARY ROLE, not a blank. The old save stamped
+    /* ⛔ ONE BLOCK ON OPEN UNLESS THE PERSON GENUINELY HAS TWO SHIFT TIMES (Kyle, 2026-09-04: *"it
+       should still only open with one shift time and then the add another shift time.. the only time
+       it should open with two.. is if a staff with two different shift times is being edited"*).
+       The first version pushed a fresh block whenever the CLICKED CELL was empty, so anyone who
+       already had a shift opened with their block plus a spare — two sections for one shift time.
+       A blank block is only ever added when the person has nothing at all.
+       ⚠ A NEW BLOCK CARRIES THE PRIMARY ROLE, not a blank. The old save stamped
        `staff.position_id` whenever there was no picker, and its comment says why: an absent role
        means the primary, and a blank would cost the shift at $0 for single-role staff. */
-    if (!this.shiftsFor(staffId, day).length) {
+    if (!this._mBlocks.length) {
       this._mBlocks.push({ start: '', end: '', position_id: staff.position_id || '', days: [day], events: {} });
     }
-    App.openModal('<div class="card form-card" style="margin:0;">'
-      + '<div class="card-title">' + esc(staff.name || 'Staff') + '</div>'
-      + '<div id="bs-m-body"></div></div>',
+    /* ⚠ THE NAME LIVES INSIDE THE BODY, because the running total sits beside it and the body is
+       what re-renders. A title outside would hold a figure that never moved. */
+    App.openModal('<div class="card form-card" style="margin:0;"><div id="bs-m-body"></div></div>',
       { id: 'bs-shift-modal', maxWidth: 520, confirmDirty: true });
     this._renderShiftModal();
   },
@@ -1010,20 +1016,6 @@ S.LaborBuildSchedule = {
         ? '<div class="f" style="margin-bottom:12px;"><label>Role</label>'
           + '<select class="bs-m-role" data-b="' + i + '">' + this.roleOptionsFor(staffId, b.position_id) + '</select></div>'
         : '';
-      let calc = '';
-      if (b.start && b.end) {
-        const hrs = this.hoursOf(b.start, b.end);
-        if (sal) calc = hrs.toFixed(1) + ' hrs &middot; salaried (no hourly cost)';
-        else {
-          const wage = App.wageForStaffPosition(staff, b.position_id || staff.position_id || '', this.draft.week_start);
-          const per = hrs * wage;
-          const n = (b.days || []).length;
-          /* The WEEK total when the block covers more than one day, because that is the number the
-             operator is actually about to commit and the per-day figure alone understates it. */
-          calc = hrs.toFixed(1) + ' hrs &middot; ' + App.fmtCurrency(per) + (wage ? ' @ ' + App.fmtCurrency(wage) + '/hr' : '')
-            + (n > 1 ? ' &middot; ' + App.fmtCurrency(per * n) + ' across ' + n + ' days' : '');
-        }
-      }
       const pills = this.DAYS.map(d => {
         const off = this.offReasonFor(staffId, d);
         const on = (b.days || []).indexOf(d) >= 0;
@@ -1034,20 +1026,38 @@ S.LaborBuildSchedule = {
               : on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
                    : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(d) + '</button>';
       }).join('');
-      const drop = blocks.length > 1
-        ? '<button type="button" class="bs-m-drop" data-b="' + i + '" style="background:none;border:0;padding:0;color:var(--t3);font-size:11px;cursor:pointer;">Remove this shift time</button>'
-        : '';
+      /* ⚠ NO "DAYS" HEADING AND NO PER-BLOCK REMOVE (Kyle, 2026-09-04). The chips are self-evident
+         under a start and an end, and a Remove under every block was a second way to do what
+         unticking every day already does. Backing out of a block you just opened is the Add link's
+         own job now, below. */
+      const evRows = this._eventRowsFor(staffId, i, b);
       return '<div class="bs-m-block" style="padding:14px 0;' + (i < blocks.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
         + role
         + '<div class="form-row" style="margin-bottom:12px;">' + this._timeSelectFields('bs-m-start-' + i, b.start, 'Start') + '</div>'
         + '<div class="form-row" style="margin-bottom:0;">' + this._timeSelectFields('bs-m-end-' + i, b.end, 'End') + '</div>'
-        + '<div style="font-size:11px;color:var(--t3);margin-top:10px;min-height:14px;">' + calc + '</div>'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin:12px 0 7px;">Days</div>'
-        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + pills + '</div>'
-        + this._eventRowsFor(staffId, i, b)
-        + (drop ? '<div style="margin-top:10px;">' + drop + '</div>' : '')
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;">' + pills + '</div>'
+        // ⚠ the event rows need real air under the chips, or the checkbox reads as part of the row.
+        + (evRows ? '<div style="margin-top:14px;">' + evRows + '</div>' : '')
         + '</div>';
     }).join('');
+
+    /* ⭐⭐ THE RUNNING TOTAL SITS BESIDE THE NAME (Kyle: *"move the hours/wage calculations up next to
+       the employees name and it keeps total there.. it totals any shift times together as one
+       hours/cost numbers so the user can schedule a whole shift and see the total"*). It is the
+       whole week being committed, every block and every day, so a per-block figure would understate
+       what the operator is about to do. Salaried keeps its own read: hours, no hourly cost. */
+    let tHrs = 0, tCost = 0;
+    blocks.forEach(b => {
+      if (!b.start || !b.end) return;
+      const n = (b.days || []).length;
+      if (!n) return;
+      const hrs = this.hoursOf(b.start, b.end);
+      tHrs += hrs * n;
+      if (!sal) tCost += hrs * n * App.wageForStaffPosition(staff, b.position_id || staff.position_id || '', this.draft.week_start);
+    });
+    const totalLine = tHrs
+      ? tHrs.toFixed(1) + ' hrs' + (sal ? ' &middot; salaried (no hourly cost)' : ' &middot; ' + App.fmtCurrency(tCost))
+      : '';
 
     const plan = this._planShifts(staffId, blocks);
     const sum = this._planSummary(staffId, plan.shifts);
@@ -1057,12 +1067,30 @@ S.LaborBuildSchedule = {
     const bits = [];
     if (sum.added) bits.push(sum.added + ' to add');
     if (sum.removed) bits.push('<span style="color:var(--red);font-weight:700;">' + sum.removed + ' to remove</span>');
-    const net = bits.length ? bits.join(', ') + '.' : (sum.total ? 'No changes.' : 'No shifts set.');
+    /* ⛔ AN UNFINISHED BLOCK IS SAID OUT LOUD, NOT SAVED UP FOR THE BUTTON PRESS. `_planShifts`
+       skips a block it cannot use, so the count read "Save 5 Shifts" while a block carrying a time
+       and no days sat above it — a true number about a plan that was quietly ignoring part of the
+       screen ([[output-honesty]]). The refusal belongs where the operator is looking. */
+    const net = plan.errors.length
+      ? '<span style="color:var(--red);font-weight:700;">' + esc(plan.errors[0]) + '</span>'
+      : (bits.length ? bits.join(', ') + '.' : (sum.total ? 'No changes.' : 'No shifts set.'));
     const label = plan.shifts.length === 1 ? 'Save Shift' : 'Save ' + plan.shifts.length + ' Shifts';
 
-    return body
+    /* ⭐ THE LINK IS THE WAY IN AND THE WAY BACK OUT (Kyle: *"'+ Add another shift time' link opens
+       one ... and changes to '+ Cancel this Shift time' ... the first original one is always open"*).
+       It offers Cancel only while the LAST block is still untouched, so backing out of one you just
+       opened is one press, and once you have filled it in the link goes back to offering another. */
+    const last = blocks[blocks.length - 1];
+    const lastEmpty = blocks.length > 1 && last && !last.start && !last.end && !(last.days || []).length;
+    const linkText = lastEmpty ? '+ Cancel This Shift Time' : '+ Add Another Shift Time';
+
+    return '<div class="card-title" style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">'
+      +   '<span>' + esc(staff.name || 'Staff') + '</span>'
+      +   '<span style="font-size:11px;font-weight:600;color:var(--t3);">' + totalLine + '</span>'
+      + '</div>'
+      + body
       + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
-      +   '<button type="button" id="bs-m-add" style="background:none;border:0;padding:0;color:var(--gold);font-weight:700;font-size:12px;cursor:pointer;">+ Add Another Shift Time</button>'
+      +   '<button type="button" id="bs-m-add" data-cancel="' + (lastEmpty ? '1' : '0') + '" style="background:none;border:0;padding:0;color:var(--gold);font-weight:700;font-size:12px;cursor:pointer;">' + linkText + '</button>'
       + '</div>'
       + '<div id="bs-m-net" style="font-size:12px;color:var(--t2);margin-top:14px;">' + net + '</div>'
       + '<div class="card-actions">'
@@ -1111,14 +1139,13 @@ S.LaborBuildSchedule = {
       b.days.sort((x, y) => this.DAYS.indexOf(x) - this.DAYS.indexOf(y));
       this._renderShiftModal();
     }));
-    document.querySelectorAll('#bs-m-body .bs-m-drop').forEach(el => el.addEventListener('click', () => {
+    /* One control, both directions: Add while the last block has something in it, Cancel while it is
+       still blank. Cancel drops that block and whatever was typed into it, which is what it says. */
+    document.getElementById('bs-m-add')?.addEventListener('click', el => {
+      const btn = document.getElementById('bs-m-add');
       this._readModalBlocks();
-      this._mBlocks.splice(Number(el.dataset.b), 1);
-      this._renderShiftModal();
-    }));
-    document.getElementById('bs-m-add')?.addEventListener('click', () => {
-      this._readModalBlocks();
-      this._mBlocks.push({ start: '', end: '', position_id: '', days: [], events: {} });
+      if (btn && btn.dataset.cancel === '1') this._mBlocks.pop();
+      else this._mBlocks.push({ start: '', end: '', position_id: (this.staffById(staffId) || {}).position_id || '', days: [], events: {} });
       this._renderShiftModal();
     });
     document.getElementById('bs-m-save')?.addEventListener('click', () => {
