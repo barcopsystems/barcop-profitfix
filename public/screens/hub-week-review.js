@@ -1218,7 +1218,7 @@ S.WeekReview = {
     /* ⭐ CONFIRMING THE WEEK IS A THING THE OPERATOR DID, so it gets a line like every other thing
        they did. It is the one act this whole section exists for and the recap never said it out
        loud — the page only ever mentioned the close by ACCUSING somebody of skipping it. */
-    if (w) did.push(this._did('week confirmed', this._n('The week') + ' was confirmed.'));
+    if (w) did.push(this._did('the week confirmed', this._n('The week') + ' was confirmed.'));
     const activity = this._didBand(did);
 
     const costCell = (i, label) => {
@@ -1285,7 +1285,11 @@ S.WeekReview = {
     reads.forEach(r => r.wk.forEach(a => {
       const items = (a.action_items || []);
       const yr = items.reduce((s, x) => s + (x.monthly_impact || 0), 0) * 12;
-      did.push(this._did(r.label + ' audit', this._n(r.label + ' audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
+      /* ⚠ THE KIND IS THE AUDIT'S NAME, NOT "<name> audit" — the head sits under a section already
+         called Run Audit, so carrying the word made it say "audit" three times in one line and gave
+         the page its longest note. The BAND still says it in full, because there the sentence stands
+         alone ([[writing-style]] — a heading is context the line underneath does not have to repeat). */
+      did.push(this._did(r.label, this._n(r.label + ' audit') + ' run' + this._on(a.date || (a.generated_at || '').slice(0, 10))
         + (a.overall_score != null ? ', scored ' + a.overall_score : '') + '.'
         + (items.length ? ' ' + items.length + ' action ' + this._plu(items.length, 'item')
             + (yr ? ' worth ' + this._m0(yr) + '/yr' : '') + '.' : '')));
