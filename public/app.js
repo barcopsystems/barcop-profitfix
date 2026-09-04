@@ -2811,7 +2811,7 @@ const App = {
        still be reachable by any caller passing that action to `openHubFullPage`. */
     'week-close': { title: 'How Closing The Week Works', sections: [
       { h: 'What this is', p: ['The one place a week gets closed. It reads what you have already logged, tells you what the week still needs, and then you confirm it. Every line is read from your real records, so it cannot say the sales are in when they are not.'] },
-      { h: 'What the week needs', p: ['Sales and hours are what the numbers are built from. Tips, drawer counts and catering fill in when you have them, and a week closes fine without any of the three. Anything marked optional is not a gap.'] },
+      { h: 'What the week needs', p: ['Two things: your sales, and a count. Those are the pair that produce your bar pour cost and food cost, which is why they sit at the top. Hours, tips, drawer counts and catering fill in when you have them, and a week closes fine without any of them. Anything marked optional is not a gap, it is a piece you may not keep.'] },
       /* ⛔⛔⛔ ADDED 2026-09-04, AND EVERY FIGURE NAMED IN IT WAS MEASURED (Kyle: *"we need to connect
          the hub and the week together on what closing the week actually does/gives the user.. a user
          goes oh i get it.. i just need to type in my bar and food revenue and i get this"*). The
@@ -2823,7 +2823,12 @@ const App = {
          would be the exact defect this rule exists for; the row itself says where they do go.
          Pinned by `verify-week-close` block P, which proves every named cell is real and that the
          rows lighting nothing promise nothing. */
-      { h: 'What each row gives you', p: ['Every row on this page turns into something, and each one says what before you fill it in. Sales gives you net sales, bar pour cost and food cost. Hours turn those sales into prime cost and labor, which is why hours are not optional: without them a closed week has no prime cost at all. A count gives you cost of goods here, plus what is on your shelf and what to reorder on Inventory. Catering adds an event\'s revenue to the week you are closing.'] },
+      /* ⛔⛔ CORRECTED TWICE, AND KYLE FOUND IT BOTH TIMES. The first version gave Sales prime cost
+         and labor, which need the HOURS. The second gave it bar pour cost and food cost, which need
+         the COUNT: a cost percentage is cogs divided by revenue, so revenue alone produces neither.
+         MEASURED by closing a week with sales and nothing else: The Week card shows Net sales and
+         nothing more ([[lessons-paid-for]] #64). */
+      { h: 'What each row gives you', p: ['Every row turns into something, and each one says what before you fill it in. Sales gives you net sales, and it is the base every cost percentage is worked out against. A count gives you cost of goods, bar pour cost and food cost, because a cost percentage is what you used divided by what you sold. Hours turn those into prime cost and labor.', 'Skip a row and only the figures that need it stay blank. Nothing is barred: a bar with no timeclock export closes its week the same as anyone else, it just reads no prime cost until the hours are in.'] },
       /* ⛔⛔⛔ THIS SECTION EXISTS BECAUSE KYLE ASKED THE QUESTION AND WAS RIGHT TO: *"if they are
          dropping a tip file from their pos they already have their tip totals.. so what is the point
          of dropping a file?"* and *"if they have a pos drawer count, wouldn't that already have
