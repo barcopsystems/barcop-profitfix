@@ -2782,15 +2782,27 @@ const App = {
   // page's activeAction; openHubFullPage/showHub install the matching shim.
   // Pages not listed fall back to the full Help and FAQ. Sections: {h, p:[...]}.
   _HUB_HELP: {
+    /* ⛔⛔⛔ REWRITTEN 2026-09-04 WITH THE PAGE, AND ALL NINE SECTIONS WERE FALSE (Kyle: *"then i help
+       files need to be updated for the pages we have changed"*). The old topic described the six
+       bands `T138` deleted: a money line of four figures, an Operations Audit panel, a fixed
+       two-week comparison, Do this first, a gain-and-drag card and a six-reading bottom row. Not one
+       of them is on the Hub. Copy that describes a deleted mechanism is FALSE, not a wording
+       preference, and it is the third of [[the-loop]] #61's three greps — the one nobody does
+       ([[lessons-paid-for]] #116).
+       ⚠ AND NO VOCABULARY RATCHET COULD HAVE CAUGHT IT. `verify-help-not-stale` bans words that no
+       longer name anything the operator can see, and every word here is still live: the Hub exists,
+       audits exist, cost of goods exists. What died was the LAYOUT, and only reading the render
+       against the words finds that ([[lessons-paid-for]] #150).
+       ⭐ EVERY CLAIM BELOW IS READ OFF THE SHIPPED RENDER: seven cards in rail order, a cell that is
+       either a figure or its job, one card open at a time seeded from the account, the three body
+       blocks `_cardBodyHTML` emits, and the audit scores block on Run Audit. */
     'hub': { title: 'How the Hub Works', sections: [
-      { h: 'What this is', p: ['Your home screen. The Hub answers one question: are you running the bar better than you were? Every band on it is about movement, not a snapshot, and every number is a door into the screen behind it.'] },
-      { h: 'The money line', p: ['Four figures across the top. Total Opportunity is every dollar your audits have surfaced that you have not closed yet. Recovered, in gold, is the proven dollars you have put back, counted only after Bar Cop has measured that gap moving. Trapped Cash is the dead and overstocked inventory you could free. Break-Even is the sales you need to clear your costs. The first three open the audit that found that money.'] },
-      { h: 'Your Operations Audit', p: ['The left panel is the whole history in two numbers: your first score, today\'s score, and the points between them. Under it sit the Profit, Revenue and Cash audits, each with the date it last ran. A score that has never run reads as a dash, not a zero.'] },
-      { h: 'Where you were, where you are', p: ['A fixed two-week comparison. Prime cost, labor, check average and weekly sales, each shown as the reading two weeks ago against the reading now. Green means the number moved the way you want it to, which is not always up: labor falling is good, check average falling is not. The headline turns the prime cost move into dollars a month. Under about a hundred dollars a month it says you are holding steady instead, because twenty-five dollars a week is not a result.'] },
-      { h: 'Do this first', p: ['The single biggest money move across all your audits, with what it is worth and a button into the fix. One item, not a list: Bar Cop has already done the ranking, so it tells you the answer. Before your first audit this space is your Get Started steps instead.'] },
-      { h: 'Your biggest gain and worst drag', p: ['The operating number that moved furthest in your favour over the same two weeks, and the one that moved furthest against you, each with what the move is worth a week at your current volume. Bar pour cost, food cost, labor, check average, voids and comps, and overtime all compete for the two slots, so the card names whichever actually moved the money. Two weeks where nothing slipped shows no drag, which is the truth rather than a hole in the page.'] },
-      { h: 'Needs attention and Done this week', p: ['Needs attention is the operational list: expiring certs and permits, projected overtime, cash flags, worst first, each a tap into the item it names. Done this week is the five recurring jobs, ticked from your real records rather than by hand, so a tick means the work is on file. It resets Monday.'] },
-      { h: 'The bottom row', p: ['Six operational readings, one per system, each a door: what is below par, hours logged, overtime, cost of goods, voids and comps, and your cash runway. The ones that read last week say so. Below par and cash runway carry no comparison because nothing stores a history of them, so they state today\'s figure and stop.'] },
+      { h: 'What this is', p: ['Your home screen, laid out the way the rest of the app is: one card for each part of the rail, top down, Inventory through Books. Each card is where that part of the business stands right now, and every number on it opens the page behind it.'] },
+      { h: 'A number, or the job that gets you one', p: ['Every slot on a card is one or the other. You will not see a dash, and you will not see a zero standing in for a figure Bar Cop does not have. Before your first count the Inventory card shows the count as the thing to do; once it is in, that same slot shows what is on your shelf. So a card fills itself in as you use that part of the app, and each job says what it will turn into.'] },
+      { h: 'Opening a card', p: ['Click anywhere on a card\'s header to open it and click again to shut it. One is open at a time. Inventory is open the first time you land here; after that Bar Cop reopens the one you left open. That choice is kept on your account, so it follows you to the phone.'] },
+      { h: 'What is inside an open card', p: ['Needs attention is what that part of the business is waiting on, worst first, each row a tap into the item it names. What moved is the operating number that went furthest your way over the last two weeks and the one that went furthest against you. Done this week is work already on file, read from your records rather than ticked by hand. A block with nothing to say does not draw a heading at all.'] },
+      { h: 'The audit scores', p: ['Open Run Audit and it carries your Profit, Revenue and Cash scores as well, each with the date it last ran and the points it has moved since the run before. An audit that has never run reads as a dash, not a zero.'] },
+      { h: 'Hiding a card', p: ['Hide takes a card off the page, which is what to do with a part of the app you do not use. Nothing is deleted: hidden sections are named at the foot of the page and one press brings any of them back. The choice is stored on your account, so a card you hide on the laptop stays hidden on the phone.'] },
       { h: 'Multiple bars', p: ['Your bar name shows in the top bar. If you run more than one bar, that name becomes a switcher: pick another bar and Bar Cop reloads into it.'] }
     ] },
     /* `'flowmap'` (Workflow) was removed on 2026-08-11 with the page. [[the-loop]] #61: retiring a
@@ -2799,14 +2811,26 @@ const App = {
        still be reachable by any caller passing that action to `openHubFullPage`. */
     'week-close': { title: 'How Closing The Week Works', sections: [
       { h: 'What this is', p: ['The one place a week gets closed. It reads what you have already logged, tells you what the week still needs, and then you confirm it. Every line is read from your real records, so it cannot say the sales are in when they are not.'] },
-      { h: 'What the week needs', p: ['Sales and hours are what the numbers are built from. Tips, cash over and short, and catering fill in when you have them, and a week closes fine without any of the three. Anything marked optional is not a gap.'] },
+      { h: 'What the week needs', p: ['Sales and hours are what the numbers are built from. Tips, drawer counts and catering fill in when you have them, and a week closes fine without any of the three. Anything marked optional is not a gap.'] },
+      /* ⛔⛔⛔ ADDED 2026-09-04, AND EVERY FIGURE NAMED IN IT WAS MEASURED (Kyle: *"we need to connect
+         the hub and the week together on what closing the week actually does/gives the user.. a user
+         goes oh i get it.. i just need to type in my bar and food revenue and i get this"*). The
+         page and the Hub were two halves of one thing and nothing said so.
+         ⚠ MEASURED BY DIFFERENCING WORLDS ON THE LIVE DEMO, never written from memory: empty the
+         store a row fills, rebuild the seven Hub cards, read which cells stopped being figures. That
+         is what a claim about what the app will do costs ([[lessons-paid-for]] #64).
+         ⛔ TIPS ARE DELIBERATELY ABSENT FROM THE LIST. They light no Hub cell at all, so naming one
+         would be the exact defect this rule exists for; the row itself says where they do go.
+         Pinned by `verify-week-close` block P, which proves every named cell is real and that the
+         rows lighting nothing promise nothing. */
+      { h: 'What each row gives you', p: ['Every row on this page turns into something on your Hub, and each one says so before you fill it in. Sales gives you net sales, prime cost, bar pour cost, food cost and labor on The Week card. Hours gives you hours logged and overtime on The Floor. Drawer counts give you over and short. A count gives you cost of goods here, and what is on your shelf and what to reorder on Inventory.', 'Tips are the exception: they do not show on the Hub. They feed Tip Tracking and Labor Reports, which is what that row says. Catering adds an event\'s revenue to the week you are closing rather than lighting a figure of its own.'] },
       /* ⛔ THIS SECTION DID NOT EXIST, AND SALES IS THE FIRST ROW ON THE PAGE. The help explained how
          to get HOURS in and said nothing about how to get SALES in beyond one clause in "What the
          week needs" — so the row an operator meets first was the one with no directions. Added with
          the week-total door (T135), and every claim below was walked on the live build: three
          numbers write ONE row for the week, the file drop still reads each day, and typing days
          over a week total replaces it. */
-      { h: 'Getting the sales in', p: ['Enter the Week is the quickest way and it is two numbers: your bar sales and your food sales for the whole week, plus covers if you count them. That is enough to close a week. Or drop your POS sales export in the box underneath and Bar Cop reads each day off it and shows you every row before anything saves. Enter by Day is there if you would rather key each day in yourself.', 'A week total is stored as the week, not split across seven days, because Bar Cop does not know what your Tuesday was. If the week already has days in it and you save a week total, it asks you first and says how many days it would replace. Filling the days in afterwards replaces the week total the same way.'] },
+      { h: 'Getting the sales in', p: ['Enter the Week is the quickest way and it is two numbers: your bar sales and your food sales for the whole week, plus covers if you count them. Save Sales stores them; the week itself is closed by the confirm at the foot of the page. That is enough to close a week. Or drop your POS sales export in the box underneath and Bar Cop reads each day off it and shows you every row before anything saves. Enter by Day is there if you would rather key each day in yourself.', 'A week total is stored as the week, not split across seven days, because Bar Cop does not know what your Tuesday was. If the week already has days in it and you save a week total, it asks you first and says how many days it would replace. Filling the days in afterwards replaces the week total the same way.'] },
       { h: 'Getting the hours in', p: ['Import file on the Hours row opens a drop zone for your weekly timeclock export. Bar Cop reads the file, matches each row to your roster and rates, and shows you every row with what it worked out before anything is saved. Take out anything you do not want, then press the button to add them. Re-dropping the same file will not double-count, and a week that arrives in two files is fine. Open takes you to Log Hours if you would rather type them in.'] },
       { h: 'Cost of goods', p: ['If your counts happen to span this week, Bar Cop prices the cost of goods from them and says so. If they do not, you type it on the confirm. Counting weekly is not required, and Bar Cop will never book a month of usage onto one week.'] },
       { h: 'Confirming', p: ['Confirm the Week saves the week\'s figures. Anything missing reads as blank, so you can confirm now and fill the rest in later. Once it is confirmed the button reopens the same form so you can correct it.'] }
