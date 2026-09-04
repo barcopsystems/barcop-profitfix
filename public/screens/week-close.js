@@ -262,6 +262,30 @@ S.WeekClose = {
     return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   },
 
+  /* ⛔⛔⛔ A PROMISE ABOUT WHAT THE APP WILL DO IS A MEASUREMENT, NOT A SENTENCE (Kyle, 2026-09-04:
+     *"for a new user they don't get the connect because on close the week steps it doesn't say it..
+     Sales just says Not in yet.. on empty state it should say enter your sales to get your X, Y,
+     Z"*). He is right that the two pages were disconnected, and the trap is writing the payoff from
+     memory: that is marketing on the operator's own dashboard ([[lessons-paid-for]] #64).
+     ⭐⭐ SO EVERY NAME BELOW WAS MEASURED, BY DIFFERENCING TWO WORLDS ON THE LIVE DEMO — empty the
+     store that lane fills, rebuild the seven Hub cards, and read which cells stopped being figures.
+     The measurement corrected me three times:
+       · HOURS and DRAWER COUNTS light NOTHING on their own. The Hub reports the last CLOSED week,
+         so with no week there is no span to count rows inside. They need the week closed as well.
+       · TIPS light no Hub cell at all. Promising one would have been the exact defect this rule is
+         about, so that row names the two screens the figure really reaches instead.
+       · CATERING removes `Booked ahead` when its store is emptied, which reads like the payoff and
+         is a DIFFERENT question: Booked ahead is events still to come, and this row is events held
+         THIS week. Its honest payoff is the week's own revenue.
+     ⛔ `lights` IS THE LIST AND THE SENTENCE IS BUILT FROM IT, so the two cannot drift apart. The
+     names are the Hub's own cell labels, byte for byte, and `verify-week-close` block P proves each
+     one is real and really goes dark without that lane ([[the-loop]] #54 — one source, not two). */
+  _promise(verb, lights) {
+    const l = lights.map(s => s.toLowerCase());
+    const last = l.pop();
+    return verb + ' ' + (l.length ? l.join(', ') + ' and ' + last : last);
+  },
+
   /* ── The rows. Four intakes, two derived reads, then the confirm. ───────────
      `ready` drives the count and the tick; `note` is what the operator reads. Nothing here is a
      task list: a row that says "type it" is describing where the number comes from, not a chore. */
@@ -279,7 +303,8 @@ S.WeekClose = {
     const cogsNote = st.cogs.has
       ? 'From your counts'
       : (st.cogs.lastCount ? 'Type it on the confirm. Last count ' + this._shortDate(st.cogs.lastCount)
-                           : 'Take a count to fill this in');
+                           : this._promise('Take a count to get',
+                               ['Cost of goods', 'On the shelf', 'Still to order']));
     return [
       /* ⛔⛔ NO `go` ON THIS ROW ANY MORE, AND THAT IS THE POINT OF THE WHOLE CHANGE. It pointed at
          `sc-dashboard` — one of the six cockpits being deleted — and it was the ONLY row on this page
@@ -295,20 +320,42 @@ S.WeekClose = {
            `sc_shifts` rows — which is right for a file or the daily grid and WRONG the moment a
            week can arrive as one row, where it would read "1 day in" about a full week. The count
            was never the fact the operator wanted; the week's takings is. */
-        note: st.sales.length ? money(st.salesTotal) + ' in' : 'Not in yet' },
+        lights: ['Net sales', 'Prime cost', 'Bar pour cost', 'Food cost', 'Labor'],
+        note: st.sales.length ? money(st.salesTotal) + ' in'
+          : this._promise('Enter your sales to get', ['Net sales', 'Prime cost', 'Bar pour cost', 'Food cost', 'Labor']) },
       /* ⛔ THE DROP BELONGS WHERE THE RESULT SHOWS. This row is where the operator reads what the
          week's hours are, so it is where the file goes in; a door whose answer appears on a
          different page is a signpost, not a door. `lane` is the key the host names a zone for. */
       { key: 'hours', label: 'Hours', ready: st.hours.length > 0, go: 'lc-log-hours', goLabel: 'Log Hours', lane: 'hours',
-        note: st.hours.length ? st.hoursTotal.toFixed(1) + ' hours across ' + st.hours.length + ' row' + (st.hours.length === 1 ? '' : 's') : 'Not in yet' },
+        lights: ['Hours logged', 'Overtime'],
+        note: st.hours.length ? st.hoursTotal.toFixed(1) + ' hours across ' + st.hours.length + ' row' + (st.hours.length === 1 ? '' : 's')
+          : this._promise('Log your hours to get', ['Hours logged', 'Overtime']) },
       { key: 'tips', label: 'Tips', ready: st.tips.length > 0, go: 'lc-tip-log', goLabel: 'Tip Tracking', optional: true, lane: 'tips',
-        note: st.tips.length ? money(st.tipsTotal) + ' logged' : 'None logged' },
-      { key: 'cash', label: 'Cash over and short', ready: st.cash.length > 0, go: 'sc-cash-control', goLabel: 'Cash Control', optional: true, lane: 'cash',
-        note: st.cash.length ? st.cash.length + ' drawer count' + (st.cash.length === 1 ? '' : 's') : 'No drawer counted' },
+        /* ⚠ NO `lights`, AND THAT IS THE MEASUREMENT TALKING. Emptying `lc_tips` changes nothing on
+           any of the seven Hub cards. `lc-tip-log` and `lc-reports` are what read it, so those are
+           what the row names — a promise about a cell that does not exist is the defect
+           [[lessons-paid-for]] #64 is about, and it would have been easy to write. */
+        note: st.tips.length ? money(st.tipsTotal) + ' logged'
+          : 'Log your tips to get tip totals in Tip Tracking and Labor Reports' },
+      /* ⛔ "DRAWER COUNTS", NOT "CASH OVER AND SHORT" (Kyle, 2026-09-04). The old label named the
+         OUTPUT and the old note named the harder of two doors: over and short is what you GET, and a
+         dropped file writes the same `sc_variances` rows a hand count does ([[two-doors-same-data]]).
+         Named that way the row read as a chore only typing could finish. */
+      { key: 'cash', label: 'Drawer counts', ready: st.cash.length > 0, go: 'sc-cash-control', goLabel: 'Cash Control', optional: true, lane: 'cash',
+        lights: ['Over and short'],
+        note: st.cash.length ? st.cash.length + ' drawer' + (st.cash.length === 1 ? '' : 's') + ' in'
+          : this._promise('Drop a drawer file or count one to get', ['Over and short']) },
       { key: 'cogs', label: 'Cost of goods', ready: st.cogs.has, go: 'ic-take-inventory', goLabel: 'Take Inventory', derived: true,
+        lights: ['Cost of goods', 'On the shelf', 'Still to order'],
         note: cogsNote },
       { key: 'catering', label: 'Catering', ready: st.catering.length > 0, go: 'ev-bookings', goLabel: 'Event Bookings', optional: true, derived: true,
-        note: st.catering.length ? st.catering.length + ' event' + (st.catering.length === 1 ? '' : 's') + ' this week' : 'No events this week' }
+        /* ⚠ NO `lights` HERE EITHER, AND FOR A SHARPER REASON THAN TIPS. Emptying `bookings` DOES
+           take `Booked ahead` off the Events card, which reads exactly like the payoff — and it is a
+           different question. Booked ahead is events still to come; this row is events HELD in the
+           week under close, and what they do is add their revenue to it ([[the-loop]] #57 — two
+           numbers are not the same quantity until you write the two questions out). */
+        note: st.catering.length ? st.catering.length + ' event' + (st.catering.length === 1 ? '' : 's') + ' this week'
+          : 'Log an event to add its revenue to this week' }
     ];
   },
 
