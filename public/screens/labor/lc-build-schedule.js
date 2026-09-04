@@ -420,7 +420,11 @@ S.LaborBuildSchedule = {
       const timed = !!(b.start && b.end);
       if (!timed && !days.length) return;
       if (!timed) { errors.push('Set a start and end time for every shift.'); return; }
-      if (!days.length) { errors.push('Pick at least one day for the ' + this._fmtTime(b.start) + ' shift.'); return; }
+      /* ⚠ THE REFUSAL NAMES THE WAY OUT. It used to say only "Pick at least one day", which was a
+         dead end: unticking every day is how an operator says they do not want the shift, and the
+         only reply was to put a day back. Delete is the other answer and the sentence says so
+         ([[the-loop]] #53 — a refusal must point somewhere you can act). */
+      if (!days.length) { errors.push('Either delete or pick at least one day for the ' + this._fmtTime(b.start) + ' shift.'); return; }
       days.forEach(day => shifts.push({
         staff_id: staffId, day: day, start: b.start, end: b.end,
         event: (b.events && b.events[day]) || '', position_id: b.position_id || ''
@@ -968,9 +972,19 @@ S.LaborBuildSchedule = {
     if (!this._mBlocks.length) {
       this._mBlocks.push({ start: '', end: '', position_id: staff.position_id || '', days: [day], events: {} });
     }
-    /* ⚠ THE NAME LIVES INSIDE THE BODY, because the running total sits beside it and the body is
-       what re-renders. A title outside would hold a figure that never moved. */
-    App.openModal('<div class="card form-card" style="margin:0;"><div id="bs-m-body"></div></div>',
+    /* ⛔⛔ THE TITLE IS A DIRECT CHILD OF THE CARD AND MUST STAY ONE. `.card-title` is a card head
+       BAND — `margin:-20px -20px` plus a top radius — and the modal's own override that flattens it
+       is written `#app-modal-host .form-card > .card-title`, a DIRECT-CHILD selector. Rendering it
+       one level deeper inside the body missed that override, so the band bled past the card and
+       took the top border with it, which is exactly what Kyle saw ([[lessons-paid-for]] #11 — a
+       class is a contract, and the pass that changes it does not know who is renting it).
+       ⚠ SO THE TOTAL UPDATES IN PLACE instead of being re-rendered with the body. */
+    App.openModal('<div class="card form-card" style="margin:0;">'
+      + '<div class="card-title" style="display:flex;align-items:baseline;gap:14px;">'
+      +   '<span>' + esc(staff.name || 'Staff') + '</span>'
+      +   '<span id="bs-m-total" style="color:var(--t2);"></span>'
+      + '</div>'
+      + '<div id="bs-m-body"></div></div>',
       { id: 'bs-shift-modal', maxWidth: 520, confirmDirty: true });
     this._renderShiftModal();
   },
@@ -979,7 +993,28 @@ S.LaborBuildSchedule = {
     const host = document.getElementById('bs-m-body');
     if (!host) return;
     host.innerHTML = this._shiftModalHTML(this._mStaff);
+    // The head is outside the body (see openShiftModal), so its figure is written, not re-rendered.
+    const tot = document.getElementById('bs-m-total');
+    if (tot) tot.innerHTML = this._shiftTotalLine(this._mStaff);
     this._wireShiftModal();
+  },
+
+  /* The week being committed: every block, every day. A per-block figure understates what the
+     operator is about to do, which is why Kyle asked for one number beside the name. */
+  _shiftTotalLine(staffId) {
+    const staff = this.staffById(staffId);
+    if (!staff) return '';
+    const sal = App.isSalaried(staff);
+    let hrs = 0, cost = 0;
+    (this._mBlocks || []).forEach(b => {
+      const n = (b.days || []).length;
+      if (!b.start || !b.end || !n) return;
+      const h = this.hoursOf(b.start, b.end);
+      hrs += h * n;
+      if (!sal) cost += h * n * App.wageForStaffPosition(staff, b.position_id || staff.position_id || '', this.draft.week_start);
+    });
+    if (!hrs) return '';
+    return hrs.toFixed(1) + ' hrs &middot; ' + (sal ? 'salaried (no hourly cost)' : App.fmtCurrency(cost));
   },
 
   // The event rows for ONE block, one per selected day that has a booking. An event belongs to a
@@ -1026,38 +1061,28 @@ S.LaborBuildSchedule = {
               : on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
                    : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + esc(d) + '</button>';
       }).join('');
-      /* ⚠ NO "DAYS" HEADING AND NO PER-BLOCK REMOVE (Kyle, 2026-09-04). The chips are self-evident
-         under a start and an end, and a Remove under every block was a second way to do what
-         unticking every day already does. Backing out of a block you just opened is the Add link's
-         own job now, below. */
+      /* ⛔⛔ DELETE IS WHAT MAKES THE MODAL COMPLETE, AND IT WAS MISSING (Kyle, 2026-09-04: *"unselect
+         monday because i want to cancel that shift.. and it won't let me.. i have to pick at least
+         one day for the shift.. what if i don't want that shift anymore?"*). Unticking every day was
+         a dead end: the plan refuses a block with a time and no days, so there was no way out of a
+         shift time at all. One control, on the chip row where the days it kills are.
+         ⚠ AND IT REPLACES THE Add/Cancel TOGGLE rather than joining it. Two controls that both make
+         a block go away is the clutter Kyle flagged on the first draft; Delete cancels a block you
+         just opened and removes one you saved, which is the same act ([[the-loop]] #90 — remove the
+         window, do not police it). */
       const evRows = this._eventRowsFor(staffId, i, b);
       return '<div class="bs-m-block" style="padding:14px 0;' + (i < blocks.length - 1 ? 'border-bottom:1px solid var(--b2);' : '') + '">'
         + role
         + '<div class="form-row" style="margin-bottom:12px;">' + this._timeSelectFields('bs-m-start-' + i, b.start, 'Start') + '</div>'
         + '<div class="form-row" style="margin-bottom:0;">' + this._timeSelectFields('bs-m-end-' + i, b.end, 'End') + '</div>'
-        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;">' + pills + '</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:14px;">'
+        +   pills
+        +   '<button type="button" class="bs-m-del btn btn-sm" data-b="' + i + '" style="margin-left:auto;background:transparent;border:1px solid var(--red);color:var(--red);font-weight:700;">Delete</button>'
+        + '</div>'
         // ⚠ the event rows need real air under the chips, or the checkbox reads as part of the row.
         + (evRows ? '<div style="margin-top:14px;">' + evRows + '</div>' : '')
         + '</div>';
     }).join('');
-
-    /* ⭐⭐ THE RUNNING TOTAL SITS BESIDE THE NAME (Kyle: *"move the hours/wage calculations up next to
-       the employees name and it keeps total there.. it totals any shift times together as one
-       hours/cost numbers so the user can schedule a whole shift and see the total"*). It is the
-       whole week being committed, every block and every day, so a per-block figure would understate
-       what the operator is about to do. Salaried keeps its own read: hours, no hourly cost. */
-    let tHrs = 0, tCost = 0;
-    blocks.forEach(b => {
-      if (!b.start || !b.end) return;
-      const n = (b.days || []).length;
-      if (!n) return;
-      const hrs = this.hoursOf(b.start, b.end);
-      tHrs += hrs * n;
-      if (!sal) tCost += hrs * n * App.wageForStaffPosition(staff, b.position_id || staff.position_id || '', this.draft.week_start);
-    });
-    const totalLine = tHrs
-      ? tHrs.toFixed(1) + ' hrs' + (sal ? ' &middot; salaried (no hourly cost)' : ' &middot; ' + App.fmtCurrency(tCost))
-      : '';
 
     const plan = this._planShifts(staffId, blocks);
     const sum = this._planSummary(staffId, plan.shifts);
@@ -1076,21 +1101,9 @@ S.LaborBuildSchedule = {
       : (bits.length ? bits.join(', ') + '.' : (sum.total ? 'No changes.' : 'No shifts set.'));
     const label = plan.shifts.length === 1 ? 'Save Shift' : 'Save ' + plan.shifts.length + ' Shifts';
 
-    /* ⭐ THE LINK IS THE WAY IN AND THE WAY BACK OUT (Kyle: *"'+ Add another shift time' link opens
-       one ... and changes to '+ Cancel this Shift time' ... the first original one is always open"*).
-       It offers Cancel only while the LAST block is still untouched, so backing out of one you just
-       opened is one press, and once you have filled it in the link goes back to offering another. */
-    const last = blocks[blocks.length - 1];
-    const lastEmpty = blocks.length > 1 && last && !last.start && !last.end && !(last.days || []).length;
-    const linkText = lastEmpty ? '+ Cancel This Shift Time' : '+ Add Another Shift Time';
-
-    return '<div class="card-title" style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">'
-      +   '<span>' + esc(staff.name || 'Staff') + '</span>'
-      +   '<span style="font-size:11px;font-weight:600;color:var(--t3);">' + totalLine + '</span>'
-      + '</div>'
-      + body
+    return body
       + '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b2);">'
-      +   '<button type="button" id="bs-m-add" data-cancel="' + (lastEmpty ? '1' : '0') + '" style="background:none;border:0;padding:0;color:var(--gold);font-weight:700;font-size:12px;cursor:pointer;">' + linkText + '</button>'
+      +   '<button type="button" id="bs-m-add" style="background:none;border:0;padding:0;color:var(--gold);font-weight:700;font-size:12px;cursor:pointer;">+ Add Another Shift Time</button>'
       + '</div>'
       + '<div id="bs-m-net" style="font-size:12px;color:var(--t2);margin-top:14px;">' + net + '</div>'
       + '<div class="card-actions">'
@@ -1139,13 +1152,22 @@ S.LaborBuildSchedule = {
       b.days.sort((x, y) => this.DAYS.indexOf(x) - this.DAYS.indexOf(y));
       this._renderShiftModal();
     }));
-    /* One control, both directions: Add while the last block has something in it, Cancel while it is
-       still blank. Cancel drops that block and whatever was typed into it, which is what it says. */
-    document.getElementById('bs-m-add')?.addEventListener('click', el => {
-      const btn = document.getElementById('bs-m-add');
+    /* Delete drops the block and everything in it. On save that block's shifts are simply not in the
+       plan, so they go — which the net line has already counted as removals before the press. */
+    document.querySelectorAll('#bs-m-body .bs-m-del').forEach(el => el.addEventListener('click', () => {
       this._readModalBlocks();
-      if (btn && btn.dataset.cancel === '1') this._mBlocks.pop();
-      else this._mBlocks.push({ start: '', end: '', position_id: (this.staffById(staffId) || {}).position_id || '', days: [], events: {} });
+      this._mBlocks.splice(Number(el.dataset.b), 1);
+      /* ⚠ NEVER LEAVE THE MODAL WITH NOTHING IN IT. Deleting the last block would render an empty
+         card with no way to start again, so one blank block always survives — the same rule
+         `openShiftModal` applies to a person with no shifts at all. */
+      if (!this._mBlocks.length) {
+        this._mBlocks.push({ start: '', end: '', position_id: (this.staffById(staffId) || {}).position_id || '', days: [], events: {} });
+      }
+      this._renderShiftModal();
+    }));
+    document.getElementById('bs-m-add')?.addEventListener('click', () => {
+      this._readModalBlocks();
+      this._mBlocks.push({ start: '', end: '', position_id: (this.staffById(staffId) || {}).position_id || '', days: [], events: {} });
       this._renderShiftModal();
     });
     document.getElementById('bs-m-save')?.addEventListener('click', () => {
