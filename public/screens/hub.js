@@ -759,7 +759,10 @@ S.Hub = {
         hit: firstIn(LAB.lc_actuals) },
       { label: 'Built the schedule', screen: 'lc-build-schedule', mod: 'labor',
         hit: firstIn(LAB.lc_schedules, 'week_start'), field: 'week_start' },
-      { label: 'Counted a drawer',  screen: 'sc-cash-control',   mod: 'shift',
+      /* ⚠ NOT "Counted a drawer": the same `sc_variances` row arrives from a dropped file, and
+         labelling the record by the harder of its two doors tells an operator they did it the wrong
+         way ([[two-doors-same-data]]). */
+      { label: 'Drawer numbers in',  screen: 'sc-cash-control',   mod: 'shift',
         hit: firstIn(SH.sc_variances) },
       { label: 'Server check',      screen: 'r-server-check',    mod: 'revenue',
         hit: firstIn(D.revenue_server_checks) },
@@ -1371,8 +1374,20 @@ S.Hub = {
     const gates = [
       { key: 'ops',   met: !!bc, label: 'Run your first audit', screen: 'bar-cop-audit' },
       { key: 'money', met: total > 0, label: 'Run a Profit, Revenue or Cash audit', screen: 'audit-tracker' },
-      { key: 'fixed', met: (rec.dollars || 0) > 0, label: 'Mark a fix as done', screen: 'bar-cop-audit',
-        note: 'Bar Cop measures what it was worth from your closed weeks' }
+      /* ⛔⛔⛔ "MARK A FIX AS DONE" WAS A CONTROL THE APP DOES NOT HAVE (Kyle, 2026-09-04: *"MARK A
+         FIX AS DONE is not even a feature in the app anymore"*). He is right, and measuring it made
+         it sharper: NOTHING marks a fix. `Recovery.total()` reads `_fixBaselines` plus `fix_log`,
+         `ensureBaseline` is stamped automatically the moment a gap is DETECTED, and the only writer
+         of a `fix_log` row in the whole tree is `App.logPriceChange` — a side effect of repricing an
+         item, not a button. So the step told a new operator to go and press something that has not
+         existed since the Fix layer was deleted ([[lessons-paid-for]] #116 — copy describing a
+         deleted mechanism is FALSE, not a wording preference).
+         ⭐ THE HONEST JOB IS THE ONE THAT ACTUALLY MOVES THE FIGURE. `compute()` measures the weeks
+         at or after the baseline, so what produces a number is acting on a finding and then closing
+         the week. The note was already true and stays. */
+      { key: 'fixed', met: (rec.dollars || 0) > 0, label: 'Act on a finding, then close the week',
+        screen: 'bar-cop-audit',
+        note: 'Bar Cop measures what it was worth from your closed weeks. There is nothing to tick off' }
     ];
     const cells = [
       { label: 'Operations score', needs: ['ops'], screen: 'bar-cop-audit',
@@ -1380,10 +1395,18 @@ S.Hub = {
         sub: climb ? (climb.delta >= 0 ? 'up ' : 'down ') + Math.abs(climb.delta) + ' since '
                      + this._shortDate(climb.firstDate)
                    : 'run ' + this._shortDate(bc && bc.date) },
-      { label: 'On the table', needs: ['money'], screen: top.screen,
-        value: m0(total), sub: 'a month, most of it in ' + top.name },
-      { label: 'Recovered', needs: ['fixed'], screen: 'bar-cop-audit',
-        value: m0(rec.dollars), sub: rec.fixes + ' measured fix' + (rec.fixes === 1 ? '' : 'es') }
+      /* ⛔ PLAIN WORDS, BECAUSE THE DEMO IS THE SHOP WINDOW (Kyle, 2026-09-04: *"on the table / a
+         month, most of it in revenue / recovered / 4 measured fixes .. these need to be said more
+         plainly.. no one knows what that means.. so a potential user looking at the demo also has no
+         idea what you are talking about"*). "On the table" and "Recovered" are Bar Cop nouns: they
+         mean something to somebody who has used the product and nothing at all to the person
+         deciding whether to. The figures are unchanged; only the words are
+         ([[writing-style]] — a payoff may use only words the reader already owns). */
+      { label: 'Money to go after', needs: ['money'], screen: top.screen,
+        value: m0(total), sub: 'per month, most of it in ' + top.name },
+      { label: 'Money you got back', needs: ['fixed'], screen: 'bar-cop-audit',
+        value: m0(rec.dollars),
+        sub: 'from ' + rec.fixes + ' thing' + (rec.fixes === 1 ? '' : 's') + ' you fixed' }
     ];
     /* ⚠ THE RINGS ARE THE CARD'S OWN BLOCK and they render only when the card is OPENED, like every
        other body block. Closed, this card is still three figures like the rest; opened, it is the
@@ -1414,7 +1437,18 @@ S.Hub = {
         label: 'Add your positions and staff', screen: 'lc-positions',
         note: 'An hours report only lands for people already on your roster' },
       { key: 'hours', met: lw.hoursRows > 0, label: 'Log a week of hours', screen: 'lc-log-hours' },
-      { key: 'safe',  met: lw.overShortRows > 0, label: 'Count a drawer', screen: 'sc-cash-control' }
+      /* ⛔⛔ TWO DOORS, AND THE STEP NAMED THE HARDER ONE AS IF IT WERE THE ONLY ONE (Kyle,
+         2026-09-04: *"a user doesn't have to count a drawer to get over and short.. they can drop a
+         drawer file.. you can't pick one over the other when there are two options.. and definitely
+         don't want to pick the optional manual way over a simple file drop"*). Over and short comes
+         from `sc_variances`, and the cash lane on CLOSE THE WEEK writes those rows from a dropped
+         file exactly as the manual count does. Naming only the count made typing look compulsory.
+         ⭐ THE DROP LEADS AND THE DOOR GOES WITH IT. `from: 'week'` is how a job whose page lives in
+         another section keeps a working door — `week-close` is a row in The Week's nav, so the
+         router resolves it there ([[lessons-paid-for]] #167). The manual count is named in the same
+         breath so neither reads as the only way ([[two-doors-same-data]]). */
+      { key: 'safe',  met: lw.overShortRows > 0, from: 'week', screen: 'week-close',
+        label: 'Drop a drawer file, or count one by hand' }
     ];
     const cells = [
       { label: 'Hours logged', needs: ['roster', 'hours'], screen: 'lc-log-hours',
@@ -1423,7 +1457,8 @@ S.Hub = {
         value: m0(lw.otCost), sub: on },
       { label: 'Over and short', needs: ['safe'], screen: 'cash-recon',
         value: App.fmtBal(lw.overShort || 0),
-        sub: lw.overShortRows + ' drawer count' + (lw.overShortRows === 1 ? '' : 's') + (on ? ', ' + on : '') }
+        sub: lw.overShortRows + ' drawer' + (lw.overShortRows === 1 ? '' : 's') + ' in'
+             + (on ? ', ' + on : '') }
     ];
     return this._cardFrom(key, name, gates, cells);
   },
@@ -1695,9 +1730,21 @@ S.Hub = {
          ⚠ The two hub-specific chevron rules live in this file's own style block rather than in
          `style.css`, because markup in a script plus layout in a stylesheet is a two-file atomic
          unit and there is no such thing ([[lessons-paid-for]] #66). */
+      /* ⛔⛔⛔ THE WHOLE HEAD OPENS THE CARD, AND THE NAME NO LONGER NAVIGATES (Kyle, 2026-09-04:
+         *"the section titles when clicked should open the card... right now if you click inventory it
+         takes you to inventory and if you click the other section titles it does nothing... so the
+         entire header if clicked should open the card.. except for the Hide button"*).
+         ⛔ MEASURED, AND IT WAS WORSE THAN ONE ODD ROW: `App.jumpToSection` looks the key up in
+         `App._SECTION_DASH`, which holds MODULE keys — profit, revenue, cash, events, inventory,
+         labor, shift. Of the seven card keys only `inventory` and `events` are in it, so TWO titles
+         navigated and FIVE returned silently. That is the dead-row class this project has shipped
+         three times, and its own guard already says why: jumpToSection only knows module keys, so a
+         hub section handed to it returns on the missing lookup ([[lessons-paid-for]] #120/#126).
+         ⭐ HIS FIX REMOVES THE CLASS RATHER THAN REPAIRING IT. With no second job on the row there
+         is no key to resolve and nothing to go dead — the rail is how an operator reaches a section,
+         and the card head does one thing ([[the-loop]] #90 — remove the window, do not police it). */
       + '<span style="display:inline-flex;align-items:center;gap:8px;min-width:0;">'
-      +   '<span onclick="event.stopPropagation();App.jumpToSection(\'' + esc(card.key) + '\')" '
-      +     'style="font-size:13px;font-weight:700;color:var(--gold);">'
+      +   '<span style="font-size:13px;font-weight:700;color:var(--gold);">'
       +     esc(card.name) + '</span>'
       +   '<span class="card-chevron" aria-hidden="true">&#9662;</span>'
       + '</span>'
@@ -1804,8 +1851,8 @@ S.Hub = {
           + (d === 0 ? 'var(--t4)' : d > 0 ? 'var(--green)' : 'var(--red)') + ';">'
           + (d === 0 ? 'no change' : (d > 0 ? '&#9650; +' : '&#9660; ') + d + ' pts') + '</div>';
       return '<div onclick="S.Hub._goSectionRow(\'audit\',\'' + esc(m.screen) + '\')" '
-        + 'style="flex:1 1 140px;min-width:130px;cursor:pointer;display:flex;flex-direction:column;'
-        + 'align-items:center;text-align:center;">'
+        + 'style="flex:0 0 auto;min-width:110px;cursor:pointer;display:flex;flex-direction:column;'
+        + 'align-items:flex-start;text-align:left;">'
         + svg
         + '<div style="font-size:11px;color:var(--t1);margin-top:7px;font-weight:700;">' + esc(m.name) + '</div>'
         + '<div style="font-size:10px;color:var(--t4);margin-top:2px;">'
@@ -1814,12 +1861,16 @@ S.Hub = {
         /* ⚠ THE RECOVERED LINE RENDERS ONLY WHEN THERE IS SOMETHING TO SAY. A `$0` under every ring
            on a new account is three confident zeros where the honest answer is that nothing has been
            measured yet, and the audit above it already says "never run". */
-        + (m.recovered > 0
-            ? '<div style="font-size:10px;color:var(--gold);margin-top:4px;">'
-              + esc(App.fmtCurrency(m.recovered, 0)) + ' back</div>' : '')
         + '</div>';
     };
-    return '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + rows.map(ring).join('') + '</div>';
+    /* ⛔ LEFT, NOT CENTRED, AND NO MONEY UNDER THE RING (Kyle, 2026-09-04: *"the 3 audit scores in
+       the drop down align left.. not centered.. and remove the gold numbers.. just the score, last
+       run and score point difference up/down"*). Three centred columns floated in the middle of a
+       full-width card while every other block on the page starts at the left edge, and the gold
+       `$X back` line repeated the Money you got back cell six inches above it.
+       ⚠ `flex:0 0 auto` RATHER THAN `flex:1`, or three items still spread themselves across the
+       width and "left" would be true of the text inside each column and false of the columns. */
+    return '<div style="display:flex;gap:28px;flex-wrap:wrap;">' + rows.map(ring).join('') + '</div>';
   },
 
   /* ── HIDING A CARD ──────────────────────────────────────────────────────────────────────────
