@@ -71,10 +71,21 @@ S.CashAudit = {
     const sales  = ((App.shiftData && App.shiftData.sc_shifts) || []).length;
     const terms  = (window.CashEngine && CashEngine.termVendors) ? CashEngine.termVendors().length : 0;
     return [
-      { label: 'Opening cash balance set',   done: hasOpening,   go: 'c-position' },
-      { label: 'Two inventory counts taken', done: counts >= 2,  go: 'ic-take-inventory' },
-      { label: 'A week of POS sales imported', done: sales >= 1, go: 'week-close' },
-      { label: 'Vendors on payment terms',   done: terms > 0,    go: 'ic-vendors' }
+      /* ⚠ NO `lights` HERE, AND THAT IS MEASURED RATHER THAN LAZY. Liquidity and Runway looks like
+         this row's payoff and is not: `survivalForecast().hasData` reads inflow and outflow ROWS,
+         while `hasOpening` is a separate read. So the opening balance is what the forecast counts
+         FROM, not what makes it scorable ([[lessons-paid-for]] #141 — before claiming a payoff,
+         grep what actually decides it). */
+      { label: 'Type your bank balance as of today', done: hasOpening, go: 'c-position',
+        note: 'The balance every forecast counts from.' },
+      { label: 'Count your inventory twice, a week apart', done: counts >= 2, go: 'ic-take-inventory',
+        lights: ['Capital Efficiency', 'Cash Conversion Cycle'] },
+      /* ⚠ MEASURED AT NOTHING: emptying the sales rows AND the week revenue they produce costs this
+         audit no section. It feeds the forecast alongside the bills rather than turning one on. */
+      { label: 'Enter your bar and food sales for the week', done: sales >= 1, go: 'week-close',
+        note: 'Feeds the runway forecast alongside your bills.' },
+      { label: 'Set payment terms on one vendor', done: terms > 0, go: 'ic-vendors',
+        lights: ['Payment Terms'] }
     ];
   },
 
