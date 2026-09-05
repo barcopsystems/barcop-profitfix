@@ -3867,9 +3867,9 @@ S.HubSettings = {
       const baseAgo    = sunOff + ANCHS.endAgo(a);
       const wkScale    = lcHoursScale(a);
       const rowsBefore = lcActuals.length;
-      lcAllocate(lcBar,     wkScale, baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, wkScale, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   wkScale, baseAgo, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      lcAllocate(lcBar,     wkScale, baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Happy Hour', 'Late Night']);
+      lcAllocate(lcKitchen, wkScale, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Lunch', 'Lunch']);
+      lcAllocate(lcFloor,   wkScale, baseAgo, ['Happy Hour', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
       seedLeaders(baseAgo);
       const wkRows = lcActuals.slice(rowsBefore);
       seededHrs[a.wk] = +wkRows.reduce((s, r) => s + (r.hours || 0), 0).toFixed(1);
@@ -3996,9 +3996,9 @@ S.HubSettings = {
     const curLBase = sunOff - 7;
     if (curL) {
       const cScale = lcHoursScale(curL);
-      lcAllocate(lcBar,     cScale, curLBase, ['Dinner', 'Late Night', 'Dinner', 'Brunch', 'Late Night']);
-      lcAllocate(lcKitchen, cScale, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Brunch', 'Lunch']);
-      lcAllocate(lcFloor,   cScale, curLBase, ['Brunch', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      lcAllocate(lcBar,     cScale, curLBase, ['Dinner', 'Late Night', 'Dinner', 'Happy Hour', 'Late Night']);
+      lcAllocate(lcKitchen, cScale, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Lunch', 'Lunch']);
+      lcAllocate(lcFloor,   cScale, curLBase, ['Happy Hour', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
       seedLeaders(curLBase);
     }
     App.laborData.lc_actuals   = lcActuals;
