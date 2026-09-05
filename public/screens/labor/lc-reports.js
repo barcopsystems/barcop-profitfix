@@ -569,7 +569,9 @@ S.LaborReports = {
   // ── RANGE lens ──────────────────────────────────────────────────────────────
   rangeBody() {
     const rows = this.actuals().filter(a => this.inRange(a));
-    const tips = this.tips().filter(t => this.inRange(t));
+    // Settled shifts only, same rule as Books and Year-End: a report is a statement about what
+    // happened, and a shift still being counted has not happened yet.
+    const tips = App.settledTips(this.tips()).filter(t => this.inRange(t));
 
     const { from: winFrom, to: winTo } = this.rangeWindow();
     const datesInRange = rows.map(a => a.date).filter(Boolean).sort();

@@ -206,7 +206,11 @@ S.LaborTipLog = {
   showHowTo() {
     App.showHelpModal('How Tips Work', [
       { p: ['This screen handles a day\'s tips two ways: the toggle up top picks Log Tips to record each person\'s actual cash and card tips, or Tip Pool to split a shared pool across the crew. Both share the same week and day picker, so pick the day once and switch as you need.'] },
-      { h: 'Logging Tips', p: ['On Log Tips, tap the day on the week strip. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet and save the whole day at once. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week. Most weeks you import this off your POS export on Close The Week in Labor instead.'] },
+      { h: 'Logging Tips', p: ['On Log Tips, tap the day on the week strip. Bar Cop loads a row for every tipped employee scheduled to work it, adjusted by the Call-Out Log so a no-show drops off and whoever covered shows up. Each person\'s tippable hours fill in from their logged hours, or their scheduled hours if those are not in yet, and you can override them. Type each person\'s cash and card off your tip sheet. Use Add Staff for anyone the schedule missed. Step the week arrows to enter a prior week. Most weeks you import this off your POS export on Close The Week in Labor instead.'] },
+      /* The two actions are not the same thing, and the difference is what reaches your books, so
+         it is stated in the directions rather than on the card ([[the-loop]]: cards carry data and
+         controls, the "i" carries the explanation). */
+      { h: 'Saving As You Go, Then Closing The Shift', p: ['Save Tips banks whoever you have entered so far, so you can check a server out when she leaves and come back to the rest at close. Everybody on the shift stays on the screen the whole time, both the staff paying a tip-out and the staff receiving one, so you can see what each person owes and who is still to be paid. Collected is what the earners handed over and Distributed is what you have given out, and the two should match the envelope in your hand. When the cash reconciles, Close Shift closes every person at once. Until you close it, the shift stays out of your books, your reports and the tip-credit check, so a half-counted night never reaches a tax worksheet. A closed shift is locked; Re-open Shift if you need to fix a number.'] },
       { h: 'Tip-Outs', p: ['Set each role\'s tip-out in Positions: set Pays Tip Out to Yes, then set Tip Out On to % of Sales (usually 1 to 2 percent) or % of Tips (usually 10 to 20 percent), and set the number. Support roles like bussers and barbacks stay at No and only receive. The Tip Log then splits into two sections. The Pays / Receives Tip-Out section is where staff enter cash tips, card tips, and total sales, and Bar Cop figures their tip-out on whichever basis you set; if a tipped role also gets a cut (a bartender taking the bar share from servers), they get a Received cell too. The Receives Tip-Out section gives each support person one cell: enter what they actually received, because the real distribution is yours to make, not Bar Cop\'s. The Collected vs Distributed line flags any gap, and each person\'s net take-home carries into the tip-credit check and payroll worksheet. Bar Cop calculates the amounts only; how a tip-out is paid out is your call and your payroll provider\'s.'] },
       { h: 'Importing From A POS Export', p: ['Got a tips export? Drop it on Close The Week in Labor. Bar Cop matches each row to your roster by name; Staff Name and Date are required and a row needs at least one of Card Tips or Cash Tips. Rows with no roster match or no tip amount are reported. Imported tips land in the list here to review and edit.'] },
       { h: 'Splitting A Tip Pool', p: ['Switch the toggle to Tip Pool to split one pool across the crew. Tap the day to preload who worked it (the same crew Log Tips loads), enter the pool amount, and pick By Hours Worked or Equal Split. Bar Cop works out each person\'s share live; watch the Unallocated figure, it should land at zero when the whole pool is distributed. Add or remove a person and adjust hours, and the shares recompute. Save Tip Pool stores the split and feeds the tip-credit check on Pay Periods.'] },
@@ -336,11 +340,26 @@ S.LaborTipLog = {
     // it hides with the card.
     const modeBody = this.batchBody();
     const note = this._savedNote; this._savedNote = null;   // show once, after a save
-    const actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;">'
-      + '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
-      + '<button class="btn btn-ghost" id="tl-startover">Start Over</button>'
+    const justClosed = this._closedNote; this._closedNote = null;
+    /* ⛔ TWO ACTIONS, AND THEY ARE NOT THE SAME THING. Save Tips banks one person as they check
+       out and can be pressed all night; CLOSE SHIFT is the single action at the end that turns the
+       whole shift into a settled record. Nothing downstream counts a shift until it is closed, so
+       the difference is the difference between a working note and a figure on a tax worksheet. */
+    const closed = this.shiftClosed(this._addDate, this._addShiftType);
+    const actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+      + (closed
+          /* ⚠ A LABEL, NOT A SENTENCE. The first version explained here that a closed shift's tips
+             are in the books and reports, which is card PROSE and `verify-design-code` RULE 2b
+             refused it, correctly. The card carries the state; the explanation belongs in the
+             screen's own directions, where it now is. */
+          ? '<button class="btn btn-ghost" id="tl-reopen">Re-open Shift</button>'
+            + '<span style="font-size:12px;color:var(--t2);margin-left:4px;">Shift closed.</span>'
+          : '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
+            + '<button class="btn btn-ghost" id="tl-close-shift">Close Shift</button>'
+            + '<button class="btn btn-ghost" id="tl-startover">Start Over</button>')
       + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-      + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
+      + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '.</span>' : '')
+      + (justClosed ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Shift closed.</span>' : '')
       + '</div>';
     const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tl-print-blank" type="button">Worksheet</button>';
     // Tabs OUTSIDE the card, so they are the screen's first child (which is what
@@ -409,6 +428,17 @@ S.LaborTipLog = {
     }
 
     this.container.innerHTML = '<div class="screen">' + addCard + actionRow + below + '</div>';
+    /* A closed shift reads rather than edits. This is the COURTESY, not the guard: a re-render
+       rebuilds a disabled control enabled ([[the-loop]] #85), so `saveBatch` refuses a closed shift
+       on its own and this only stops the operator typing into something that will not be taken. */
+    if (closed) {
+      const scope = this.container.querySelector('#tl-b-rows');
+      if (scope) scope.querySelectorAll('input, select, button').forEach(el => {
+        el.disabled = true;
+        el.setAttribute('aria-disabled', 'true');
+        if (el.style) el.style.opacity = '0.6';
+      });
+    }
     App.applyCollapsed(this.container);
     this.container.onclick = ev => {
       // ⛔ `.ch-tab` / `data-tab` must match what `modeToggle()` renders. See the note there.
@@ -425,6 +455,8 @@ S.LaborTipLog = {
       if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Log', root: this.container, lists: [['lc', 'tip']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
+      if (ev.target.closest('#tl-close-shift')) { this.closeShift(); return; }
+      if (ev.target.closest('#tl-reopen')) { this.reopenShift(); return; }
       if (ev.target.closest('#tl-startover')) { this._addRows = []; this._savedNote = null; this.renderList(); return; }
       const tlRange = ev.target.closest('.tl-range-chip');
       if (tlRange) {
@@ -611,6 +643,53 @@ S.LaborTipLog = {
   // The effective date the batch logs against: the day picked in the anchor.
   batchDate() {
     return this._addDate || '';
+  },
+
+  /* ── CLOSING A SHIFT ────────────────────────────────────────────────────────────────────────
+     Kyle, 2026-09-05: *"once he has reconciled the actual cash with the screen he can click Save
+     Tips or Close Tips, that closes all the staff at one time and done."*
+     Save is per person as they check out; CLOSE is the one action at the end that turns the whole
+     shift into a settled record. Until then nothing downstream counts it. */
+  shiftRows(date, period) {
+    const key = App.tipShiftKey(date || this._addDate, period != null ? period : this._addShiftType);
+    return this.tips().filter(t => App.tipShiftKey(t.date, t.shift_type) === key);
+  },
+  /* A shift is CLOSED once it has rows and none of them is still open. An EMPTY shift is not
+     closed, it is unstarted — otherwise a day nobody has touched would refuse its first save. */
+  shiftClosed(date, period) {
+    const rows = this.shiftRows(date, period);
+    return rows.length > 0 && rows.every(t => !App.tipShiftOpen(t));
+  },
+  async setShiftOpen(open) {
+    const rows = this.shiftRows();
+    if (!rows.length) return true;
+    let ok = true;
+    for (const t of rows) {
+      /* ⚠ WRITE THE WHOLE RECORD BACK, not a patch. `putRecord` replaces, and the in-memory row is
+         the one every other screen is already reading, so mutating it and saving the same object
+         keeps the two in step instead of leaving the store ahead of the array. */
+      t.tip_shift_open = !!open;
+      ok = (await App.putRecord('lc', 'tip', t)) && ok;
+    }
+    return ok;
+  },
+  async closeShift() {
+    const err = document.getElementById('tl-err');
+    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
+    if (!this._addDate) { fail('Pick a day.'); return; }
+    // Save whatever is on screen first, so Close never silently drops the last person entered.
+    await this.saveBatch({ silent: true });
+    if (!this.shiftRows().length) { fail('Nothing to close on this shift yet.'); return; }
+    const btn = document.getElementById('tl-close-shift');
+    if (btn) { btn.disabled = true; btn.textContent = 'Closing...'; }
+    const ok = await this.setShiftOpen(false);
+    if (ok) { this._savedNote = null; this._closedNote = true; this.renderList(); }
+    else { if (btn) { btn.disabled = false; btn.textContent = 'Close Shift'; } fail('Could not close the shift. Try again.'); }
+  },
+  async reopenShift() {
+    if (!this.shiftRows().length) return;
+    const ok = await this.setShiftOpen(true);
+    if (ok) { this._closedNote = null; this.renderList(); }
   },
 
   // Read the batch rows back into state for re-renders and save (the day + period
@@ -805,12 +884,26 @@ S.LaborTipLog = {
 
   // Save every row that has a staff member and a tip amount as its own lc_tips
   // record, skipping anyone already logged for the shift (no double-count).
-  async saveBatch() {
+  /* `opts.silent` is how Close Shift saves the screen before closing it: no "nothing to save"
+     refusal when everybody is already in, and no re-render, because the caller renders once at the
+     end. It is not a quieter save, it is the same save without the two things that only make sense
+     when a human pressed the button. */
+  async saveBatch(opts) {
+    opts = opts || {};
     this.collectBatch();
     const err = document.getElementById('tl-err');
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = this._addDate || '';
     if (!date) { fail('Pick a day.'); return; }
+    /* ⛔ A CLOSED SHIFT IS LOCKED. Kyle's call: closing is the end of the night, so a stray save
+       afterwards must not quietly rewrite a settled record. Re-open is deliberate and one click.
+       ⚠ It refuses here rather than disabling the button alone, because a re-render rebuilds a
+       disabled button ENABLED ([[the-loop]] #85) — the disabled attribute is the courtesy, this is
+       the guard. */
+    if (this.shiftClosed(date, this._addShiftType)) {
+      fail('This shift is closed. Re-open it to change anything.');
+      return;
+    }
     const shiftType = this._addShiftType || '';
     const shiftId = App.tipShiftKey(date, shiftType);
     const managerId = App.activeManagerId ? App.activeManagerId() : '';
@@ -846,11 +939,16 @@ S.LaborTipLog = {
         sales: tipOutOn ? r2(o.sales) : 0,
         tip_out_paid: tipOutOn ? r2(o.paid) : 0,
         tip_out_received: tipOutOn ? r2(o.received) : 0,
+        /* ⛔ EVERY ROW SAVED HERE IS OPEN UNTIL THE SHIFT IS CLOSED. Save-as-you-go means a record
+           exists from the moment a server is checked out, so nothing can be lost on any device —
+           but a half-entered night must not reach the tip-credit check or Form 8027 until the
+           manager has reconciled the cash. `App.settledTips` is the one door that decides. */
+        tip_shift_open: true,
         hours: (h != null && !isNaN(h)) ? h : null, notes: (prior && prior.notes) || '',
         created_at: (prior && prior.created_at) || new Date().toISOString()
       });
     });
-    if (!recs.length) { fail('Enter cash or card tips for at least one person.'); return; }
+    if (!recs.length) { if (!opts.silent) fail('Enter cash or card tips for at least one person.'); return; }
 
     const btn = document.getElementById('tl-save-all');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
@@ -866,8 +964,7 @@ S.LaborTipLog = {
          ⭐ RELOAD instead: the shift comes back with every saved figure in place, so the manager can
          keep going, check Collected against the envelope, and see who is still owed. */
       this.preloadFromDate(this._addDate, this._addShiftType);
-      this._savedNote = recs.length;
-      this.renderList();
+      if (!opts.silent) { this._savedNote = recs.length; this.renderList(); }
     } else {
       if (btn) { btn.disabled = false; this.recalcBatch(); }
       fail('Save failed. Try again.');
