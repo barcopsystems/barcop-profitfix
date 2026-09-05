@@ -168,17 +168,26 @@ S.LaborTipLog = {
     this.renderList();
   },
 
-  // Segmented toggle that picks the mode (sits at the top of the card, above the
-  // shared week + day anchor). Switching keeps the selected day and preloads the
-  // new mode's crew if it has nothing in progress.
+  /* PAGE TABS that pick the mode. They sit ABOVE the card, as the screen's first child.
+     ⭐ THIS IS THE APP'S EXISTING PAGE-TAB SHELL, NOT A NEW ONE (Kyle, 2026-09-05: *"can the Log
+     Tips and Tip Pool be moved out of the card and become tab selections at the top?"* once the
+     shift selector made the card too crowded). `.ch-tabs` is used on twenty screens including
+     `lc-tip-history` next door, and `style.css` already positions a strip in this exact spot with
+     a rule scoped BY SHAPE rather than by a list of screens: `.screen > .ch-tabs:first-child`.
+     ⚠ IT ALSO HAD TO LEAVE THE CARD FOR A SECOND REASON. The old segmented toggle lived inside
+     `collapse-body`, so collapsing the Tips card took the mode switch with it.
+     ⛔⛔ THE CLASS RENDERED HERE AND THE SELECTOR THE WIRING READS ARE ONE FACT IN TWO PLACES, and
+     this codebase has already paid for getting it wrong: every tab in the Menu Builder was dead on
+     click because the markup said `ch-tab` and the handler asked for `.mi-tab`, with both halves
+     independently asserted and green ([[the-loop]] integrity #11). They are pinned AGAINST EACH
+     OTHER in verify-tip-shift-tabs.js. */
+  TABS: [['log', 'Log Tips'], ['pool', 'Tip Pool']],
   modeToggle() {
-    const seg = (mode, label) => {
-      const on = this._mode === mode;
-      return '<button type="button" class="btn btn-sm tl-modesel" data-mode="' + mode + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--gold-tint-bord);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + label + '</button>';
-    };
-    return '<div class="seg-toggle">' + seg('log', 'Log Tips') + seg('pool', 'Tip Pool') + '</div>';
+    return '<div class="ch-tabs no-print">'
+      + this.TABS.map(([k, label]) =>
+          '<button type="button" class="ch-tab' + (this._mode === k ? ' on' : '') + '" data-tab="' + esc(k) + '">'
+          + esc(label) + '</button>').join('')
+      + '</div>';
   },
   switchMode(mode) {
     if (mode === this._mode) return;
@@ -334,10 +343,12 @@ S.LaborTipLog = {
       + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '. See the list below.</span>' : '')
       + '</div>';
     const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tl-print-blank" type="button">Worksheet</button>';
-    const addCard = '<div class="card form-card">'
+    // Tabs OUTSIDE the card, so they are the screen's first child (which is what
+    // `.screen > .ch-tabs:first-child` styles) and survive the card being collapsed.
+    const addCard = this.modeToggle()
+      + '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-log', 'Tips', wsBtn)
       + '<div class="collapse-body">'
-      + this.modeToggle()
       + modeBody
       + '</div></div>';
 
@@ -400,8 +411,9 @@ S.LaborTipLog = {
     this.container.innerHTML = '<div class="screen">' + addCard + actionRow + below + '</div>';
     App.applyCollapsed(this.container);
     this.container.onclick = ev => {
-      const modeSel = ev.target.closest('.tl-modesel');
-      if (modeSel) { this.switchMode(modeSel.dataset.mode); return; }
+      // ⛔ `.ch-tab` / `data-tab` must match what `modeToggle()` renders. See the note there.
+      const modeSel = ev.target.closest('.ch-tab');
+      if (modeSel) { this.switchMode(modeSel.dataset.tab); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       // Day anchor (batch builder) — week pill + day chips, no future.
@@ -1097,10 +1109,11 @@ S.LaborTipLog = {
     // toggle, the day picker, and the entry below. No boxes around each part.
     const divLine = '<div style="border-top:1px solid var(--b2);margin:14px 0 16px;"></div>';
     const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tl-print-blank" type="button">Worksheet</button>';
-    const card = '<div class="card form-card">'
+    // Same move as the Log Tips card: the tabs sit above it, not inside its collapse body.
+    const card = this.modeToggle()
+      + '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-log', 'Tips', wsBtn)
       + '<div class="collapse-body">'
-      + this.modeToggle()
       + divLine
       + '<div id="tp-anchor">' + this.tlAnchor('tp', this._addWeekStart, this._addDate) + '</div>'
       + divLine
@@ -1154,8 +1167,9 @@ S.LaborTipLog = {
     document.getElementById('tp-clear')?.addEventListener('click', () => { this._poolEditId = null; this._poolAmount = ''; this._poolMethod = 'hours'; this._addDate = App.todayLocal(); this._addWeekStart = this.mondayOf(this._addDate); this._poolRows = this.crewForDate(this._addDate); this.renderPool(); });
     document.getElementById('tp-pool')?.addEventListener('input', () => this.onPoolInput());
     this.container.onclick = ev => {
-      const modeSel = ev.target.closest('.tl-modesel');
-      if (modeSel) { this.switchMode(modeSel.dataset.mode); return; }
+      // ⛔ `.ch-tab` / `data-tab` must match what `modeToggle()` renders. See the note there.
+      const modeSel = ev.target.closest('.ch-tab');
+      if (modeSel) { this.switchMode(modeSel.dataset.tab); return; }
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
       if (ev.target.closest('.tp-wk-prev')) { this.collectPool(); this._addWeekStart = this.addDaysYmd(this._addWeekStart, -7); this.renderPool(); return; }
