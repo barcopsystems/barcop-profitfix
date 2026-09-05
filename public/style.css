@@ -116,8 +116,8 @@
      different jobs — a stat box, a data row and a panel can still be moved apart at any time, which
      is exactly what having three of them buys. Do not "tidy" them into one. */
   --stat:      #202C36;
-  --c3:        #283642;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
-  --c4:        #283642;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
+  --c3:        #2E3D4A;                /* 3rd navy: menu borders/accents + secondary (icon) button backgrounds in the chrome */
+  --c4:        #2E3D4A;                /* 4th navy: accent splash — active section pills, active sidebar row, icon-button hover */
   --hover:     rgba(255,255,255,0.02);
   --nav-act:   #162C3C;
 
@@ -137,7 +137,7 @@
      it keeps "the open step" separate from the sixty other panel fills. It points AT --gold-tint
      rather than repeating its hex, so there is no second copy of the value to drift. */
   --step-open: #161E24;           /* open cockpit step background. */
-  --sel-active-bg: #283642;                /* active selector pill / chip background (filter chips, date-range pills, segmented toggles, week selector). A touch lighter than the panel fill so the active choice pops. */
+  --sel-active-bg: #2E3D4A;                /* active selector pill / chip background (filter chips, date-range pills, segmented toggles, week selector). A touch lighter than the panel fill so the active choice pops. */
   /* ⛔ ITS OWN TOKEN, NOT A LITERAL AND NOT `--sel-active-bg` (Kyle, 2026-09-05). The chosen plan
      on the two subscription pickers was the literal #1E2B34, written out TWICE in app.js — and
      that hex is `--c4`/`--sel-active-bg` territory, which this file already bans copying by hand.
