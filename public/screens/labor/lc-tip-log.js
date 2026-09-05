@@ -12,7 +12,6 @@
 
 S.LaborTipLog = {
   _mode: 'log',            // 'log' = per-person tip log, 'pool' = tip pool split (toggle at top)
-  editId: null,
   filterPreset: 'last-4',  // active range chip: this-week|last-week|this-month|last-4|all|custom
   _prevPreset: 'last-4',   // range to restore when Custom is toggled closed
   filterFrom: '',          // custom range only
@@ -25,7 +24,6 @@ S.LaborTipLog = {
   _addRows: null,          // [{ staff_id, hours, cash, card, sales, received }]
   _savedNote: null,        // count to confirm after a save (shown once)
   // Edit pop-up anchor state (one record at a time).
-  _eDate: '', _ePeriod: '',
   // Tip Pool mode state (shares the anchor above; own crew rows + amount + method).
   _poolRows: null,         // [{ staff_id, name, hours }]
   _poolAmount: '',         // pool dollar amount (operator-entered)
@@ -118,8 +116,35 @@ S.LaborTipLog = {
         + (on ? 'background:var(--sel-active-bg);border:1px solid var(--b-edge);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + wd + ' ' + d.getDate() + '</button>';
     }
+    /* ⛔⛔⛔ THE SHIFT ROW. A tip-out is owed to the SUPPORT CREW WHO WORKED THAT SHIFT, and that
+       crew changes between dayparts, so the tip-out has to be figured per shift even though a
+       server counts their bank once. Kyle, 2026-09-05: *"a server or bartender works 3 hours of
+       lunch and 3 hours of dinner... the manager could enter their sales up to that point, get the
+       tip out amount to the lunch staff receiving it, close it out, then open the dinner shift."*
+       ⭐ NOTHING NEW HAD TO BE BUILT FOR THIS. `App.SHIFT_TYPES` is a getter derived from the
+       operator's own service periods, the records have always carried `shift_type`, and
+       `App.tipShiftKey(date, shift_type)` has always grouped on it. Tips were flattened to per-day
+       and the plumbing was left intact underneath.
+       ⚠ ALL DAY IS A REAL OPTION, NOT A PLACEHOLDER. Every tip row written before today carries a
+       blank period, so blank has to stay selectable or two years of records become unreachable —
+       and a house that runs one close a night wants it. It is also the default.
+       ⚠ THIS IS ONLY SAFE BECAUSE THE SAVE UPSERTS. Keying a save `date|Dinner` while a `date|`
+       record exists for the same person used to slip past the duplicate guard and write a SECOND
+       row, which Form 8027 and the tip-credit check would both have counted. */
+    const periods = ['', ...((typeof App !== 'undefined' && App.SHIFT_TYPES) || [])];
+    const shiftChips = periods.map(p => {
+      const on = (this._addShiftType || '') === p;
+      return '<button type="button" class="btn btn-sm ' + prefix + '-shift" data-shift="' + esc(p) + '" style="'
+        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--b-edge);color:var(--t1);font-weight:700;'
+              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
+        + esc(p || 'All Day') + '</button>';
+    }).join('');
     return '<div style="margin-bottom:16px;">' + weekRow
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px;">' + dayChips + '</div></div>';
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px;">' + dayChips + '</div>'
+      + (periods.length > 1
+          ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + shiftChips + '</div>'
+          : '')
+      + '</div>';
   },
 
   fmtDate(str) {
@@ -159,7 +184,9 @@ S.LaborTipLog = {
       if (!logWork) {
         this._addWeekStart = this.mondayOf(today);
         this._addDate = today;
-        this._addShiftType = '';   // tips log per DAY now (no service-period split)
+        // Landing on All Day. A house that runs one close a night never touches the shift row, and
+        // it is the period every pre-2026-09-05 record carries, so it is the honest default.
+        this._addShiftType = '';
         this._addRows = [];
         this.preloadFromDate(today, this._addShiftType);
       }
@@ -220,104 +247,12 @@ S.LaborTipLog = {
     ]);
   },
 
-  // Shared form fields for the edit pop-up. p = element-id prefix ('tle-'). Clean
-  // two-up layout for the narrow modal: Date + Staff, then the tips, then the
-  // tip-out row and Notes. A plain Date field (like the other edit pop-ups) replaces
-  // the week+day chip picker, which was overkill for correcting one record.
-  formBody(x, p) {
-    p = p || 'tle-';
-    const v = val => (val != null && val !== '') ? val : '';
-    return '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Date</label>'
-          + '<input type="date" id="' + p + 'date" value="' + esc(this._eDate || App.todayLocal()) + '"/></div>'
-        + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Staff</label>'
-          + '<select id="' + p + 'staff"></select></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Cash Tips</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'cash" min="0" step="0.01" value="' + v(x?.cash_tips) + '"/></div></div>'
-        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Card Tips</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'card" min="0" step="0.01" value="' + v(x?.card_tips) + '"/></div></div>'
-      + '</div>'
-      + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Tippable Hours</label>'
-          + '<input type="number" id="' + p + 'hours" min="0" step="0.25" value="' + v(x?.hours) + '" placeholder="Auto"/></div>'
-        + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Total</label>'
-          + '<div class="f-display" id="' + p + 'c-total">-</div></div>'
-      + '</div>'
-      + '<div id="' + p + 'tipout-wrap" class="tl-tipout-wrap">' + (x ? this.tipoutRowHtml(x.staff_id, p, x.sales, x.tip_out_received) : '') + '</div>'
-      + App.noteField({ id: p + 'notes', value: x?.notes });
-  },
 
-  // Wire the edit-form field interactions. Save/Cancel/anchor are wired by the
-  // caller. p = element-id prefix. x = the record being edited.
-  wireForm(x, p) {
-    p = p || 'tle-';
-    document.getElementById(p + 'date')?.addEventListener('change', e => { this._eDate = e.target.value || this._eDate; this.populateStaffList(x, p); });
-    document.getElementById(p + 'staff')?.addEventListener('change', () => this.onStaffChange(x, p));
-    // Cash/card change the gross total and, for a tips-basis role, the tip-out.
-    const upd = () => { this.calc(p); this.updateTipoutPreview(p); };
-    document.getElementById(p + 'cash')?.addEventListener('input', upd);
-    document.getElementById(p + 'card')?.addEventListener('input', upd);
-    document.getElementById(p + 'sales')?.addEventListener('input', () => this.updateTipoutPreview(p));
-    this.updateTipoutPreview(p);
-    this.populateStaffList(x, p);
-    this.calc(p);
-  },
+  // Live tip-out preview: the payer's percent on their basis (their sales, or the
+  // tips they made). Reads whichever cells are present.
 
-  // The edit-modal tip-out row markup for a given staff: an earner gets Sales +
-  // a live Tip-Out preview + Received; a support role gets just Received. Built
-  // here so onStaffChange can rebuild it when the staff (and thus role) changes.
-  tipoutRowHtml(staffId, p, salesVal, receivedVal) {
-    p = p || 'tl-';
-    if (!App.tipOutEnabled() || !staffId) return '';
-    const v = val => (val != null && val !== '') ? val : '';
-    const toPct = App.tipOutPctFor(staffId);
-    const basis = App.tipOutBasisFor(staffId);
-    const role = App.tipRole(staffId) || 'earner';
-    const receivedCell = '<div class="f" style="width:170px;flex-shrink:0;"><label>Tip-Out Received</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'received" min="0" step="0.01" value="' + v(receivedVal) + '"/></div></div>';
-    // Payer needs a Sales cell only when the tip-out is a percent of sales; on a
-    // percent-of-tips basis the cash and card cells above already hold the base.
-    const salesCell = basis === 'tips' ? '' : '<div class="f" style="width:170px;flex-shrink:0;"><label>Sales</label>'
-      + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'sales" min="0" step="0.01" value="' + v(salesVal) + '"/></div></div>';
-    const toLabel = 'Tip-Out (' + App.fmtPct(toPct) + ' of ' + (basis === 'tips' ? 'tips' : 'sales') + ')';
-    return role === 'support'
-      ? '<div class="form-row" style="gap:16px;">' + receivedCell + '</div>'
-      : '<div class="form-row" style="gap:16px;flex-wrap:wrap;">' + salesCell
-        + '<div class="f" style="flex-shrink:0;"><label>' + toLabel + '</label><div class="f-display" id="' + p + 'c-tipout">-</div></div>'
-        + receivedCell + '</div>';
-  },
-
-  // Live tip-out preview in the edit modal: the payer's percent on their basis
-  // (their sales, or the tips they made). Reads whichever cells are present.
-  updateTipoutPreview(p) {
-    p = p || 'tl-';
-    const el = document.getElementById(p + 'c-tipout');
-    if (!el) return;
-    const staffId = document.getElementById(p + 'staff')?.value || '';
-    const sales = parseFloat(document.getElementById(p + 'sales')?.value) || 0;
-    const gross = (parseFloat(document.getElementById(p + 'cash')?.value) || 0) + (parseFloat(document.getElementById(p + 'card')?.value) || 0);
-    const paid = App.tipOutPaid(staffId, sales, gross);
-    el.textContent = paid > 0 ? '-' + App.fmtCurrency(paid, 2) : '-';
-  },
-
-  // Rebuild the tip-out row from the currently selected staff (edit modal), keeping
-  // any sales/received already typed, and rewire the live tip-out preview.
-  refreshTipoutRow(p) {
-    p = p || 'tl-';
-    const wrap = document.getElementById(p + 'tipout-wrap');
-    if (!wrap) return;
-    const staffId = document.getElementById(p + 'staff')?.value || '';
-    const sales = document.getElementById(p + 'sales')?.value;
-    const received = document.getElementById(p + 'received')?.value;
-    wrap.innerHTML = this.tipoutRowHtml(staffId, p, sales, received);
-    document.getElementById(p + 'sales')?.addEventListener('input', () => this.updateTipoutPreview(p));
-    this.updateTipoutPreview(p);
-  },
 
   renderList() {
-    this.editId = null;
     this.actions.innerHTML = '';
 
     if (this.staff().length === 0) {
@@ -452,6 +387,11 @@ S.LaborTipLog = {
       if (ev.target.closest('.tl-b-wk-now')) { this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderList(); return; }
       const dayChip = ev.target.closest('.tl-b-day');
       if (dayChip) { this._addDate = dayChip.dataset.ymd; this._addWeekStart = this.mondayOf(this._addDate); this.preloadFromDate(this._addDate, this._addShiftType); this.renderList(); return; }
+      /* ⚠ SWITCHING SHIFT RELOADS THE CREW, it does not filter what is on screen. A different
+         daypart is a different set of people, different hours and a different saved record, so
+         anything typed and not saved belongs to the shift it was typed on and does not travel. */
+      const shiftChip = ev.target.closest('.tl-b-shift');
+      if (shiftChip) { this._addShiftType = shiftChip.dataset.shift || ''; this.preloadFromDate(this._addDate, this._addShiftType); this.renderList(); return; }
       if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Log', root: this.container, lists: [['lc', 'tip']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
@@ -473,8 +413,8 @@ S.LaborTipLog = {
       const edit = ev.target.closest('.tl-edit');
       const del = ev.target.closest('.tl-del');
       if (del)       { ev.stopPropagation(); this.confirmDel(del.dataset.id); return; }
-      if (edit)      { ev.stopPropagation(); this.openEditModal(edit.dataset.id); return; }
-      if (row && App.canEdit('lc-tip-log')) this.openEditModal(row.dataset.id);
+      if (edit)      { ev.stopPropagation(); this.goToShift(edit.dataset.id); return; }
+      if (row && App.canEdit('lc-tip-log')) this.goToShift(row.dataset.id);
     };
 
     this.wireBatch();
@@ -485,9 +425,9 @@ S.LaborTipLog = {
   // ── Batch manual entry (preloaded from the day) ──────────────────────────────
   // The builder is a multi-row table: tap the day up top and Bar Cop loads a row for
   // every TIPPED employee who worked it (hours pre-filled), so the manager types
-  // each person's cash/card off the tip sheet and saves the whole day at once.
-  // Mirrors the Void/Comp + Waste builders. The single-record form (formBody) is
-  // still used for the edit pop-up.
+  // each person's cash/card off the tip sheet as they check out.
+  // Mirrors the Void/Comp + Waste builders. It is the ONLY editor now: the
+  // per-person pop-up was retired 2026-09-05, and a saved row opens its shift here.
   batchBody() {
     const on = App.tipOutEnabled();
     // Two inset divider lines (not full-bleed) separate the three parts: the
@@ -510,10 +450,20 @@ S.LaborTipLog = {
     const tbl = (head, body) => '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
+    /* Only rendered for somebody genuinely on two shifts, so an ordinary night carries no extra
+       line. The figure is their cash and card across the whole day, which is what they banked. */
+    const splits = this.daySplitNotes();
+    const splitNote = splits.length
+      ? '<div style="margin-top:12px;font-size:12px;color:var(--t2);line-height:1.6;">'
+        + splits.map(s => esc(s.name) + ' worked ' + esc(s.shifts.join(' and '))
+            + '. Day total ' + App.fmtCurrency(s.total, 2) + '.').join('<br/>')
+        + '</div>'
+      : '';
+
     if (!on) {
       const body = rows.map((r, i) => this.batchRowHtml(r, i)).join('');
       const table = '<div id="tl-b-rows">' + tbl('<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash Tips</th><th style="width:110px;">Card Tips</th><th style="width:100px;">Total</th><th style="width:90px;"></th>', body) + '</div>';
-      return header + table + addBtn;
+      return header + table + addBtn + splitNote;
     }
 
     // Tip-out on: two sections, EARNERS first then SUPPORT, so the form reads
@@ -547,7 +497,9 @@ S.LaborTipLog = {
         + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
         + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop figures each tip-out at the percent you set per role, on their sales or on the tips they made, and tracks what you record as distributed. It is a calculator, not legal or payroll advice. How a tip-out is collected and paid out, who must participate, and tip-credit rules vary by jurisdiction and change over time. Verify the rules for your area, and confirm the actual amounts with your payroll provider.</div>'
       + '</div>';
-    return header + tables + addBtn + reconBox;
+    // The split-shift day total sits below the reconciliation, because it is the second thing the
+    // manager checks: Collected against the envelope, then each person's night against their bank.
+    return header + tables + addBtn + reconBox + splitNote;
   },
 
   // Simple row (tip-out off): Staff / Tippable Hours / Cash / Card / Total.
@@ -650,6 +602,51 @@ S.LaborTipLog = {
      Tips or Close Tips, that closes all the staff at one time and done."*
      Save is per person as they check out; CLOSE is the one action at the end that turns the whole
      shift into a settled record. Until then nothing downstream counts it. */
+  /* ⛔⛔⛔ A PERSON ON TWO SHIFTS IN ONE DAY IS THE ONE WAY TO SILENTLY DOUBLE THEIR TIP INCOME.
+     Kyle's workflow puts a server who works lunch and dinner on BOTH sheets, which is right: the
+     tip-out is owed to whichever support crew was on, and those are different people. But their own
+     cash and card are ONE night's money, split across the two rows, and nothing stops a manager
+     typing the full $300 on each.
+     ⛔ IT IS NOT A DISPLAY PROBLEM. `App.tipShareForStaffInWeek` sums every row for that person, and
+     it decides whether a $2.13 server cleared minimum wage and therefore how much MAKEUP PAY they
+     are owed. Form 8027 sums the same rows per employee. A doubled night lands on both.
+     ⭐ SO THE SCREEN SHOWS THE DAY TOTAL, and the manager reconciles it against the bank-out the
+     same way they reconcile Collected against the envelope. It only appears for somebody who is
+     actually on more than one shift, so an ordinary night says nothing extra. */
+  daySplitNotes() {
+    const date = this._addDate;
+    if (!date) return [];
+    const here = new Set((this._addRows || []).map(r => r.staff_id).filter(Boolean));
+    const byStaff = new Map();
+    this.tips().forEach(t => {
+      if (t.date !== date || !t.staff_id || !here.has(t.staff_id)) return;
+      const e = byStaff.get(t.staff_id) || { shifts: new Set(), total: 0 };
+      e.shifts.add(t.shift_type || '');
+      e.total += (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0);
+      byStaff.set(t.staff_id, e);
+    });
+    const out = [];
+    byStaff.forEach((e, id) => {
+      if (e.shifts.size < 2) return;                       // one shift is the ordinary case
+      const st = this.staffById(id);
+      out.push({ name: (st && st.name) || '', shifts: [...e.shifts].map(s => s || 'All Day'), total: e.total });
+    });
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  /* A saved row opens its SHIFT rather than a private editor. There is one way to change a tip
+     record now: land on its day and period, Re-open if it is closed, and fix it in the same
+     table the night was entered on. Kyle: "keeping two ways to edit would be confusing." */
+  goToShift(id) {
+    const t = this.tips().find(x => x.id === id);
+    if (!t || !t.date) return;
+    this._mode = 'log';
+    this._addDate = t.date;
+    this._addWeekStart = this.mondayOf(t.date);
+    this._addShiftType = t.shift_type || '';
+    this.preloadFromDate(this._addDate, this._addShiftType);
+    this.renderList();
+  },
   shiftRows(date, period) {
     const key = App.tipShiftKey(date || this._addDate, period != null ? period : this._addShiftType);
     return this.tips().filter(t => App.tipShiftKey(t.date, t.shift_type) === key);
@@ -1010,148 +1007,14 @@ S.LaborTipLog = {
   },
 
   // ── Edit in a focused pop-up (day/period anchor + own tle- ids) ─────────────
-  openEditModal(id) {
-    if (!App.canEdit('lc-tip-log')) return;
-    const x = this.tips().find(t => t.id === id);
-    if (!x) return;
-    this.editId = id;
-    this._eDate = x.date || App.todayLocal();
-    this._ePeriod = x.shift_type || '';   // preserved (no period selector); tips are per-day now
-    const html = '<div class="card form-card narrow-form" style="margin:0;"><div class="card-title">Edit Tips</div>'
-      + this.formBody(x, 'tle-')
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="tle-save">Update</button>'
-        + '<span id="tle-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + '<button class="btn btn-danger" id="tle-del" style="margin-left:auto;">Delete</button>'
-      + '</div></div>';
-    App.openModal(html, { id: 'tl-edit-modal', maxWidth: 540, noClose: true });
-    this.wireForm(x, 'tle-');
-    document.getElementById('tle-save')?.addEventListener('click', () => this.save('tle-'));
-    document.getElementById('tle-del')?.addEventListener('click', () => { this.editId = null; App.closeModal('tl-edit-modal'); this.confirmDel(id); });
-  },
 
   // Populate the staff dropdown: who logged hours on the picked day first (an
   // optgroup), then the rest of the roster.
-  populateStaffList(existingRec, p) {
-    p = p || 'tle-';
-    const sel = document.getElementById(p + 'staff');
-    if (!sel) return;
-    const date = this._eDate || '';
-    const workedIds = new Set();
-    if (date) this.actuals().filter(a => a.date === date).forEach(a => { if (a.staff_id) workedIds.add(a.staff_id); });
-    const selectedId = existingRec?.staff_id || sel.value || '';
-    const all = this.staff().filter(s => s.status !== 'Inactive' || s.id === selectedId);
-    const onShift = all.filter(s => workedIds.has(s.id));
-    const offShift = all.filter(s => !workedIds.has(s.id));
-    let h = '<option value="">Select staff...</option>';
-    if (onShift.length) {
-      h += '<optgroup label="Worked This Day">';
-      onShift.forEach(s => { h += '<option value="' + s.id + '"' + (s.id === selectedId ? ' selected' : '') + '>' + esc(s.name) + '</option>'; });
-      h += '</optgroup>';
-    }
-    if (offShift.length) {
-      h += '<optgroup label="' + (onShift.length ? 'Other Staff' : 'Roster') + '">';
-      offShift.forEach(s => { h += '<option value="' + s.id + '"' + (s.id === selectedId ? ' selected' : '') + '>' + esc(s.name) + '</option>'; });
-      h += '</optgroup>';
-    }
-    sel.innerHTML = h;
-  },
 
   // When the staff dropdown changes — auto-fill hours from lc_actuals for this
   // staff member + the picked day. Operator can still override.
-  onStaffChange(existingRec, p) {
-    p = p || 'tle-';
-    const staffId = document.getElementById(p + 'staff')?.value || '';
-    const date = this._eDate || '';
-    // Reshape the tip-out row to the newly selected staff's role.
-    if (existingRec && App.tipOutEnabled()) this.refreshTipoutRow(p);
-    const hoursInp = document.getElementById(p + 'hours');
-    if (!hoursInp) return;
-    if (existingRec && hoursInp.value && parseFloat(hoursInp.value) > 0) return;
-    const hrs = App.hoursFor(staffId, date, this._ePeriod);
-    if (hrs != null && hrs > 0) hoursInp.value = hrs;
-  },
 
-  calc(p) {
-    p = p || 'tl-';
-    const num = id => parseFloat(document.getElementById(p + id)?.value) || 0;
-    const total = num('cash') + num('card');
-    const el = document.getElementById(p + 'c-total');
-    if (el) el.textContent = App.fmtCurrency(total);
-  },
 
-  async save(p) {
-    p = p || 'tl-';
-    const isEdit = p === 'tle-';
-    const err = document.getElementById(p + 'err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById(p + 'date')?.value || this._eDate || '';
-    if (!date) { fail('Pick a day.'); return; }
-    this._eDate = date;
-    const shiftType = this._ePeriod || '';
-    const shiftId = App.tipShiftKey(date, shiftType);
-    const managerId = App.activeManagerId ? App.activeManagerId() : '';
-
-    const staff = this.staffById(document.getElementById(p + 'staff')?.value);
-    if (!staff) { fail('Choose a staff member.'); return; }
-    const num = id => { const n = parseFloat(document.getElementById(p + id)?.value); return isNaN(n) ? null : n; };
-    const cash = num('cash') || 0, card = num('card') || 0;
-    // Tip-out side (edit pop-up). Earner pays their percent on their basis (sales,
-    // or the tips they made); anyone can have an operator-entered Received (a
-    // bartender takes the bar share). A row can be valid on received alone (support).
-    const tipOn = App.tipOutEnabled();
-    const role = App.tipRole(staff) || 'earner';
-    const r2 = n => Math.round((n || 0) * 100) / 100;
-    let salesV = 0, paidV = 0, receivedV = 0;
-    if (tipOn) {
-      receivedV = num('received') || 0;
-      if (role !== 'support') { salesV = num('sales') || 0; paidV = App.tipOutPaid(staff, salesV, cash + card); }
-    }
-    if (cash + card <= 0 && receivedV <= 0) { fail('Enter cash or card tips.'); return; }
-
-    const rec = {
-      id:          this.editId || App.uid(),
-      shift_id:    shiftId,
-      manager_id:  managerId,
-      date,
-      staff_id:    staff.id,
-      name:        staff.name,
-      position_id: staff.position_id || '',
-      shift_type:  shiftType,
-      cash_tips:   cash,
-      card_tips:   card,
-      total_tips:  cash + card,
-      hours:       num('hours'),
-      notes:       document.getElementById(p + 'notes')?.value.trim() || ''
-    };
-    if (tipOn) {
-      rec.sales = role === 'support' ? 0 : r2(salesV);
-      rec.tip_out_paid = role === 'support' ? 0 : r2(paidV);
-      rec.tip_out_received = r2(receivedV);
-    }
-    if (!this.editId) rec.created_at = new Date().toISOString();
-
-    const list = this.tips();
-    let saved = rec;
-    if (this.editId) {
-      const i = list.findIndex(t => t.id === this.editId);
-      if (i > -1) { list[i] = { ...list[i], ...rec }; saved = list[i]; }
-    } else {
-      list.push(rec);
-    }
-
-    const btn = document.getElementById(p + 'save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const ok = await App.putRecord('lc', 'tip', saved);
-    this.editId = null;
-    if (ok) {
-      if (isEdit) App.closeModal('tl-edit-modal');
-      this.renderList();
-    } else {
-      if (btn) { btn.disabled = false; btn.textContent = isEdit ? 'Update' : 'Save Tips'; }
-      fail('Save failed. Try again.');
-    }
-  },
 
   async confirmDel(id) {
     const ok = await App.confirmDelete();
@@ -1193,7 +1056,11 @@ S.LaborTipLog = {
        across the crew handed to it, so a missing person is not a missing row, it is a bigger share
        for everybody else. That used to need an `includeLogged` opt-out because the loader filtered;
        the filter is gone for both callers now, so this is a plain call again. */
-    this.preloadFromDate(date, '');
+    /* ⚠ THE PICKED SHIFT, not a hardcoded whole day. It passed '' while tips were per-day; with a
+       shift row on the anchor, asking for the whole day would hand a lunch pool the dinner crew's
+       hours and split the pot across people who were not there. `hoursFor` is period-scoped, so
+       this also gives each person the hours they worked IN that shift, which is the denominator. */
+    this.preloadFromDate(date, savedShift || '');
     const crew = (this._addRows || []).map(r => { const st = this.staffById(r.staff_id); return { staff_id: r.staff_id, name: st ? st.name : '', hours: (r.hours != null ? r.hours : '') }; });
     this._addRows = savedRows; this._addDate = savedDate; this._addShiftType = savedShift;
     return crew;
@@ -1294,6 +1161,11 @@ S.LaborTipLog = {
       if (ev.target.closest('.tp-wk-now')) { this.collectPool(); this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderPool(); return; }
       const dayChip = ev.target.closest('.tp-day');
       if (dayChip) { this.loadPoolDay(dayChip.dataset.ymd); return; }
+      /* ⛔ WIRED, NOT DECORATIVE. The shift row lives on the shared anchor, so it renders on this
+         tab too — and an unwired chip is the dead-row class this project has shipped three times.
+         It reloads the crew for the picked shift, the same as the Log Tips side. */
+      const poolShift = ev.target.closest('.tp-shift');
+      if (poolShift) { this._addShiftType = poolShift.dataset.shift || ''; this.loadPoolDay(this._addDate); return; }
       if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Pool', root: this.container, lists: [['lc', 'tip_pool']], reRender: () => this.renderPool(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlankPool(); return; }
       const tpRange = ev.target.closest('.tl-range-chip');
@@ -1431,9 +1303,13 @@ S.LaborTipLog = {
     const existing = this._poolEditId ? this.pools().find(x => x.id === this._poolEditId) : null;
     const rec = {
       id:          this._poolEditId || App.uid(),
-      shift_id:    App.tipShiftKey(this._addDate, ''),
+      /* ⛔ THE POOL IS PER SHIFT FOR THE SAME REASON THE LOG IS: a lunch crew's pool is not split
+         with the dinner crew. These were hardcoded blank when tips were flattened to per-day; the
+         shift row on the anchor now feeds them, and `App.tipShiftKey` has always been what joins a
+         pool to its Tip Log entries in Books and Tip History. */
+      shift_id:    App.tipShiftKey(this._addDate, this._addShiftType || ''),
       date:        this._addDate,
-      shift_type:  '',
+      shift_type:  this._addShiftType || '',
       method:      this._poolMethod,
       pool_amount: pool,
       total_hours: totalHours,
