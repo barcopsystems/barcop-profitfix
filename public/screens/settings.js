@@ -4209,9 +4209,21 @@ S.HubSettings = {
                                             : +(supTot * (earnTot > 0 ? p.share / earnTot : 0)).toFixed(2);
         handed = +(handed + p.paid).toFixed(2);
         p.gross = +(p.share + p.paid).toFixed(2);
-        // Sales that make the DECLARED tip-out percentage true, not merely plausible.
+        /* Sales that make the DECLARED tip-out percentage true, not merely plausible.
+           ⛔⛔ TO THE CENT, NOT ROUNDED TO A DOLLAR (fixed 2026-09-05, found by walking the live
+           demo). This was `Math.round(...)`, which is realistic-looking and leaves the stored
+           tip-out a penny off what the percentage actually gives: Ashley B. banked $1,510 at 2%,
+           which is $30.20, against a stored $30.19, and Brianna K. $1,222 at 3% = $36.66 against
+           $36.65. The tip screen RECOMPUTES each earner's tip-out from their sales, because
+           Collected has to equal the Tip-Out cells the manager can see, so those two pennies landed
+           on the reconciliation: **Collected $345.02 against Distributed $345.00**, and the gap
+           turns amber above a penny. A false discrepancy on the one screen whose whole job is
+           showing a shift reconciling, on the demo.
+           ⚠ THE THREE CANNOT ALL HOLD: whole-dollar sales, a percentage that is exactly true, and
+           Collected equalling Distributed. Sales is the one to give, because it is the only one
+           nobody reads as a promise, and $1,509.50 of bar sales is entirely ordinary. */
         const pct = TIPOUT_PCT[p.role] || 0;
-        p.sales = pct > 0 ? Math.round(p.paid / (pct / 100)) : 0;
+        p.sales = pct > 0 ? +(p.paid / (pct / 100)).toFixed(2) : 0;
         // A bar this size runs card-heavy; the split is fixed, not random, so the seed is
         // reproducible and Form 8027's charged-tips line is a stable number.
         p.cash = +(p.gross * 0.30).toFixed(2);
