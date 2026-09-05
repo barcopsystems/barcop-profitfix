@@ -1487,12 +1487,17 @@ const App = {
                off the pricing page — and this gate, the screen a LAPSED customer is recovered on,
                was still running it. $67 is the figure the website toggle and Stripe's own
                checkout page both print, so the three surfaces now say one thing.
-               ⚠ REPRICED 2026-08-31: $189/$1,890 -> $87/$804. 87 x 12 = 1,044, so the annual
-               saves 240. Every figure here is derived from those two and moves with them.
+               ⚠ REPRICED 2026-09-05: $87/$804 -> $149/$1,488. 149 x 12 = 1,788, so the annual
+               saves 300, and 1,488 / 12 = 124.00 exactly. Every figure here is derived from those
+               two and moves with them. (It was $189/$1,890 until 2026-08-31 and $87/$804 until
+               today; the earlier numbers are history, not a second price.)
+               ⛔ THE SAVING IS IN DOLLARS, NEVER "two months free" OR A PERCENTAGE. A ratio claim
+               goes false on the next reprice with no number in it for any sweep to catch, which
+               is exactly how "two months free" survived the last one ([[pricing-decision]]).
                ⛔ `data-plan` IS THE SERVER'S PLAN ID: only the LABEL is "Yearly". Renaming the
                value sends a plan `planPrice()` does not know and the checkout is refused. */
-            +   planOpt('monthly', '<b>Monthly</b> &middot; $87 / month', '')
-            +   planOpt('annual',  '<b>Yearly</b> &middot; $67 / month', 'billed annually &middot; save $240')
+            +   planOpt('monthly', '<b>Monthly</b> &middot; $149 / month', '')
+            +   planOpt('annual',  '<b>Yearly</b> &middot; $124 / month', 'billed annually &middot; save $300')
             + '</div>'
             // In-app billing clause: the terms the operator agrees to by paying. Kept
             // in step with the website Refund Policy (recurring, per bar, auto-renews,

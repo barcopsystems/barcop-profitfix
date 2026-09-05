@@ -973,8 +973,9 @@ window.CashEngine = {
        MEASURED on the deployed demo: `recurringBills` correctly returned all five as monthly
        (Barton Springs $12,000 · Austin Energy $2,600 · Texas Mutual $1,500 · Bar Cop $189 ·
        Sonitrol $89) and `projectedBills` returned ONE.
-       ⚠ Those are the figures AS MEASURED. The seed's own Bar Cop line was repriced to $87 on
-       2026-08-31, so do not read this list as the seed's current contents. About $16,189 a month of fixed overhead
+       ⚠ Those are the figures AS MEASURED. The seed's own Bar Cop line has been repriced twice
+       since: to $87 on 2026-08-31 and to $149 on 2026-09-05, so do not read this list as the
+       seed's current contents. About $16,189 a month of fixed overhead
        missing from the ending balance, the low-point week, the runway and Safe to Spend, in the
        optimistic direction, with nothing on screen saying a bill was gone.
        ⚠ IT WAS INVISIBLE BECAUSE THE SEED CARRIED THE OLD `recurring` FLAG. The typed path filled
