@@ -452,10 +452,20 @@ S.LaborTipLog = {
     const header = divLine + '<div id="tl-b-anchor">' + this.tlAnchor('tl-b', this._addWeekStart, this._addDate) + '</div>' + divLine;
     const addBtn = '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button>';
     const rows = this._addRows || [];
+    /* ⭐ HOW MANY OF THIS DAY ARE ALREADY IN. The list below shows only the people still to enter,
+       which is right, but with nine of ten saved it shows one name and reads as missing data. Kyle
+       read it that way on the demo and he built the screen. Naming the ones already done is what
+       makes a short list legible ([[lessons-paid-for]] #181 — say out loud what a number counts). */
+    const doneToday = this._addDate ? this.tips().filter(t => t.date === this._addDate).length : 0;
+    const doneNote = doneToday
+      ? '<div style="font-size:12px;color:var(--t3);margin:4px 0 10px;">' + doneToday + ' already entered for this day.</div>'
+      : '';
     if (!rows.length) {
       return header + '<div id="tl-b-rows" style="font-size:12px;color:var(--t3);margin:4px 0 12px;">'
         + (this._addDate
-            ? 'No tipped staff scheduled for this day still need tips entered. Add staff below.'
+            ? (doneToday
+                ? 'All ' + doneToday + ' tipped staff for this day are entered. Add staff below if somebody is missing.'
+                : 'No tipped staff scheduled for this day still need tips entered. Add staff below.')
             : 'Pick a day above to load its scheduled tipped staff, or add staff by hand.') + '</div>' + addBtn;
     }
     const tbl = (head, body) => '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
@@ -464,7 +474,8 @@ S.LaborTipLog = {
     if (!on) {
       const body = rows.map((r, i) => this.batchRowHtml(r, i)).join('');
       const table = '<div id="tl-b-rows">' + tbl('<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash Tips</th><th style="width:110px;">Card Tips</th><th style="width:100px;">Total</th><th style="width:90px;"></th>', body) + '</div>';
-      return header + table + addBtn;
+      // The same note, because a one-name list is just as misleading with tip-out off.
+      return header + doneNote + table + addBtn;
     }
 
     // Tip-out on: two sections, EARNERS first then SUPPORT, so the form reads
@@ -475,14 +486,25 @@ S.LaborTipLog = {
     const support = rows.filter(r => isSupport(r));
     this._addRows = earners.concat(support);
     const eBody = earners.map((r, i) => this.batchEarnerRow(r, i)).join('');
+    /* ⛔ "No staff on schedule" WAS FALSE ON A PARTLY-ENTERED DAY, and it is the sentence that made
+       the tip-out look impossible to distribute: the support crew WERE on the schedule, they were
+       simply already entered and therefore filtered out of `rows`. An operator reading it next to
+       a live tip-out concluded there was nobody to hand it to. Say which of the two it is. */
+    const savedSupport = this._addDate
+      ? this.tips().filter(t => t.date === this._addDate && App.tipRole(t.staff_id) === 'support').length
+      : 0;
+    const sEmpty = savedSupport
+      ? 'All ' + savedSupport + ' support staff for this day are already entered.'
+      : 'No staff on schedule. Add staff below if one worked.';
     const sBody = support.map((r, j) => this.batchSupportRow(r, earners.length + j)).join('')
-      || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No staff on schedule. Add staff below if one worked.</td></tr>';
+      || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">' + sEmpty + '</td></tr>';
     const grid = '<th style="width:150px;">Pays / Receives Tip-Out</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
     const sGrid = '<th style="width:150px;">Receives Tip-Out</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
     const eTable = tbl(grid, eBody);
     const sTable = tbl(sGrid, sBody);
-    const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
-    const recon = this.tipOutRecon(this._addRows);
+    // `doneNote` sits ABOVE the tables so a short list is explained before it is read, not after.
+    const tables = doneNote + '<div id="tl-b-rows">' + eTable + sTable + '</div>';
+    const recon = this.tipOutRecon(this._addRows, this._addDate);
     const gapCls = Math.abs(recon.gap) > 0.01 ? 'warn' : 'good';
     const reconBox = '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
       + '<div class="calc-item"><div class="calc-label">Collected</div><div class="calc-val" id="tl-b-collected">' + App.fmtCurrency(recon.collected, 2) + '</div></div>'
@@ -566,15 +588,33 @@ S.LaborTipLog = {
     out.forEach(o => { o.net = o.cash + o.card - o.paid + o.received; });
     return out;
   },
-  // Collected (everyone's tip-out paid) vs distributed (everyone's received, incl.
-  // a bartender getting the bar share) + the gap.
-  tipOutRecon(rows) {
+  /* Collected (everyone's tip-out paid) vs distributed (everyone's received, incl. a bartender
+     getting the bar share) + the gap.
+     ⛔⛔ IT TAKES THE DATE BECAUSE THESE THREE FIGURES ARE ABOUT THE DAY, NOT ABOUT THE ROWS THAT
+     HAPPEN TO BE ON SCREEN (Kyle, 2026-09-05). It used to read `_addRows` alone, which is only the
+     people not yet entered, so a partly-entered day printed a confident wrong number under a label
+     naming the day. MEASURED on the deployed demo: the day had genuinely collected $345.00 and
+     distributed $345.00, and all three boxes read $0.00 because nine of the ten rows were saved
+     and therefore invisible to this ([[output-honesty]] — a figure must be true of the label it
+     sits under).
+     ⭐ THE SAVED SIDE USES THE STORED `tip_out_paid` / `tip_out_received`, never a recompute. The
+     question here is what this day actually collected and handed over, which is a fact about the
+     RECORDS; re-deriving it would answer a different question the moment a role's percentage is
+     edited after the fact. */
+  tipOutRecon(rows, date) {
     const out = this.computeTipOut(rows);
-    const collected = out.reduce((s, o) => s + o.paid, 0);
-    const distributed = out.reduce((s, o) => s + o.received, 0);
+    let collected = out.reduce((s, o) => s + o.paid, 0);
+    let distributed = out.reduce((s, o) => s + o.received, 0);
+    const saved = date ? this.tips().filter(t => t.date === date) : [];
+    saved.forEach(t => {
+      collected   += (parseFloat(t.tip_out_paid) || 0);
+      distributed += (parseFloat(t.tip_out_received) || 0);
+    });
     return { collected, distributed, gap: collected - distributed,
-      hasSupport: out.some(o => o.role === 'support' && o.staff_id),
-      hasEarner: out.some(o => o.paid > 0) };
+      savedCount: saved.length,
+      hasSupport: out.some(o => o.role === 'support' && o.staff_id)
+        || saved.some(t => App.tipRole(t.staff_id) === 'support'),
+      hasEarner: out.some(o => o.paid > 0) || saved.some(t => (parseFloat(t.tip_out_paid) || 0) > 0) };
   },
 
   // The effective date the batch logs against: the day picked in the anchor.
@@ -604,7 +644,18 @@ S.LaborTipLog = {
   // logged actuals when they exist, otherwise the scheduled hours (an estimate you
   // can override). Schedule, not logged hours, because tips are entered at close
   // before hours are usually logged.
-  preloadFromDate(date, period) {
+  /* ⛔⛔⛔ `opts.includeLogged` EXISTS BECAUSE THE SKIP BELOW IS RIGHT FOR ONE CALLER AND A MONEY
+     DEFECT FOR THE OTHER (Kyle, 2026-09-05, walking the demo).
+     For LOG TIPS, dropping anyone already tip-logged is correct: it is what stops a second entry
+     for the same person on the same day.
+     For the TIP POOL it is not, because a pool is DIVIDED across the crew it is handed. Excluding
+     the people already logged does not merely hide them, it hands their share to whoever is left.
+     MEASURED on the deployed demo: nine of ten tipped staff already had rows for the day, so
+     `crewForDate` returned ONE person and a $1,000 pool split $1,000.00 to her alone.
+     ⚠ The screen's own help already described the honest behaviour ("tap the day to preload who
+     worked it"), so the copy was right and the code was not. */
+  preloadFromDate(date, period, opts) {
+    opts = opts || {};
     this._addDate = date || '';
     if (period != null) this._addShiftType = period;
     if (!date) { this._addRows = []; return; }
@@ -631,8 +682,11 @@ S.LaborTipLog = {
       }
     });
     // Skip anyone already tip-logged for this day + period, fill hours from actuals else schedule.
+    // ⛔ NOT when the caller is splitting a pool: see the note on this member's signature.
     const key = App.tipShiftKey(date, per);
-    const already = new Set(this.tips().filter(t => App.tipShiftKey(t.date, t.shift_type) === key).map(t => t.staff_id));
+    const already = opts.includeLogged
+      ? new Set()
+      : new Set(this.tips().filter(t => App.tipShiftKey(t.date, t.shift_type) === key).map(t => t.staff_id));
     const rows = [];
     [...schedHrs.keys()].forEach(id => {
       if (already.has(id)) return;
@@ -680,7 +734,8 @@ S.LaborTipLog = {
       }
     });
     if (on) {
-      const recon = this.tipOutRecon(rows);
+      // Same date as the render, or the live recalc contradicts the figure it is replacing.
+      const recon = this.tipOutRecon(rows, this._addDate);
       const set = (id, v, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = v; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
       set('tl-b-collected', App.fmtCurrency(recon.collected, 2));
       set('tl-b-distributed', App.fmtCurrency(recon.distributed, 2));
@@ -1005,7 +1060,11 @@ S.LaborTipLog = {
   crewForDate(date) {
     if (!date) return [];
     const savedRows = this._addRows, savedDate = this._addDate, savedShift = this._addShiftType;
-    this.preloadFromDate(date, '');
+    /* ⛔ `includeLogged` IS LOAD-BEARING AND IT IS ABOUT MONEY, NOT DISPLAY. A pool is DIVIDED
+       across the crew handed to it, so a missing person is not a missing row, it is a bigger share
+       for everybody else. Without this a partly-logged day split the whole pot among the
+       leftovers. See the note on preloadFromDate. */
+    this.preloadFromDate(date, '', { includeLogged: true });
     const crew = (this._addRows || []).map(r => { const st = this.staffById(r.staff_id); return { staff_id: r.staff_id, name: st ? st.name : '', hours: (r.hours != null ? r.hours : '') }; });
     this._addRows = savedRows; this._addDate = savedDate; this._addShiftType = savedShift;
     return crew;
