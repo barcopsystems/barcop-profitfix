@@ -1121,7 +1121,10 @@ S.HubSettings = {
     // The subscriptions, and the major fixed overhead: Occupancy / Utilities / Insurance. One row
     // per elapsed month across the 90-day window, so Books, the P&L and the By Category card all
     // read a bar that actually pays its bills, and the forecast derives the commitment from them.
-    monthlyBill(5, 2, { category:'Software and Subscriptions', vendor:'Bar Cop', amount:87, notes:'Monthly software subscription.' });
+    /* ⚠ THE DEMO BILLS ITSELF AT THE REAL PRICE, so the number a visitor meets on the pricing page
+       is the number they meet again inside the product. Left stale it shows the OLD price on the
+       one screen that is meant to look like their own books. $189 -> $87 (2026-08-31) -> $149. */
+    monthlyBill(5, 2, { category:'Software and Subscriptions', vendor:'Bar Cop', amount:149, notes:'Monthly software subscription.' });
     monthlyBill(5, 2, { category:'Other', vendor:'Sonitrol', amount:89, notes:'Alarm and security monitoring.' });
     monthlyBill(5, 2, { category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.' });
     monthlyBill(5, 2, { category:'Utilities', vendor:'Austin Energy', amount:2600, notes:'Power, gas, water.' });
