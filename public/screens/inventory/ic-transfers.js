@@ -303,8 +303,11 @@ S.InventoryTransfers = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const dateTime = document.getElementById('trb-when')?.value;
     if (!dateTime) { fail('Date and time are required.'); return; }
+    /* ⛔ THE STAFF NAME IS OPTIONAL AND MAY NOT BLOCK THIS SAVE (Kyle, 2026-09-05). See the note in
+       ic-take-inventory.js startCount: a new account has nobody on the roster, every reader of
+       `performed_by` already falls back, and verify-inventory-staff-optional.js B1 censuses all
+       four Inventory write doors so this cannot come back on one of them. */
     const byId = document.getElementById('trb-by')?.value || '';
-    if (!byId) { fail('Pick who performed the transfer.'); return; }
     const byName = (this.staffById(byId) || {}).name || '';
     const witId = document.getElementById('trb-witness')?.value || '';
     const witName = witId ? ((this.staffById(witId) || {}).name || '') : '';
@@ -500,8 +503,8 @@ S.InventoryTransfers = {
     if (!from)       { fail('Pick a From location.'); return; }
     if (!to)         { fail('Pick a To location.'); return; }
     if (from === to) { fail('From and To must be different locations.'); return; }
+    // Optional, same as the batch door above and for the same reason.
     const performedById = document.getElementById(idp + 'by')?.value;
-    if (!performedById) { fail('Pick who performed the transfer.'); return; }
     const performedBy = (this.staffById(performedById) || {}).name || '';
     const witnessedById = document.getElementById(idp + 'witness')?.value || '';
     const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';

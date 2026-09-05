@@ -340,8 +340,12 @@ S.InventoryAdjustments = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const dateTime = document.getElementById('ajb-when')?.value;
     if (!dateTime) { fail('Date and time are required.'); return; }
+    /* ⛔ THE STAFF NAME IS OPTIONAL AND MAY NOT BLOCK THIS SAVE (Kyle, 2026-09-05). The refusal
+       that stood here blocked a brand new account, which has nobody on the roster because nothing
+       creates a staff record at signup. Every reader of `performed_by` already falls back, exactly
+       as `witnessed_by` beside it always has. Full reasoning in ic-take-inventory.js startCount;
+       censused across all four doors by verify-inventory-staff-optional.js B1. */
     const byId = document.getElementById('ajb-by')?.value || '';
-    if (!byId) { fail('Pick who logged the adjustment.'); return; }
     const byName = (this.staffById(byId) || {}).name || '';
     const witId = document.getElementById('ajb-witness')?.value || '';
     const witName = witId ? ((this.staffById(witId) || {}).name || '') : '';
@@ -565,8 +569,8 @@ S.InventoryAdjustments = {
     if (!reason) { fail('Pick a reason.'); return; }
     const direction = document.getElementById(idp + 'dir')?.value || this._dirFor(reason);
     const unit = document.getElementById(idp + 'unit')?.value || '';
+    // Optional, same as the batch door above and for the same reason.
     const performedById = document.getElementById(idp + 'by')?.value;
-    if (!performedById) { fail('Pick who logged the adjustment.'); return; }
     const performedBy = (this.staffById(performedById) || {}).name || '';
     const witnessedById = document.getElementById(idp + 'witness')?.value || '';
     const witnessedBy   = witnessedById ? ((this.staffById(witnessedById) || {}).name || '') : '';

@@ -349,17 +349,26 @@ S.InventoryTakeInventory = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const picked = [...this.container.querySelectorAll('.ti-loc-tile.selected')].map(t => t.dataset.loc);
     if (picked.length === 0) { fail('Pick at least one location to count.'); return; }
-    /* ⛔ F6: A COUNT USED TO SAVE WITH counted_by:"" AND NOTHING ASKED. Every sibling write form
-       in the module names its counter — Transfers "Pick who performed the transfer.", Empties
-       "Pick who logged this.", Adjustments "Pick who logged the adjustment." — and the one
-       record that reaches the books had no such refusal. The name prints on the count detail,
-       every count export, and hub-books' year-end pack.
-       It goes HERE, beside the location check, for the reason written out below: the picker is
-       on this screen, nothing has been entered yet, so the refusal costs nothing. At submit it
-       would arrive after a 64-product shelf had been counted.
-       The select is pre-filled from the active shift's manager, so on the ordinary path this
-       never fires. */
-    if (!(document.getElementById('ti-by')?.value || '')) { fail('Pick who is counting.'); return; }
+    /* ⛔⛔⛔ THERE IS NO COUNTER REFUSAL HERE ANY MORE, AND IT MUST NOT COME BACK (Kyle, 2026-09-05).
+       F6 used to refuse a count with nobody picked, on two claims that were both wrong:
+         1. "the name reaches the books". MEASURED: `counted_by` has four readers in the tree and
+            every one already degrades. hub-books prints `counted_by || 'unrecorded'` on one
+            provenance line of the year-end audit trail. It is not a books figure.
+         2. "every sibling write form refuses without one". True, and an argument for consistency
+            pointing the wrong way. All four now behave the same way: optional.
+       ⛔ THE COST NOBODY WEIGHED: nothing creates a staff record at signup. Onboarding collects the
+       bar name, city, state and service periods, never a person, and the only writer of `lc_staff`
+       is the Staff Roster under The Floor. So a new account had an EMPTY picker and seven refusals
+       across four screens blocked the whole Inventory write path. An inventory-only operator, which
+       is the customer the website sells to, could not take their first count.
+       Kyle: "I would not block any function in the app because there is not a staff member name in
+       a drop down... if a name is attached to books a 'none selected' option can be attached just
+       the same." That is what the readers already do.
+       ⭐ THE PICKER STAYS. Optional is not absent: anyone who wants the name on the record still
+       puts it there, and it is pre-filled from the active shift's manager. `witnessed_by` in the
+       sibling records has always worked exactly this way.
+       🔧 verify-inventory-staff-optional.js A1/A2 run this member with nobody picked and B1
+       censuses all four doors, so the refusal cannot return to any of them. */
     /* ⚠⚠ TELL THEM BEFORE THEY COUNT, NOT AFTER (S330b — Kyle, and he was right).
        The duplicate guard shipped on the SUBMIT handler, which is the last possible moment: the
        operator picked Kitchen Line, counted every product on it, pressed Submit, and only THEN

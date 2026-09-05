@@ -307,8 +307,11 @@ S.InventoryEmpties = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = document.getElementById('emb-date')?.value;
     if (!date) { fail('Date is required.'); return; }
+    /* ⛔ THE STAFF NAME IS OPTIONAL AND MAY NOT BLOCK THIS SAVE (Kyle, 2026-09-05). See the note in
+       ic-take-inventory.js startCount: a new account has nobody on the roster, every reader of
+       `performed_by` already falls back, and verify-inventory-staff-optional.js B1 censuses all
+       four Inventory write doors so this cannot come back on one of them. */
     const byId = document.getElementById('emb-by')?.value || '';
-    if (!byId) { fail('Pick who logged this.'); return; }
     const byName = (this.staffById(byId) || {}).name || '';
     const notes = document.getElementById('emb-notes')?.value.trim() || '';
 
@@ -480,8 +483,8 @@ S.InventoryEmpties = {
     if (isNaN(quantity) || quantity <= 0) { fail('Enter a quantity greater than zero.'); return; }
     const disposition = document.getElementById(idp + 'disp')?.value;
     if (!disposition) { fail('Pick a disposition (Recycle, Return for Deposit, or Trash).'); return; }
+    // Optional, same as the batch door above and for the same reason.
     const performedById = document.getElementById(idp + 'by')?.value;
-    if (!performedById) { fail('Pick who logged this.'); return; }
     const performedBy = (this.staffById(performedById) || {}).name || '';
 
     const rec = {
