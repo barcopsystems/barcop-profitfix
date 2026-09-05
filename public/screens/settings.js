@@ -984,10 +984,22 @@ S.HubSettings = {
     // The Anchor's own services (a craft cocktail bar + bistro): Lunch, Happy Hour
     // (a Custom, since it is no longer a standard preset), Dinner, Late Night — no
     // Breakfast. Feeds SHIFT_TYPES app-wide + the Pre-Shift Briefing daypart chips.
+    /* ⛔⛔ THESE MAY NOT CROSS EACH OTHER, AND THEY USED TO (fixed 2026-09-05). Happy Hour ran
+       15:00-18:00 across Lunch's last hour and Dinner's first two. `ServicePeriods._conflict` now
+       REFUSES that at both editing doors, so the seed was demonstrating a configuration the app no
+       longer accepts — the demo has to be a bar an operator could actually have set up.
+       ⭐ IT IS ALSO WHAT MAKES A TIP CLOSE ANSWERABLE. Tips close per shift, so a server crossing
+       two dayparts banks out twice; that only has a meaning if the dayparts are disjoint. MEASURED
+       on this schedule: with the old crossing set, SEVEN of twelve Saturday shifts landed on three
+       or more periods. With these, two do, and both are genuinely long shifts.
+       ⚠ ONLY THE TIMES MOVED. Every name is unchanged, which is what keeps the blast radius small:
+       `lc_actuals`, the server-check rows and the void/comp rows all key on the NAME, and
+       `SHIFT_TYPES` is derived from these names. Happy Hour stays a custom, which is the thing it
+       is seeded to demonstrate. */
     App.data.settings.service_periods = [
-      { id:'sp_anchor_lunch',  name:'Lunch',      start:'11:00', end:'16:00' },
-      { id:'sp_anchor_hh',     name:'Happy Hour', start:'15:00', end:'18:00', custom:true },
-      { id:'sp_anchor_dinner', name:'Dinner',     start:'16:00', end:'22:00' },
+      { id:'sp_anchor_lunch',  name:'Lunch',      start:'11:00', end:'15:00' },
+      { id:'sp_anchor_hh',     name:'Happy Hour', start:'15:00', end:'17:00', custom:true },
+      { id:'sp_anchor_dinner', name:'Dinner',     start:'17:00', end:'22:00' },
       { id:'sp_anchor_late',   name:'Late Night', start:'22:00', end:'02:00' }
     ];
 
