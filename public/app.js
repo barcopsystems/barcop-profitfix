@@ -1529,7 +1529,12 @@ const App = {
       const on = o === el;
       o.classList.toggle('plan-selected', on);
       o.style.borderColor = 'var(--b-edge)';
-      o.style.background = on ? '#1E2B34' : 'var(--gold-tint)';
+      /* ⛔ `--sel-plan-bg`, NOT A LITERAL. This was #1E2B34 written out here AND again in
+         `wirePlanPicker` — one value, two copies, kept in step by hand. Kyle moved it to #2E3D4A
+         on 2026-09-05 and it is a token now, so the gate and the paywall picker cannot drift.
+         ⚠ The other three #1E2B34 uses in this file are a top bar, a fixed banner and a badge.
+         They are NOT this colour and must not follow it ([[color-system-locked]]). */
+      o.style.background = on ? 'var(--sel-plan-bg)' : 'var(--gold-tint)';
     });
     opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
     /* ⭐ OPEN ON THE PLAN THEY CHOSE. This is correctness, not polish: with a carried plan the
@@ -12202,7 +12207,10 @@ function wireAuth() {
       const on = o === el;
       o.classList.toggle('plan-selected', on);
       o.style.borderColor = 'var(--b-edge)';
-      o.style.background   = on ? '#1E2B34' : 'var(--gold-tint)';
+      // ⛔ `--sel-plan-bg`, the SAME token the plan gate reads. These two were separate copies of
+      // #1E2B34 and had to be changed together by hand; one token is what stops the next reprice
+      // or retune moving one picker and not the other.
+      o.style.background   = on ? 'var(--sel-plan-bg)' : 'var(--gold-tint)';
     });
     opts.forEach(o => o.addEventListener('click', () => select(o)));
     if (opts[0]) select(opts[0]);  // default to Monthly

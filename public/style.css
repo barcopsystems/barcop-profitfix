@@ -138,6 +138,15 @@
      rather than repeating its hex, so there is no second copy of the value to drift. */
   --step-open: #161E24;           /* open cockpit step background. */
   --sel-active-bg: #283642;                /* active selector pill / chip background (filter chips, date-range pills, segmented toggles, week selector). A touch lighter than the panel fill so the active choice pops. */
+  /* ⛔ ITS OWN TOKEN, NOT A LITERAL AND NOT `--sel-active-bg` (Kyle, 2026-09-05). The chosen plan
+     on the two subscription pickers was the literal #1E2B34, written out TWICE in app.js — and
+     that hex is `--c4`/`--sel-active-bg` territory, which this file already bans copying by hand.
+     He asked for #2E3D4A, which no token carried, so it gets one rather than a third literal.
+     ⚠ ONE TOKEN, TWO PICKERS: the Add Another Bar / lapsed gate and the paywall picker both read
+     it, so they cannot drift apart the way the old pair already had to be kept in step by hand.
+     ⚠ AND IT IS NOT `--sel-active-bg`: that is the CHIP colour and is a different decision. A
+     shared token here would mean a filter chip could never be retuned without moving a price. */
+  --sel-plan-bg: #2E3D4A;                  /* the chosen plan on a subscription picker. */
   --red:       #DA4D3E;
   --red-bg:    rgba(192,56,40,0.13);
   --red-soft:  rgba(192,56,40,0.72);    /* Tier-2 red for status indicators (off-target scores, off-target metric values) so the full --red can be reserved for true attention/action signals */
