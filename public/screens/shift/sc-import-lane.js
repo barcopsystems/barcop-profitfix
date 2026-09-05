@@ -800,7 +800,25 @@ S.ShiftLane = {
        ⚠ AND THE FAILURE LINE KEEPS EVERYTHING, deliberately. A refused write is when they read
        hardest, and success/failure agreeing is pinned for the path that still prints both. */
     this._flashZone = 'import';
-    this._flash = allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported')
+    /* ⛔⛔ A WEEK TOTAL IS ONE ROW, AND COUNTING ROWS CALLED IT "1 day saved" (Kyle, 2026-09-05,
+       after typing his week-end bar and food totals). `allToAdd.length` is a ROW count, which was
+       the same thing as a day count until this lane began taking three numbers for the whole week
+       and writing ONE row dated the week's end. Reproduced on the deployed build: bar 50,000 +
+       food 55,000 + 500 covers saved correctly as `shift_type: 'Week Total'` and the operator was
+       told "1 day saved" ([[output-honesty]] test 2 — a figure must be true of the label it sits
+       under, and [[lessons-paid-for]] #181, which is this same class one surface over).
+       ⛔ IT ASKS THE OPTS, NOT THE ROW, AND THAT IS MEASURED RATHER THAN CHOSEN. `hub-week-review`
+       fixed the identical defect by asking `App.isWeekTotalShift(s)`, which is right THERE because
+       it reads rows already in the store. Here the rows are not stamped yet — `buildSales` applies
+       `opts.shiftType` further down — so the handed-in row carries no `shift_type` and
+       `isWeekTotalShift` returns FALSE. Written that way this branch could never fire and the fix
+       would have read correct and done nothing ([[the-loop]] #118).
+       ⚠ EVERY OTHER CLAUSE STILL APPENDS, `cwNote` most of all: saving a week total into a week
+       that is already confirmed has to say so, and that sentence is not about days. */
+    const savedHead = opts.weekTotal
+      ? 'Week total saved'
+      : allToAdd.length + ' day' + (allToAdd.length === 1 ? '' : 's') + ' ' + (opts.manual ? 'saved' : 'imported');
+    this._flash = savedHead
       + (opts.reviewed ? '' : salesOutcomes)
       + (opts.cleared ? ', ' + opts.cleared + ' cleared to zero' : '') + (opts.reviewed ? '' : repNote) + '.' + cwNote;
     /* ⛔⛔ WHAT LANDED, BY DATE, so a host that shows ONE WEEK can say which week it means and move
