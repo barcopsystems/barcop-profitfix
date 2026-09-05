@@ -310,8 +310,8 @@ app.get('/api/health', async (req, res) => {
 // .trim() so a stray leading/trailing space pasted into the env var can't produce
 // a "No such price: ' price_...'" error (a space in the pasted value is invisible
 // in most dashboards but Stripe searches for the literal, space-and-all).
-const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $87/mo
-const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $804/yr
+const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $149/mo
+const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $1,488/yr
 const ALL_MODULES     = ['profit', 'revenue'];
 
 /* ⭐⭐ THE PLAN -> PRICE MAP, AND THE ONLY ONE. Two routes ask it now: the authenticated checkout
@@ -474,8 +474,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
        lowercase string 'annual' fell through to MONTHLY. That is harmless while the only caller is
        the in-app plan gate, which sends one of two dataset keys — but that is a fact about the
        CALLER, not about this endpoint, and the next piece of this build lets a URL name the plan.
-       At that point `?plan=ANNUAL` or `?plan=yearly` is a customer who read $804/yr on the
-       website, pressed pay, and was put on $87/mo. It is silent on both sides: Stripe charged
+       At that point `?plan=ANNUAL` or `?plan=yearly` is a customer who read $1,488/yr on the
+       website, pressed pay, and was put on $149/mo. It is silent on both sides: Stripe charged
        exactly what it was asked for, and nothing here logged a thing.
        ⚠ CASE AND SURROUNDING SPACE ARE NORMALISED, NOT REFUSED. 'ANNUAL' names annual
        unambiguously, so refusing an upper-cased or hand-typed URL buys no safety and breaks a real
@@ -2822,7 +2822,7 @@ app.post('/api/abandon-account', async (req, res) => {
     // poll gives up after ~12s and renders the new-signup gate with a "Start Over" link whose
     // confirm text reads "No payment was made." A customer who paid twelve seconds ago clicks it:
     // the account is deleted, the cascade takes the subscription row and their auth user, and the
-    // webhook then fails its foreign key. Stripe bills $87/mo forever with no row, no
+    // webhook then fails its foreign key. Stripe bills $149/mo forever with no row, no
     // stripe_customer_id anywhere in the app, no billing-portal route to it, and reconcile (which
     // walks our table) blind to it. Only a manual Stripe dashboard search would ever find it.
     // The checkout dup-guard already asks Stripe this way; this is the same question.
