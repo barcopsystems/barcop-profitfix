@@ -315,7 +315,8 @@ S.HubBooks = {
     const voidComps = (App.shiftData?.sc_void_comps || []).filter(r => inMonth(r.date));
     const variances = (App.shiftData?.sc_variances  || []).filter(r => inMonth(r.date));
     const callouts  = (App.laborData?.lc_callouts   || []).filter(r => inMonth(r.date));
-    const tips      = (App.laborData?.lc_tips       || []).filter(r => inMonth(r.date));
+    // Settled shifts only: a half-entered night must not reach a month's books.
+    const tips      = App.settledTips(App.laborData?.lc_tips || []).filter(r => inMonth(r.date));
     const totalTips = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
 
     // Cost ratios for the month
@@ -1452,7 +1453,9 @@ S.HubBooks = {
     const COL_WIDTHS = [{ wch: 60 }, { wch: 18 }, { wch: 42 }, { wch: 16 }, { wch: 22 }];
 
     const inMonth = (d) => d && String(d).slice(0, 7) === monthKey;
-    const tips   = (App.laborData?.lc_tips       || []).filter(t => inMonth(t.date));
+    // ⛔ FORM 8027 IS A TAX WORKSHEET. Settled shifts only, or a night still being counted lands
+    // on an IRS form as a per-employee allocation.
+    const tips   = App.settledTips(App.laborData?.lc_tips || []).filter(t => inMonth(t.date));
     const pools  = (App.laborData?.lc_tip_pools  || []).filter(p => inMonth(p.date));
     const shifts = (App.shiftData?.sc_shifts     || []).filter(s => inMonth(s.date));
 

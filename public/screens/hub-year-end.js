@@ -749,7 +749,8 @@ S.HubYearEnd = {
     const COL_WIDTHS = [{ wch: 60 }, { wch: 18 }, { wch: 42 }, { wch: 16 }, { wch: 22 }];
 
     const inYear = (d) => d && String(d).slice(0, 4) === year;
-    const tips   = (App.laborData?.lc_tips      || []).filter(t => inYear(t.date));
+    // Settled shifts only: the year-end pack goes to an accountant.
+    const tips   = App.settledTips(App.laborData?.lc_tips || []).filter(t => inYear(t.date));
     const pools  = (App.laborData?.lc_tip_pools || []).filter(p => inYear(p.date));
     const shifts = (App.shiftData?.sc_shifts    || []).filter(s => inYear(s.date));
 
@@ -1165,7 +1166,7 @@ S.HubYearEnd = {
     const variancesOut = variances.filter(v => App.varianceIsOut(v)).length;
     const callouts = (App.laborData?.lc_callouts || []).filter(c => inYear(c.date));
     const walked = (App.shiftData?.sc_walked_tabs || []).filter(w => inYear(w.date));
-    const tips = (App.laborData?.lc_tips || []).filter(t => inYear(t.date));
+    const tips = App.settledTips(App.laborData?.lc_tips || []).filter(t => inYear(t.date));
     const totalTips = tips.reduce((s, t) => s + (parseFloat(t.total_tips) || (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0)), 0);
 
     // Strongest/weakest month. Revenue is already net sales (comps excluded), so

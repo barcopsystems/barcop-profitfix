@@ -765,7 +765,8 @@ S.WeekReview = {
     const laborPct = weekRevenue > 0 ? (wkCost / weekRevenue * 100) : null;
     const rplh = (wkHours > 0 && weekRevenue > 0) ? (weekRevenue / wkHours) : null;
     const proj = this._weekProjection(wkStart);
-    const wkTips = (lab.lc_tips || []).filter(t => this._inWeek(t.date));
+    // Settled shifts only: the recap reports what the week DID, not what is still being counted.
+    const wkTips = App.settledTips(lab.lc_tips || []).filter(t => this._inWeek(t.date));
     const tipN = wkTips.length;
     const tipTotal = wkTips.reduce((t, r) => t + (r.total_tips || 0), 0);
     const wkPeople = new Set(wkActuals.map(a => a.name).filter(Boolean)).size;
