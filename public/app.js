@@ -6402,6 +6402,26 @@ const App = {
     return gross - (parseFloat(t.tip_out_paid) || 0) + (parseFloat(t.tip_out_received) || 0);
   },
 
+  /* ⛔⛔⛔ A TIP ROW IS PART OF AN OPEN SHIFT ONLY WHILE IT SAYS SO. ABSENT MEANS CLOSED.
+     The Tip Log saves each person as they check out, so a shift is half-entered for most of a
+     night, and half-entered tips must not reach anything that treats them as final: the tip-credit
+     check decides how much MAKEUP PAY is owed to a $2.13 server, and Form 8027 is a tax worksheet.
+     ⭐ THE POLARITY IS THE WHOLE SAFETY OF IT, and it is why the field names the OPEN state rather
+     than the closed one. Every tip row written before this existed carries no field at all, and
+     those are complete history. With `tip_shift_open` absent reads FALSY, so they are closed and
+     cannot be captured by a state invented after them ([[lessons-paid-for]] #63 — a field that
+     predates your feature has a meaning your feature does not get to choose; the safety comes from
+     the field being NEW). A `tip_shift_closed` spelling would have needed `!== false` at six call
+     sites to say the same thing, and the one that got it wrong would silently re-open two years of
+     records.
+     ⚠ ONE CONSUMER DELIBERATELY DOES NOT FILTER: `PosIngest.buildTips` compares against EVERY
+     existing row to spot duplicates, so hiding open rows from it would re-import somebody who is
+     already on the screen. That exemption is pinned with its reason. */
+  tipShiftOpen(t) { return !!(t && t.tip_shift_open); },
+  // The rows any final figure may be built from. One door, so a seventh consumer added next month
+  // asks the same question the other six do.
+  settledTips(list) { return (list || []).filter(t => !this.tipShiftOpen(t)); },
+
   // The logical "shift" a tip entry or tip pool belongs to = its day + service
   // period. A deterministic key both the Tip Log and the Tip Pool compute the
   // same way, so Books / Year-End / Tip History / pay periods keep joining tips
@@ -11168,7 +11188,10 @@ const App = {
     // No pool split saved this week: fall back to the person's own logged NET tips, so a
     // house that logs tips without splitting a pool still gets a real number rather than a
     // false $0 that would read as a shortfall.
-    const tips = ((this.laborData && this.laborData.lc_tips) || []);
+    /* ⛔ SETTLED ROWS ONLY. This figure decides whether a tipped employee cleared minimum wage and
+       therefore how much MAKEUP PAY is owed. A shift half entered at 9pm would understate their
+       tips and manufacture a shortfall that is not real. */
+    const tips = this.settledTips((this.laborData && this.laborData.lc_tips) || []);
     return tips.reduce((s, t) => (t.staff_id === staffId && t.date >= weekStart && t.date <= weekEnd)
       ? s + this.netTips(t) : s, 0);
   },
