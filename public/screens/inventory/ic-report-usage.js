@@ -95,10 +95,13 @@ S.InventoryUsageReport = {
   statItem(label, val, cls) {
     return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>';
   },
-  statsCard(items) {
+  /* `foot` (optional) renders INSIDE the card, below the tile row — for a note that qualifies the
+     numbers rather than the page. Kyle moved the theoretical-coverage line here on 2026-09-06;
+     appended after the card it read as a page note, which is not what it is. */
+  statsCard(items, foot) {
     return '<div class="card"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
       + '<div style="flex:1;display:flex;gap:28px;align-items:center;flex-wrap:wrap;">' + items + '</div>'
-      + '</div></div>';
+      + '</div>' + (foot || '') + '</div>';
   },
   dataCard(headers, rowsHtml, fixedColgroup) {
     return '<div class="card" style="overflow-x:auto;"><table class="row-list"'
@@ -183,8 +186,10 @@ S.InventoryUsageReport = {
          Every figure is true on its own; the row of them implies a relationship that does not
          hold. The numbers are RIGHT, so the fix is disclosure, not recalculation. */
       const priced = rows.filter(r => r.theoSales != null).length;
+      /* ⚠ THE NOTE GOES IN THE CARD, NOT AFTER IT. It qualifies these four tiles, so it is the
+         card's own footnote — passed as statsCard's `foot`, never concatenated onto the result. */
       const note = priced < rows.length
-        ? '<div style="font-size:11px;color:var(--t3);margin-top:10px;line-height:1.5;">'
+        ? '<div style="font-size:11px;color:var(--t3);margin-top:14px;line-height:1.5;">'
           + 'Theoretical sales and profit cover the <strong>' + priced + '</strong> of '
           + rows.length + ' products that carry a serving price. Usage cost covers all '
           + rows.length + '.</div>'
@@ -193,7 +198,7 @@ S.InventoryUsageReport = {
         this.statItem('Products', rows.length)
         + this.statItem('Usage Cost', App.fmtCurrency(totCost))
         + this.statItem('Theo Sales', App.fmtCurrency(totSales))
-        + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn')) + note;
+        + this.statItem('Theo Profit', App.fmtCurrency(totProfit), totProfit >= 0 ? 'good' : 'warn'), note);
     }
 
     // Period = a windowed stepper (‹ prev · current · next ›, like the Build
