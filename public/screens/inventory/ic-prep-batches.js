@@ -184,18 +184,25 @@ S.PrepBatches = {
   // inline add card and the edit pop-up. b = the batch being edited (null = add).
   formBodyHTML(b, inline) {
     const catOpts = this.CATEGORIES.map(c => '<option' + (b?.category === c ? ' selected' : '') + '>' + c + '</option>').join('');
-    // On the on-page (inline) form, Batch Yield + Serving Size are fixed-width so
-    // they do not stretch across the form; the edit pop-up keeps its original layout.
-    const yw = inline ? 'flex:0 0 175px;' : 'flex:1 1 130px;min-width:0;';
+    /* ⛔ FOUR EQUAL COLUMNS ON THE ON-PAGE FORM (Kyle, 2026-09-06). Batch Name and Category grew
+       to 338px each while Batch Yield and Serving Size sat pinned at 175, so the row read as two
+       wide cells and two narrow ones. `flex:0 0 calc((100% - 36px) / 4)` is a quarter of the row
+       minus the three 12px gaps, with NO grow.
+       ⚠ THE `.fj` PAIR STILL FITS: at a 257px quarter the number takes 167 and the unit select 90,
+         measured, with no overflow. Re-measure before narrowing this row further.
+       ⭐ THE EDIT POP-UP IS UNTOUCHED, and not by luck: all four of its cells were already
+         `flex:1 1 130px;min-width:0;` — the first two literally, the last two through `yw`'s
+         non-inline branch — so one `cw` carrying that same string covers every pop-up cell. */
+    const cw = inline ? 'flex:0 0 calc((100% - 36px) / 4);min-width:0;' : 'flex:1 1 130px;min-width:0;';
     const catBlank = inline ? 'Select category...' : 'Select...';
     return '<div class="form-row" style="gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;">'
-        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Batch Name</label>'
+        + '<div class="f" style="' + cw + '"><label>Batch Name</label>'
           + '<input type="text" id="pb-name" value="' + esc(b?.name || '') + '" placeholder="Frozen Margarita Mix"/></div>'
-        + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Category' + App.manageListLink('prep_category') + '</label>'
+        + '<div class="f" style="' + cw + '"><label>Category' + App.manageListLink('prep_category') + '</label>'
           + App.customSelect({ id: 'pb-cat', key: 'prep_category', builtin: this.CATEGORIES, selected: (b ? b.category : ''), blank: true, blankLabel: catBlank }) + '</div>'
-        + '<div class="f" style="' + yw + '"><label>Batch Yield</label>'
+        + '<div class="f" style="' + cw + '"><label>Batch Yield</label>'
           + '<div class="fj"><input type="number" id="pb-yield" value="' + (b?.batch_yield || '') + '" placeholder="1"/><select id="pb-yield-unit">' + this.yOpts(b?.batch_yield_unit) + '</select></div></div>'
-        + '<div class="f" style="' + yw + '"><label>Serving Size</label>'
+        + '<div class="f" style="' + cw + '"><label>Serving Size</label>'
           + '<div class="fj"><input type="number" id="pb-serv" value="' + (b?.serving_size || '') + '" placeholder="5"/><select id="pb-serv-unit">' + this.yOpts(b?.serving_size_unit) + '</select></div></div>'
       + '</div>'
       + '<div id="pb-ings" style="margin-top:14px;margin-bottom:12px;"></div>'
