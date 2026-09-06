@@ -3673,10 +3673,10 @@ S.HubSettings = {
     // Per week, each person logs the shifts SCHED_PLAN rosters them for, scaled so the
     // week totals the hours LC_BASE_HOURS declares. cost = hours x wage, per row.
     const lcActuals = [];
-    // ⚠ THE DAYPART IS READ OFF THE CLOCK (`splitShift`), never assigned, and a shift that
-    // crosses two periods logs a line in each. This block used to carry three hand-written
-    // rotations that dealt dayparts out by (person + day), so a 09:00-15:00 prep shift could
-    // be logged as "Late Night" and everyone worked five days whatever the schedule said.
+    // ⚠ THE DAYPART IS READ OFF THE CLOCK (`periodOfShift`), never assigned. This block used
+    // to carry three hand-written rotations that dealt dayparts out by (person + day), so a
+    // 09:00-15:00 prep shift could be logged as "Late Night" and everyone worked five days
+    // whatever the schedule said. One row per shift; the Tip Log tracks per day.
     /* ⛔⛔⛔ HOURS ARE DECLARED, NOT DERIVED FROM PAY (T1, 2026-08-17).
        This table used to not exist: the allocator computed
        `weekHours = (deptDollars * weight) / st.wage`, i.e. it split a DOLLAR budget and
@@ -3736,46 +3736,27 @@ S.HubSettings = {
       'Carlos P.':  [ {day:'Mon',start:'10:00',end:'19:00',hours:9}, {day:'Tue',start:'10:00',end:'19:00',hours:9}, {day:'Thu',start:'14:00',end:'23:00',hours:9}, {day:'Fri',start:'14:00',end:'23:00',hours:9}, {day:'Sun',start:'12:00',end:'21:00',hours:9} ]
     };
     const SHIFT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    /* ⛔⛔⛔ A SHIFT IS LOGGED PER SERVICE PERIOD, NOT UNDER ONE LABEL, AND THIS IS A MONEY BUG
-       IF YOU GET IT WRONG (found by walking the pushed demo, 2026-09-05).
-       The first cut of this stamped each shift with the ONE period it spent most of itself in,
-       which reads as sensible and is not. `App.hoursFor(staffId, date, shiftType)` filters
-       `lc_actuals` by period and SUMS whatever matches, and the Tip Log fills each row's hours
-       from it — so a whole 8-hour shift stamped "Dinner" was charged, entire, to the dinner
-       pool. MEASURED on the live demo: Maria G. worked Friday 16:00-00:00 and the Dinner tab
-       showed her at 8 h against a five-hour dinner, while Happy Hour and Late Night fell back
-       to the schedule overlap and showed her again at 1 h and 2 h. Eleven hours billed across
-       three pools on an eight-hour shift, and the dinner crew paying for her last call.
-       ⭐ THE REAL DOOR ALREADY WORKS THIS WAY, which is what settles it. `lc-log-hours.save()`
-       writes one row per (staff, date, shift_type) and its duplicate guard is keyed on exactly
-       that triple, with the comment "a real split shift can still be added on purpose". A
-       manager logging a bartender who worked happy hour through last call enters three lines.
-       The seed has to store the shape the real door stores (L2).
-       ⚠ THE LEG OUTSIDE EVERY PERIOD IS BLANK, NOT DROPPED. Prep starts at 09:00 and the first
-       period opens at 11:00, so two paid hours belong to no daypart. Blank is what Log Hours'
-       picker offers for exactly this ('Select shift...') and what the salaried rows already
-       carry (S219) — dropping them would lose hours the crew was paid for.
-       The last leg absorbs the rounding remainder, so the legs always sum to the shift. */
-    const splitShift = (start, end, hours) => {
-      const win = App._clockSpan(start, end);
-      const total = win[1] - win[0];
-      if (!(total > 0)) return [{ period: '', hours: hours }];
-      const legs = []; let used = 0;
+    /* The service period a logged shift belongs to: the one it spends the most of itself inside.
+       ⛔ DERIVED, NEVER DECLARED. The allocator used to carry a hand-written rotation
+       (['Dinner','Late Night','Dinner','Happy Hour','Late Night']) with no relation to the clock,
+       so a 09:00-15:00 prep shift could be stamped "Late Night". Reading it off
+       `App.servicePeriods()` — the same list Settings wrote above, and what `SHIFT_TYPES` is
+       derived from — means a row can only ever carry a period an operator could pick (S219).
+       ⚠ ONE ROW PER SHIFT, NOT ONE PER PERIOD (back to this 2026-09-05). A shift crossing two
+       dayparts was briefly logged as a line in each, because the Tip Log queried hours by period
+       and a whole shift under one label billed the whole shift to that pool. The Tip Log tracks
+       per DAY again, so nothing queries by period, the defect cannot arise, and a manager reading
+       Log Hours sees one line per shift instead of three. */
+    const periodOfShift = (start, end) => {
+      let best = '', bestMin = 0;
       (App.servicePeriods() || []).forEach(p => {
         if (!p.start || !p.end) return;
         const mins = App.overlapMinutes(start, end, p.start, p.end);
-        if (mins > 0) { legs.push({ period: p.name, min: mins }); used += mins; }
+        if (mins > bestMin) { bestMin = mins; best = p.name; }
       });
-      if (used < total) legs.push({ period: '', min: total - used });
-      if (!legs.length) return [{ period: '', hours: hours }];
-      let handed = 0;
-      return legs.map((leg, i) => {
-        const h = (i === legs.length - 1) ? Math.max(0, +(hours - handed).toFixed(1))
-                                          : +(hours * leg.min / total).toFixed(1);
-        handed = +(handed + h).toFixed(1);
-        return { period: leg.period, hours: h };
-      }).filter(l => l.hours > 0);
+      return best;
     };
+
     const LC_BASE_HOURS = {
       'Maria G.':   42,   'Jake T.':    35,   'Ashley B.':  25,   'Devin R.':   15,
       'Luis V.':    41,   'Sam P.':     34,   'Hector M.':  19,   'Tonya B.':   23,
@@ -3828,13 +3809,13 @@ S.HubSettings = {
        and people leave early. Hours stay DECLARED (T1) — the roster sets their SHAPE, never
        their total, and nothing here divides dollars by a wage.
        🔧 verify-seed-crew.js and verify-seed-schedule-real.js both measure off this. */
-    /* ⭐ ONE SOURCE FOR WHAT A PERSON WORKED. Both the hours seed and the tip pools need the same
-       answer — which day, which daypart, how many hours — and computing it twice is how the two
-       drift apart. The pool splits by hours, the Tip Log shows hours off `lc_actuals`, and a
-       manager reconciling a shift reads them side by side, so they have to BE the same number.
+    /* ⭐ ONE SOURCE FOR WHAT A PERSON WORKED. The hours seed and the tip pools need the same
+       answer — which day, how many hours — and computing it twice is how the two drift apart.
+       The pool splits by hours and the Tip Log shows hours off `lc_actuals`, so a manager
+       reconciling a day reads them side by side and they have to BE the same number.
        ⚠ The last shift absorbs the week's rounding remainder, so the week adds up to the hours
        LC_BASE_HOURS declares instead of drifting a tenth per shift. */
-    const weekLegs = (st, scale) => {
+    const weekShifts = (st, scale) => {
       const roster = SCHED_PLAN[st.name] || [];
       const plannedH = roster.reduce((s, r) => s + r.hours, 0);
       const weekHours = (LC_BASE_HOURS[st.name] || 0) * scale;
@@ -3845,20 +3826,18 @@ S.HubSettings = {
         const h = (i === roster.length - 1) ? Math.max(0, +(weekHours - given).toFixed(1))
                                             : +(r.hours * trim).toFixed(1);
         given = +(given + h).toFixed(1);
-        if (h <= 0) return;
-        splitShift(r.start, r.end, h).forEach(leg =>
-          out.push({ day: r.day, period: leg.period, hours: leg.hours }));
+        if (h > 0) out.push({ day: r.day, period: periodOfShift(r.start, r.end), hours: h });
       });
       return out;
     };
     const lcAllocate = (staff, scale, baseAgo) => {
       staff.forEach(st => {
-        weekLegs(st, scale).forEach(leg => {
+        weekShifts(st, scale).forEach(sh => {
           lcActuals.push({
-            id:uid(), date:dateStr(baseAgo + 6 - SHIFT_DAYS.indexOf(leg.day)), staff_id:st.id, name:st.name,
-            position_id:st.position_id, shift_type:leg.period,
-            hours:leg.hours, wage:st.wage,
-            cost:+(leg.hours * st.wage).toFixed(2), notes:''
+            id:uid(), date:dateStr(baseAgo + 6 - SHIFT_DAYS.indexOf(sh.day)), staff_id:st.id, name:st.name,
+            position_id:st.position_id, shift_type:sh.period,
+            hours:sh.hours, wage:st.wage,
+            cost:+(sh.hours * st.wage).toFixed(2), notes:''
           });
         });
       });
@@ -3934,12 +3913,7 @@ S.HubSettings = {
        $7.71 a tipped hour on top of the cash wage. Kyle's call, put to him with the numbers.
        🔧 verify-tip-credit-seed.js B5 pins the CLEARANCE now, with the margin on all ten. */
     const TIP_POOL_RATE = 15;                                   // $ per tipped hour on the clock
-    /* Each daypart's share of the day it sits in, renormalised over the periods that day actually
-       trades — so a Monday that closes at 22:00 splits its lunch/happy hour/dinner three ways
-       instead of leaving a quarter of the money on a late night that never happened. Dinner
-       carries a bar-and-kitchen's evening; lunch is thin, which is why the lunch pools pay a
-       third of what a Friday late night does. */
-    const TIP_PERIOD_W  = { 'Lunch': 0.15, 'Happy Hour': 0.15, 'Dinner': 0.45, 'Late Night': 0.25 };
+
     /* ⭐ PER PERIOD, BECAUSE THE LIVE DOOR NOW WRITES ONE. This said "DAY-ONLY, because that is
        all a live user can write" — true when the Tip Log had no period selector and saved every
        pool as `App.tipShiftKey(this._addDate, '')`. The shift rebuild gave both tabs a daypart
@@ -3975,64 +3949,43 @@ S.HubSettings = {
         participants: parts,
         created_at:  daysAgoISO(dayAgo) };
     };
-    /* ⛔⛔⛔ ONE CLOSE-OUT PER SHIFT, PER DAY. Kyle, 2026-09-05: *"managers aren't leaving tips
-       open all week, they get closed each night if they are using it, so the demo should follow
-       that."* This used to write TWO pools a week: a "night" pool dated one day but carrying
-       every tipped person's WHOLE-WEEK hours, and a $70 "day" pool. That is not a shift
-       close-out at all — it is a weekly aggregate wearing a date, and it is what put eight
-       names and a week of hours onto one Saturday on the demo.
-       ⭐ POOLS NOW COME OFF THE SAME LEGS THE HOURS DO (`weekLegs`), so the crew on a pool is
-       exactly the crew the Tip Log shows for that shift, at the same hours. Prep time outside
-       every service period is not tipped out, so blank legs are skipped.
-       ⚠ THE MONEY IS SPREAD BY THE SEED'S OWN SALES CURVE, not evenly: `dayW` (the same weights
-       the revenue seed uses) times the daypart's share of that day. A Friday late night pays
-       ~$44 a tipped hour and a Sunday lunch ~$8, which is what a bar actually looks like.
-       ⛔ AND THE TIP-CREDIT SHORTFALL IS GONE, WHICH IS THE HONEST OUTCOME (Kyle's call, put to
-       him with the measurement). The old seed produced exactly one person owed makeup pay only
-       because Priya N. was fenced into that $70 pool while the other nine shared $3,465. She is
-       a dinner server on the current roster, and once every pool is split by the hours actually
-       worked, NOBODY is short: $15 a tipped hour against a $2.13 cash wage clears $7.25 with
-       room, and even the thinnest pool in the week pays $7.71/h on top of it. Pay Periods now
-       reports that the tipped crew cleared the minimum, which is true of a bar this busy.
-       🔧 verify-tip-credit-seed.js B5 measures that, from the other side. */
     const lcTipPools = [];
+    /* ⛔⛔⛔ ONE CLOSE-OUT PER DAY. Kyle, 2026-09-05, after walking a per-daypart build:
+       *"I just don't like it, I think it is confusing, I think users are going to think it is
+       confusing... just track each staff by the day, no shifts, keep it simple for a user who
+       wants to use it that way."* His call, and the screen follows the same rule.
+       ⚠ WHAT THIS REPLACED, SO NOBODY REBUILDS IT BY ACCIDENT: 25 close-outs a week, one per
+       (day, daypart), weighted by the daypart's share of the day. It reconciled and it was
+       measurably more accurate. It was also four tabs, four crews and four envelopes a night
+       for a house that counts one, and accuracy nobody can follow is not worth having.
+       ⭐ THE MONEY STILL FOLLOWS THE SEED'S OWN SALES CURVE: `dayW`, the same weights the
+       revenue seed uses, so a Saturday close-out is twice a Monday's and the pot is spent to
+       the cent. The crew is whoever worked that day, split by the hours they worked.
+       ⚠ Seeded per SEEDED WEEK, not on a hand-written day list: `tipShareForStaffInWeek`
+       treats every pool in the week as that week's tips, so a week with no pool silently falls
+       back to the raw log. */
     const seedPoolsFor = (baseAgo, scale, openFrom) => {
-      // day|period -> { name: hours }, straight off the legs the crew logs.
-      const buckets = {};
-      poolTipped.forEach(st => weekLegs(st, scale).forEach(leg => {
-        if (!leg.period) return;                                // prep time is not tipped out
-        const k = leg.day + '|' + leg.period;
-        const b = (buckets[k] = buckets[k] || {});
-        b[st.name] = +((b[st.name] || 0) + leg.hours).toFixed(1);
+      const byDay = {};
+      poolTipped.forEach(st => weekShifts(st, scale).forEach(sh => {
+        const b2 = (byDay[sh.day] = byDay[sh.day] || {});
+        b2[st.name] = +((b2[st.name] || 0) + sh.hours).toFixed(1);
       }));
-      const keys = Object.keys(buckets);
-      if (!keys.length) return;
-      const hoursOf = k => Object.keys(buckets[k]).reduce((s, n) => s + buckets[k][n], 0);
-      const pot = +(keys.reduce((s, k) => s + hoursOf(k), 0) * TIP_POOL_RATE).toFixed(2);
-      /* ⛔ A SHORT DAY EARNS LESS; IT DOES NOT CONCENTRATE. This renormalised each day's daypart
-         weights over the periods that day actually trades, which sounds careful and is wrong:
-         Monday closes at 22:00, so its dinner absorbed the late-night share and came out ahead
-         of a Wednesday that trades four dayparts. MEASURED on the pushed demo — Monday dinner
-         $226.17 against Wednesday's $203.55, and $26.00 a tipped hour against Saturday's $13.19.
-         A Monday out-earning a Saturday is the first thing an operator would call.
-         ⭐ The raw weights are right: `dayW` already says Monday does 10% of the week BECAUSE it
-         shuts early, so multiplying by the dayparts it runs is the whole answer. Everything is
-         then divided by the real total, so the pot is still spent to the cent. */
+      const days = SHIFT_DAYS.filter(d => byDay[d]);
+      if (!days.length) return;
+      const hoursOf = d => Object.keys(byDay[d]).reduce((s, n) => s + byDay[d][n], 0);
+      const pot = +(days.reduce((s, d) => s + hoursOf(d), 0) * TIP_POOL_RATE).toFixed(2);
       let totW = 0; const wOf = {};
-      keys.forEach(k => { const d = k.split('|')[0], per = k.split('|')[1];
-        wOf[k] = (dayW[SHIFT_DAYS.indexOf(d)] || 0.12) * (TIP_PERIOD_W[per] || 0);
-        totW += wOf[k]; });
-      // The last pool absorbs the remainder, so the week's close-outs total the pot to the cent.
+      days.forEach(d => { wOf[d] = dayW[SHIFT_DAYS.indexOf(d)] || 0.12; totW += wOf[d]; });
+      // The last close-out absorbs the remainder, so the week totals the pot to the cent.
       let handed = 0;
-      keys.forEach((k, i) => {
-        const amt = (i === keys.length - 1) ? +(pot - handed).toFixed(2)
-                                            : +(pot * wOf[k] / (totW || 1)).toFixed(2);
+      days.forEach((d, i) => {
+        const amt = (i === days.length - 1) ? +(pot - handed).toFixed(2)
+                                            : +(pot * wOf[d] / (totW || 1)).toFixed(2);
         handed = +(handed + amt).toFixed(2);
         if (amt <= 0) return;
-        const dayAgo = baseAgo + 6 - SHIFT_DAYS.indexOf(k.split('|')[0]);
-        const pool = mkPool(dayAgo, amt, buckets[k], k.split('|')[1]);
-        // Everything up to yesterday was closed out that night. Today's shifts are still open,
-        // which is the state a manager actually walks into.
+        const pool = mkPool(baseAgo + 6 - SHIFT_DAYS.indexOf(d), amt, byDay[d], '');
+        // Everything up to yesterday was closed out that night. Today is still open, which is
+        // the state a manager actually walks into.
         if (openFrom && pool.date >= openFrom) pool.tip_shift_open = true;
         lcTipPools.push(pool);
       });
