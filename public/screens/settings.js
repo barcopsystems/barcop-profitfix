@@ -3670,13 +3670,13 @@ S.HubSettings = {
     const lcKitchen = lcByPos('Line Cook', 'Prep Cook');
     const lcFloor   = lcByPos('Server', 'Host', 'Busser');
 
-    // Per week, split each department's labor dollars across its staff, then
-    // log five daily hour entries per person. cost sums back to ANCHOR labor.
+    // Per week, each person logs the shifts SCHED_PLAN rosters them for, scaled so the
+    // week totals the hours LC_BASE_HOURS declares. cost = hours x wage, per row.
     const lcActuals = [];
-    // Each department covers a realistic spread of dayparts: the bar skews to
-    // dinner and late night, the kitchen to lunch and dinner, the floor to the
-    // brunch/lunch/dinner stretch. Rotating by (person + day) gives each staffer
-    // a believable week instead of the same daypart five days running.
+    // ⚠ THE DAYPART IS READ OFF THE CLOCK (`periodOfShift`), never assigned. This block used
+    // to carry three hand-written rotations that dealt dayparts out by (person + day), which
+    // meant a 09:00-15:00 prep shift could be logged as "Late Night" and every person worked
+    // exactly five days whatever the schedule said. Both are gone; see lcAllocate below.
     /* ⛔⛔⛔ HOURS ARE DECLARED, NOT DERIVED FROM PAY (T1, 2026-08-17).
        This table used to not exist: the allocator computed
        `weekHours = (deptDollars * weight) / st.wage`, i.e. it split a DOLLAR budget and
@@ -3693,9 +3693,68 @@ S.HubSettings = {
        ⚠ Each figure divides into 5 clean daily entries at 0.1 precision (42/5 = 8.4), so
        what the Log Hours grid shows sums back to exactly this.
        🔧 verify-tip-credit-seed.js C1-C4 pins the overtime spread and the server weeks. */
+    /* ══ THE ROSTER — WHO ACTUALLY WORKS, DAY BY DAY ═══════════════════════════════════
+       Kyle, 2026-09-05, walking the demo: *"monday has 1 person working 4 hours, that is the
+       entire day. Tuesday is 2 people working the entire day... this is supposed to be a
+       restaurant doing $20,000 a week and they run on barely any staff, and on 2 days 1 person
+       for the entire front house with no bartender at all."*
+       ⛔ HE WAS RIGHT, AND THE CAUSE WAS STRUCTURAL. The old plan was keyed by POSITION, each
+       position holding a few shift patterns, and `expandPlan` gave every person exactly ONE of
+       them (`patterns[i % patterns.length]`). Three bartenders and three patterns meant the day
+       bar was one person on the four days that pattern listed — so MEASURED on the shipped seed:
+       Monday had 3 shifts and ONE tipped person all day, Monday and Tuesday had nobody at all
+       after 17:00 (a bar booking revenue on a night it was apparently shut), Monday had no cook,
+       and Sunday 15:00-17:00 had nobody on the clock.
+       ⭐ SO THE PLAN NAMES PEOPLE, NOT POSITIONS. That is what a schedule IS — a manager writes
+       names against days — and it is the only shape that can put one person on a day shift
+       Monday and a close on Saturday. The rotation artifact cannot come back, because there is
+       no rotation left.
+       ⚠ THE INVARIANTS IT IS BUILT TO: every hour the doors are open has a BARTENDER; every hour
+       the kitchen is open has a SERVER and a COOK; nobody works 7 days; nobody is scheduled on a
+       day `off_days` declares off (Priya Mon/Tue, Owen Tue, Ashley Wed); and each row's `hours`
+       equals its own clock span. Doors: Mon/Tue/Sun 11:00-22:00, Wed/Thu 11:00-00:00, Fri/Sat
+       11:00-02:00; the kitchen closes at 22:00 (23:00 Wed-Sat), after which it is a bar and the
+       floor goes home. That is why late night is bartenders and a barback, not servers.
+       🔧 verify-seed-schedule-real.js measures all of it off this table. */
+    const SCHED_PLAN = {
+      'Maria G.':   [ {day:'Mon',start:'11:00',end:'17:00',hours:6}, {day:'Tue',start:'11:00',end:'17:00',hours:6}, {day:'Wed',start:'11:00',end:'17:00',hours:6}, {day:'Thu',start:'11:00',end:'19:00',hours:8}, {day:'Fri',start:'16:00',end:'00:00',hours:8}, {day:'Sat',start:'16:00',end:'00:00',hours:8} ],
+      'Jake T.':    [ {day:'Wed',start:'16:00',end:'00:00',hours:8}, {day:'Thu',start:'16:00',end:'00:00',hours:8}, {day:'Fri',start:'18:00',end:'02:00',hours:8}, {day:'Sat',start:'18:00',end:'02:00',hours:8}, {day:'Sun',start:'11:00',end:'17:00',hours:6} ],
+      'Ashley B.':  [ {day:'Mon',start:'16:00',end:'22:00',hours:6}, {day:'Tue',start:'16:00',end:'22:00',hours:6}, {day:'Fri',start:'11:00',end:'17:00',hours:6}, {day:'Sat',start:'11:00',end:'17:00',hours:6}, {day:'Sun',start:'16:00',end:'22:00',hours:6} ],
+      'Devin R.':   [ {day:'Fri',start:'18:00',end:'02:00',hours:8}, {day:'Sat',start:'18:00',end:'02:00',hours:8} ],
+      'Luis V.':    [ {day:'Mon',start:'14:00',end:'22:00',hours:8}, {day:'Wed',start:'11:00',end:'19:00',hours:8}, {day:'Thu',start:'11:00',end:'19:00',hours:8}, {day:'Fri',start:'11:00',end:'19:00',hours:8}, {day:'Sat',start:'11:00',end:'20:00',hours:9} ],
+      'Sam P.':     [ {day:'Tue',start:'14:00',end:'22:00',hours:8}, {day:'Wed',start:'16:00',end:'23:00',hours:7}, {day:'Thu',start:'16:00',end:'23:00',hours:7}, {day:'Fri',start:'15:00',end:'23:00',hours:8}, {day:'Sat',start:'15:00',end:'23:00',hours:8} ],
+      'Hector M.':  [ {day:'Fri',start:'09:00',end:'15:00',hours:6}, {day:'Sat',start:'09:00',end:'17:00',hours:8}, {day:'Sun',start:'10:00',end:'18:00',hours:8} ],
+      'Tonya B.':   [ {day:'Mon',start:'09:00',end:'14:00',hours:5}, {day:'Tue',start:'09:00',end:'14:00',hours:5}, {day:'Wed',start:'09:00',end:'14:00',hours:5}, {day:'Thu',start:'09:00',end:'14:00',hours:5}, {day:'Sun',start:'15:00',end:'22:00',hours:7} ],
+      'Jessica M.': [ {day:'Mon',start:'11:00',end:'17:00',hours:6}, {day:'Tue',start:'11:00',end:'17:00',hours:6}, {day:'Wed',start:'11:00',end:'18:00',hours:7}, {day:'Thu',start:'11:00',end:'18:00',hours:7}, {day:'Fri',start:'11:00',end:'18:00',hours:7}, {day:'Sat',start:'11:00',end:'19:00',hours:8} ],
+      'Marcus T.':  [ {day:'Mon',start:'16:00',end:'22:00',hours:6}, {day:'Wed',start:'16:00',end:'22:00',hours:6}, {day:'Thu',start:'16:00',end:'22:00',hours:6}, {day:'Fri',start:'16:00',end:'23:00',hours:7}, {day:'Sat',start:'16:00',end:'23:00',hours:7} ],
+      'Brianna K.': [ {day:'Tue',start:'16:00',end:'22:00',hours:6}, {day:'Fri',start:'17:00',end:'23:00',hours:6}, {day:'Sat',start:'10:00',end:'16:00',hours:6}, {day:'Sun',start:'10:00',end:'16:00',hours:6} ],
+      'Priya N.':   [ {day:'Wed',start:'17:00',end:'23:00',hours:6}, {day:'Thu',start:'17:00',end:'23:00',hours:6}, {day:'Sat',start:'17:00',end:'23:00',hours:6}, {day:'Sun',start:'15:00',end:'22:00',hours:7} ],
+      'Owen L.':    [ {day:'Fri',start:'17:00',end:'23:00',hours:6}, {day:'Sat',start:'16:00',end:'23:00',hours:7} ],
+      'Tara W.':    [ {day:'Fri',start:'17:00',end:'23:00',hours:6}, {day:'Sat',start:'17:00',end:'23:00',hours:6} ],
+      'Diego S.':   [ {day:'Sat',start:'11:00',end:'17:00',hours:6}, {day:'Sun',start:'10:00',end:'16:00',hours:6} ],
+      'Renee K.':   [ {day:'Tue',start:'15:30',end:'22:00',hours:6.5}, {day:'Wed',start:'15:30',end:'22:00',hours:6.5}, {day:'Thu',start:'15:30',end:'22:00',hours:6.5}, {day:'Fri',start:'15:30',end:'22:00',hours:6.5}, {day:'Sat',start:'15:30',end:'22:00',hours:6.5} ],
+      'Carlos P.':  [ {day:'Mon',start:'10:00',end:'19:00',hours:9}, {day:'Tue',start:'10:00',end:'19:00',hours:9}, {day:'Thu',start:'14:00',end:'23:00',hours:9}, {day:'Fri',start:'14:00',end:'23:00',hours:9}, {day:'Sun',start:'12:00',end:'21:00',hours:9} ]
+    };
+    const SHIFT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    /* The service period a logged shift belongs to: the one it spends the most of itself inside.
+       ⛔ DERIVED, NEVER DECLARED. The old allocator carried a hand-written rotation
+       (['Dinner','Late Night','Dinner','Happy Hour','Late Night']) that had no relation to the
+       clock, so a 09:00-15:00 prep shift could be stamped "Late Night". Reading it off
+       `App.servicePeriods()` — the same list Settings wrote above and `SHIFT_TYPES` is derived
+       from — means a row can only ever carry a period an operator could pick (S219), and a
+       period-time change moves the label with it. */
+    const periodOfShift = (start, end) => {
+      let best = '', bestMin = 0;
+      (App.servicePeriods() || []).forEach(p => {
+        if (!p.start || !p.end) return;
+        const mins = App.overlapMinutes(start, end, p.start, p.end);
+        if (mins > bestMin) { bestMin = mins; best = p.name; }
+      });
+      return best;
+    };
     const LC_BASE_HOURS = {
-      'Maria G.':   42,   'Jake T.':    22,   'Ashley B.':  14,   'Devin R.':   11,
-      'Luis V.':    41,   'Sam P.':     24,   'Hector M.':  15,   'Tonya B.':    9,
+      'Maria G.':   42,   'Jake T.':    35,   'Ashley B.':  25,   'Devin R.':   15,
+      'Luis V.':    41,   'Sam P.':     34,   'Hector M.':  19,   'Tonya B.':   23,
       /* ⭐⭐⭐ A TIP-CREDIT SERVER IS IN OVERTIME ON PURPOSE, AND THAT IS ONLY HONEST BECAUSE THE
          APP NOW PRICES IT CORRECTLY. Bar Cop used to pay an OT hour at 1.5x the CASH wage —
          right for anyone at or above the full minimum (Maria at $7.25 takes no tip credit, so
@@ -3708,8 +3767,8 @@ S.HubSettings = {
          looks like: overtime on three people across three departments, one of them a server.
          🔧 verify-tip-credit-seed.js C5 is now the COUPLING: the seed may show a tip-credit
          employee in overtime only while the FLSA helper is in place to price it. */
-      'Jessica M.': 41,   'Marcus T.':  24,   'Brianna K.': 17,   'Priya N.':   16,
-      'Owen L.':    10,   'Tara W.':     7,   'Diego S.':    5
+      'Jessica M.': 41,   'Marcus T.':  29,   'Brianna K.': 22,   'Priya N.':   23,
+      'Owen L.':    12,   'Tara W.':    11,   'Diego S.':   11
     };
     /* ⚠ THE CEILING ON THIS TABLE IS `SCHED_PLAN`, NOT TASTE. Build Schedule prices the
        PLANNED week off SCHED_PLAN (408.5 h for this roster) and Schedule History compares
@@ -3732,19 +3791,36 @@ S.HubSettings = {
       const cur = ANCHL.current(), curTot = cur.bar_labor + cur.food_labor;
       return curTot > 0 ? (a.bar_labor + a.food_labor) / curTot : 1;
     };
-    const lcAllocate = (staff, scale, baseAgo, dayparts) => {
-      staff.forEach((st, i) => {
+    /* ⛔ THE LOGGED WEEK IS THE SCHEDULED WEEK, TRIMMED — not a 5-day even spread. The old
+       allocator gave everybody `weekHours / 5` on five consecutive days with a rotating
+       `shift_type`, which contradicted the schedule three ways at once: it put every person on
+       exactly five days whatever their roster said, it logged the same hours every day, and
+       (measured) it wrote Tuesday through Saturday only — so the bar booked revenue on Monday
+       and Sunday with nobody clocked in. Kyle, 2026-09-05: *"then the actual week data needs to
+       make sense."*
+       ⭐ NOW EACH PERSON LOGS THE SHIFTS THEY WERE SCHEDULED, scaled by one factor so the week
+       still totals the hours `LC_BASE_HOURS` declares. That is what makes Schedule History an
+       honest comparison: same days, same dayparts, slightly fewer hours, because shifts get cut
+       and people leave early. Hours stay DECLARED (T1) — the roster sets their SHAPE, never
+       their total, and nothing here divides dollars by a wage.
+       🔧 verify-seed-crew.js and verify-seed-schedule-real.js both measure off this. */
+    const lcAllocate = (staff, scale, baseAgo) => {
+      staff.forEach(st => {
+        const roster = SCHED_PLAN[st.name] || [];
+        const plannedH = roster.reduce((s, r) => s + r.hours, 0);
         const weekHours = (LC_BASE_HOURS[st.name] || 0) * scale;
-        for (let d = 0; d < 5; d++) {
-          const h = +(weekHours / 5).toFixed(1);
-          if (h <= 0) continue;
+        if (plannedH <= 0 || weekHours <= 0) return;
+        const trim = weekHours / plannedH;
+        roster.forEach(r => {
+          const h = +(r.hours * trim).toFixed(1);
+          if (h <= 0) return;
           lcActuals.push({
-            id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name,
-            position_id:st.position_id, shift_type:dayparts[(i + d) % dayparts.length],
+            id:uid(), date:dateStr(baseAgo + 6 - SHIFT_DAYS.indexOf(r.day)), staff_id:st.id, name:st.name,
+            position_id:st.position_id, shift_type:periodOfShift(r.start, r.end),
             hours:h, wage:st.wage,
             cost:+(h * st.wage).toFixed(2), notes:''
           });
-        }
+        });
       });
     };
     // Management is ONE salaried GM plus an HOURLY assistant manager. The blended
@@ -3867,9 +3943,9 @@ S.HubSettings = {
       const baseAgo    = sunOff + ANCHS.endAgo(a);
       const wkScale    = lcHoursScale(a);
       const rowsBefore = lcActuals.length;
-      lcAllocate(lcBar,     wkScale, baseAgo, ['Dinner', 'Late Night', 'Dinner', 'Happy Hour', 'Late Night']);
-      lcAllocate(lcKitchen, wkScale, baseAgo, ['Lunch', 'Dinner', 'Dinner', 'Lunch', 'Lunch']);
-      lcAllocate(lcFloor,   wkScale, baseAgo, ['Happy Hour', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      lcAllocate(lcBar,     wkScale, baseAgo);
+      lcAllocate(lcKitchen, wkScale, baseAgo);
+      lcAllocate(lcFloor,   wkScale, baseAgo);
       seedLeaders(baseAgo);
       const wkRows = lcActuals.slice(rowsBefore);
       seededHrs[a.wk] = +wkRows.reduce((s, r) => s + (r.hours || 0), 0).toFixed(1);
@@ -3996,9 +4072,9 @@ S.HubSettings = {
     const curLBase = sunOff - 7;
     if (curL) {
       const cScale = lcHoursScale(curL);
-      lcAllocate(lcBar,     cScale, curLBase, ['Dinner', 'Late Night', 'Dinner', 'Happy Hour', 'Late Night']);
-      lcAllocate(lcKitchen, cScale, curLBase, ['Lunch', 'Dinner', 'Dinner', 'Lunch', 'Lunch']);
-      lcAllocate(lcFloor,   cScale, curLBase, ['Happy Hour', 'Lunch', 'Dinner', 'Dinner', 'Lunch']);
+      lcAllocate(lcBar,     cScale, curLBase);
+      lcAllocate(lcKitchen, cScale, curLBase);
+      lcAllocate(lcFloor,   cScale, curLBase);
       seedLeaders(curLBase);
     }
     App.laborData.lc_actuals   = lcActuals;
@@ -4008,47 +4084,24 @@ S.HubSettings = {
     // late). Staff in a position are staggered across them (person 1 opens,
     // person 2 closes, etc.) so the grid reads like a human-built week covering
     // brunch through last call, not one identical block per role.
-    const SCHED_PLAN = {
-      'Bartender': [
-        { days:['Tue','Wed','Thu','Fri'],       start:'11:00', end:'17:00', hours:6 },   // day / lunch bar
-        { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'00:00', hours:8 },   // dinner into late
-        { days:['Fri','Sat','Sun'],             start:'17:00', end:'01:00', hours:8 },   // late bar / last call
-      ],
-      'Barback':   [ { days:['Thu','Fri','Sat','Sun'], start:'17:00', end:'01:00', hours:8 } ],
-      'Line Cook': [
-        { days:['Tue','Wed','Thu','Fri'],       start:'09:00', end:'16:00', hours:7 },   // brunch / lunch line
-        { days:['Wed','Thu','Fri','Sat'],       start:'15:00', end:'23:00', hours:8 },   // dinner line
-        { days:['Sat','Sun'],                   start:'09:00', end:'16:00', hours:7 },   // weekend brunch line
-      ],
-      'Prep Cook': [ { days:['Mon','Tue','Wed','Thu','Fri'], start:'08:00', end:'14:00', hours:6 } ],
-      'Server':    [
-        { days:['Mon','Tue','Wed','Thu','Fri'], start:'11:00', end:'15:30', hours:4.5 }, // weekday lunch
-        { days:['Wed','Thu','Fri','Sat'],       start:'16:00', end:'22:00', hours:6 },   // dinner
-        { days:['Sat','Sun'],                   start:'09:30', end:'15:00', hours:5.5 }, // weekend brunch
-        { days:['Fri','Sat','Sun'],             start:'17:00', end:'23:00', hours:6 },   // dinner into late
-      ],
-      'Busser':    [
-        { days:['Thu','Fri','Sat','Sun'],       start:'17:00', end:'23:00', hours:6 },   // dinner / late floor support
-        { days:['Sat','Sun'],                   start:'10:00', end:'15:00', hours:5 },   // weekend brunch support
-      ],
-      'Host':      [
-        { days:['Sat','Sun'],                   start:'09:30', end:'15:00', hours:5.5 }, // brunch host
-        { days:['Wed','Thu','Fri','Sat'],       start:'17:00', end:'22:30', hours:5.5 },// dinner host
-      ],
-      'Manager':   [
-        { days:['Mon','Tue','Wed','Fri'],       start:'09:00', end:'17:00', hours:8 },   // opener
-        { days:['Thu','Fri','Sat','Sun'],       start:'15:00', end:'23:00', hours:8 },   // closer
-      ],
-      'Assistant Manager': [
-        { days:['Tue','Wed','Thu','Fri','Sat'], start:'15:30', end:'22:00', hours:6.5 }, // hourly AM, dinner floor
-      ],
-    };
     const posNameOf = id => (lcPositions.find(p => p.id === id) || {}).name;
     const mondayISO = (daysBack) => {
       const d = new Date(today); d.setDate(d.getDate() - daysBack);
       const day = d.getDay();
       d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
       return App.ymdLocal(d);
+    };
+    /* The live plan names PEOPLE, so it expands by looking each one up. The position-keyed
+       `expandPlan` below survives for the two saved TEMPLATES only (Busy Weekend Push, Slow
+       Week) — those are what-ifs an operator applies to a roster, not the roster itself. */
+    const expandRoster = (rosterMap) => {
+      const out = [];
+      Object.keys(rosterMap).forEach(name => {
+        const st = lcStaff.find(s => s.name === name);
+        if (!st) return;
+        rosterMap[name].forEach(r => out.push({ st: st, day: r.day, plan: r }));
+      });
+      return out;
     };
     // Expand a plan map into per-staff day assignments. Staff within a position
     // are staggered across that position's shift patterns (i % patterns) so the
@@ -4089,7 +4142,7 @@ S.HubSettings = {
       return extra;
     };
     const buildSchedule = (weekStart, forecast) => {
-      const shifts = expandPlan(SCHED_PLAN).map(({ st, day, plan }) => ({
+      const shifts = expandRoster(SCHED_PLAN).map(({ st, day, plan }) => ({
         staff_id:st.id, name:st.name, position_id:st.position_id, day:day,
         start:plan.start, end:plan.end, hours:plan.hours, wage:st.wage,
         cost:+(plan.hours * st.wage).toFixed(2) }));
@@ -4268,6 +4321,7 @@ S.HubSettings = {
     // ── Schedule templates — three reusable week patterns the operator applies
     // in Build Schedule. Shifts are {staff_id, day, start, end}; Build Schedule
     // computes hours + cost on apply.
+    const tmplRows   = (rows) => rows.map(({ st, day, plan }) => ({ staff_id:st.id, day:day, start:plan.start, end:plan.end }));
     const tmplShifts = (planMap) => expandPlan(planMap).map(({ st, day, plan }) => ({ staff_id:st.id, day:day, start:plan.start, end:plan.end }));
     const BUSY_PLAN = {
       'Bartender':[ {days:['Wed','Thu','Fri','Sat','Sun'],start:'15:00',end:'01:00'}, {days:['Fri','Sat','Sun'],start:'18:00',end:'02:00'} ],
@@ -4287,7 +4341,7 @@ S.HubSettings = {
       'Manager':  [ {days:['Wed','Thu','Fri','Sat'],start:'14:00',end:'22:00'} ],
     };
     App.laborData.lc_schedule_templates = [
-      { id:uid(), name:'Standard Week',       shifts:tmplShifts(SCHED_PLAN), created_at:daysAgoISO(64) },
+      { id:uid(), name:'Standard Week',       shifts:tmplRows(expandRoster(SCHED_PLAN)), created_at:daysAgoISO(64) },
       { id:uid(), name:'Busy Weekend Push',   shifts:tmplShifts(BUSY_PLAN),  created_at:daysAgoISO(48) },
       { id:uid(), name:'Slow Week (Reduced)', shifts:tmplShifts(SLOW_PLAN),  created_at:daysAgoISO(30) },
     ];
