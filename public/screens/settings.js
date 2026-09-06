@@ -3673,10 +3673,10 @@ S.HubSettings = {
     // Per week, each person logs the shifts SCHED_PLAN rosters them for, scaled so the
     // week totals the hours LC_BASE_HOURS declares. cost = hours x wage, per row.
     const lcActuals = [];
-    // ⚠ THE DAYPART IS READ OFF THE CLOCK (`periodOfShift`), never assigned. This block used
-    // to carry three hand-written rotations that dealt dayparts out by (person + day), which
-    // meant a 09:00-15:00 prep shift could be logged as "Late Night" and every person worked
-    // exactly five days whatever the schedule said. Both are gone; see lcAllocate below.
+    // ⚠ THE DAYPART IS READ OFF THE CLOCK (`splitShift`), never assigned, and a shift that
+    // crosses two periods logs a line in each. This block used to carry three hand-written
+    // rotations that dealt dayparts out by (person + day), so a 09:00-15:00 prep shift could
+    // be logged as "Late Night" and everyone worked five days whatever the schedule said.
     /* ⛔⛔⛔ HOURS ARE DECLARED, NOT DERIVED FROM PAY (T1, 2026-08-17).
        This table used to not exist: the allocator computed
        `weekHours = (deptDollars * weight) / st.wage`, i.e. it split a DOLLAR budget and
@@ -3736,21 +3736,45 @@ S.HubSettings = {
       'Carlos P.':  [ {day:'Mon',start:'10:00',end:'19:00',hours:9}, {day:'Tue',start:'10:00',end:'19:00',hours:9}, {day:'Thu',start:'14:00',end:'23:00',hours:9}, {day:'Fri',start:'14:00',end:'23:00',hours:9}, {day:'Sun',start:'12:00',end:'21:00',hours:9} ]
     };
     const SHIFT_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    /* The service period a logged shift belongs to: the one it spends the most of itself inside.
-       ⛔ DERIVED, NEVER DECLARED. The old allocator carried a hand-written rotation
-       (['Dinner','Late Night','Dinner','Happy Hour','Late Night']) that had no relation to the
-       clock, so a 09:00-15:00 prep shift could be stamped "Late Night". Reading it off
-       `App.servicePeriods()` — the same list Settings wrote above and `SHIFT_TYPES` is derived
-       from — means a row can only ever carry a period an operator could pick (S219), and a
-       period-time change moves the label with it. */
-    const periodOfShift = (start, end) => {
-      let best = '', bestMin = 0;
+    /* ⛔⛔⛔ A SHIFT IS LOGGED PER SERVICE PERIOD, NOT UNDER ONE LABEL, AND THIS IS A MONEY BUG
+       IF YOU GET IT WRONG (found by walking the pushed demo, 2026-09-05).
+       The first cut of this stamped each shift with the ONE period it spent most of itself in,
+       which reads as sensible and is not. `App.hoursFor(staffId, date, shiftType)` filters
+       `lc_actuals` by period and SUMS whatever matches, and the Tip Log fills each row's hours
+       from it — so a whole 8-hour shift stamped "Dinner" was charged, entire, to the dinner
+       pool. MEASURED on the live demo: Maria G. worked Friday 16:00-00:00 and the Dinner tab
+       showed her at 8 h against a five-hour dinner, while Happy Hour and Late Night fell back
+       to the schedule overlap and showed her again at 1 h and 2 h. Eleven hours billed across
+       three pools on an eight-hour shift, and the dinner crew paying for her last call.
+       ⭐ THE REAL DOOR ALREADY WORKS THIS WAY, which is what settles it. `lc-log-hours.save()`
+       writes one row per (staff, date, shift_type) and its duplicate guard is keyed on exactly
+       that triple, with the comment "a real split shift can still be added on purpose". A
+       manager logging a bartender who worked happy hour through last call enters three lines.
+       The seed has to store the shape the real door stores (L2).
+       ⚠ THE LEG OUTSIDE EVERY PERIOD IS BLANK, NOT DROPPED. Prep starts at 09:00 and the first
+       period opens at 11:00, so two paid hours belong to no daypart. Blank is what Log Hours'
+       picker offers for exactly this ('Select shift...') and what the salaried rows already
+       carry (S219) — dropping them would lose hours the crew was paid for.
+       The last leg absorbs the rounding remainder, so the legs always sum to the shift. */
+    const splitShift = (start, end, hours) => {
+      const win = App._clockSpan(start, end);
+      const total = win[1] - win[0];
+      if (!(total > 0)) return [{ period: '', hours: hours }];
+      const legs = []; let used = 0;
       (App.servicePeriods() || []).forEach(p => {
         if (!p.start || !p.end) return;
         const mins = App.overlapMinutes(start, end, p.start, p.end);
-        if (mins > bestMin) { bestMin = mins; best = p.name; }
+        if (mins > 0) { legs.push({ period: p.name, min: mins }); used += mins; }
       });
-      return best;
+      if (used < total) legs.push({ period: '', min: total - used });
+      if (!legs.length) return [{ period: '', hours: hours }];
+      let handed = 0;
+      return legs.map((leg, i) => {
+        const h = (i === legs.length - 1) ? Math.max(0, +(hours - handed).toFixed(1))
+                                          : +(hours * leg.min / total).toFixed(1);
+        handed = +(handed + h).toFixed(1);
+        return { period: leg.period, hours: h };
+      }).filter(l => l.hours > 0);
     };
     const LC_BASE_HOURS = {
       'Maria G.':   42,   'Jake T.':    35,   'Ashley B.':  25,   'Devin R.':   15,
@@ -3811,14 +3835,22 @@ S.HubSettings = {
         const weekHours = (LC_BASE_HOURS[st.name] || 0) * scale;
         if (plannedH <= 0 || weekHours <= 0) return;
         const trim = weekHours / plannedH;
-        roster.forEach(r => {
-          const h = +(r.hours * trim).toFixed(1);
+        // The last SHIFT absorbs the week's rounding remainder, so what the crew logs adds up to
+        // the hours LC_BASE_HOURS declares instead of drifting a tenth per shift.
+        let given = 0;
+        roster.forEach((r, i) => {
+          const h = (i === roster.length - 1) ? Math.max(0, +(weekHours - given).toFixed(1))
+                                              : +(r.hours * trim).toFixed(1);
+          given = +(given + h).toFixed(1);
           if (h <= 0) return;
-          lcActuals.push({
-            id:uid(), date:dateStr(baseAgo + 6 - SHIFT_DAYS.indexOf(r.day)), staff_id:st.id, name:st.name,
-            position_id:st.position_id, shift_type:periodOfShift(r.start, r.end),
-            hours:h, wage:st.wage,
-            cost:+(h * st.wage).toFixed(2), notes:''
+          const on = dateStr(baseAgo + 6 - SHIFT_DAYS.indexOf(r.day));
+          splitShift(r.start, r.end, h).forEach(leg => {
+            lcActuals.push({
+              id:uid(), date:on, staff_id:st.id, name:st.name,
+              position_id:st.position_id, shift_type:leg.period,
+              hours:leg.hours, wage:st.wage,
+              cost:+(leg.hours * st.wage).toFixed(2), notes:''
+            });
           });
         });
       });
@@ -3842,8 +3874,18 @@ S.HubSettings = {
          reproduce these rows. Blank is also the honest answer for a salaried manager working
          open-to-close: no single service period. (`sc_shifts` above keeps 'Full Day' on purpose —
          that is what the shipped `buildSales` writes and what hub-books' join expects.) */
-      gmStaff.forEach(st => { for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:st.id, name:st.name, position_id:st.position_id, shift_type:'', hours:9, wage:0, cost:0, notes:'' }); });
-      if (amStaff) for (let d = 0; d < 5; d++) lcActuals.push({ id:uid(), date:dateStr(baseAgo + 5 - d), staff_id:amStaff.id, name:amStaff.name, position_id:amStaff.position_id, shift_type:'', hours:amHrs, wage:amStaff.wage, cost:+(amHrs * amStaff.wage).toFixed(2), notes:'' });
+      /* ⚠ THE LEADERS FOLLOW THE SAME ROSTER AS EVERYONE ELSE. This wrote five rows on
+         `baseAgo + 5 - d`, which resolves to Tuesday through Saturday whatever the schedule
+         says — so the GM was rostered Mon/Tue/Thu/Fri/Sun and logged Tue/Wed/Thu/Fri/Sat, and
+         Schedule History compared a week he did not work to a week he did. Totals are unchanged
+         (the GM's roster is 5 x 9 h, the AM's 5 x 6.5 h); only the DAYS move, onto the ones his
+         own line in SCHED_PLAN gives him. */
+      const leaderRows = (st, wage) => (SCHED_PLAN[st.name] || []).forEach(r => lcActuals.push({
+        id:uid(), date:dateStr(baseAgo + 6 - SHIFT_DAYS.indexOf(r.day)), staff_id:st.id, name:st.name,
+        position_id:st.position_id, shift_type:'', hours:r.hours, wage:wage,
+        cost:+(r.hours * (wage || 0)).toFixed(2), notes:'' }));
+      gmStaff.forEach(st => leaderRows(st, 0));
+      if (amStaff) leaderRows(amStaff, amStaff.wage);
     };
     // Hours actually seeded into lc_actuals, per week. This is the ONLY honest source
     // for revenue_weeks.total_hours: a live re-confirm reads laborFeed(), which sums
