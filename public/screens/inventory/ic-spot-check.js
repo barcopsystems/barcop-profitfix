@@ -423,21 +423,28 @@ S.InventorySpotCheck = {
         + '</div></div>'
       : '';
 
-    // Spot Check card: collapsible header, the four setup cells, a divider, then
+    // Spot Check card: collapsible header, the five setup cells, a divider, then
     // Add Products. Save lives at the bottom of the page.
+    const eq = 'flex:0 0 calc((100% - 64px) / 5);min-width:0;';
     const setup = '<div class="card form-card">'
       + App.collapsibleCardTitle('sp-setup', 'Spot Check')
       + '<div class="collapse-body">'
+      /* ⛔ FIVE EQUAL COLUMNS (Kyle, 2026-09-06). The five cells were 150/200/150/200/130, so Bar
+         Station and Checked By read a third wider than Date and Shift and Variance Flag sat short
+         at the end. `flex:0 0 calc((100% - 64px) / 5)` is a fifth of the row minus the four 16px
+         gaps, with NO grow — same idiom as lc-time-off and r-server-check.
+         ⚠ min-width:0 is load-bearing: a select's intrinsic min-content width would otherwise
+           push Checked By past its fifth and break the alignment on a narrow card. */
       + '<div class="form-row" style="gap:16px;">'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label>'
+        + '<div class="f" style="' + eq + '"><label>Date</label>'
         + '<input type="date" id="sp-date" value="' + (dft.date || App.todayLocal()) + '"/></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Bar Station</label>'
+        + '<div class="f" style="' + eq + '"><label>Bar Station</label>'
         + '<select id="sp-loc">' + this.locationOptions(dft.location) + '</select></div>'
-        + '<div class="f" style="width:150px;flex-shrink:0;"><label>Shift</label>'
+        + '<div class="f" style="' + eq + '"><label>Shift</label>'
         + '<select id="sp-shift">' + shiftOpts + '</select></div>'
-        + '<div class="f" style="width:200px;flex-shrink:0;"><label>Checked By</label>'
+        + '<div class="f" style="' + eq + '"><label>Checked By</label>'
         + '<select id="sp-by">' + App.staffOptions(dft.checked_by_id || App.activeManagerId(), { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
-        + '<div class="f" style="width:130px;flex-shrink:0;"><label>Variance Flag</label>'
+        + '<div class="f" style="' + eq + '"><label>Variance Flag</label>'
         + '<div class="fw"><input class="suf" type="number" id="sp-flagpct" min="0" step="0.5" value="' + this._flagPct + '"/><span class="suf">%</span></div></div>'
       + '</div>'
       + '<div class="divider"></div>'
