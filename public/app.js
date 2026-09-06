@@ -6521,6 +6521,47 @@ const App = {
   // Canonical shift-type names, derived from the operator's service periods. Every
   // consumer reads from here so the list never drifts.
   get SHIFT_TYPES() { return this.servicePeriods().map(p => p.name); },
+
+  /* ⛔⛔⛔ DOES A SCHEDULED SHIFT TOUCH A SERVICE PERIOD, AND FOR HOW LONG.
+     Kyle, 2026-09-05, on the first build of the tip shift selector: *"all the staff names stay on
+     every shift, just their hours change... priya works 5-11, so dinner and 1 hour into late
+     night, but she is still listed on lunch and happy hour. Why?"*
+     Because the selector filtered the HOURS lookup and never the CREW. MEASURED on the demo: every
+     period returned the same eight people, including Brianna K. (09:30-15:00) on Late Night and
+     Priya N. (17:00-23:00) on Lunch.
+     ⭐ THE HOURS MATTER AS MUCH AS THE NAMES. A tip pool divides by hours, so putting a whole
+     eight-hour shift against Lunch pays that person for time they worked at dinner and takes it off
+     everyone else. `overlapHours` is the portion that actually falls inside the period.
+     ⚠ BOTH WINDOWS CAN WRAP PAST MIDNIGHT — Late Night is 22:00-02:00 in the app's own presets, and
+     a 17:00-01:00 bar shift wraps too — so each is measured on a 48-hour line and compared against
+     the other's next-day copy as well. Touching end-to-start is NOT an overlap: 11:00-15:00 beside
+     15:00-17:00 is two adjacent dayparts, which is the normal case.
+     ⚠ ONE IMPLEMENTATION. `ServicePeriods._overlap` asks the same question when it refuses two
+     periods that cross, and two copies of a time comparison is exactly the drift this codebase
+     keeps paying for. */
+  _clockMin(t) { const a = String(t || '').split(':'); return (parseInt(a[0], 10) || 0) * 60 + (parseInt(a[1], 10) || 0); },
+  _clockSpan(start, end) {
+    const s = this._clockMin(start);
+    let e = this._clockMin(end);
+    if (e <= s) e += 1440;                     // wraps past midnight
+    return [s, e];
+  },
+  overlapMinutes(aStart, aEnd, bStart, bEnd) {
+    if (!aStart || !aEnd || !bStart || !bEnd) return 0;
+    const [as, ae] = this._clockSpan(aStart, aEnd);
+    const [bs, be] = this._clockSpan(bStart, bEnd);
+    const cut = (x1, x2, y1, y2) => Math.max(0, Math.min(x2, y2) - Math.max(x1, y1));
+    // Compare against the other window's next-day copy too, or a wrapping shift misses a morning
+    // period and vice versa.
+    return Math.max(cut(as, ae, bs, be), cut(as, ae, bs + 1440, be + 1440), cut(as + 1440, ae + 1440, bs, be));
+  },
+  windowsOverlap(aStart, aEnd, bStart, bEnd) { return this.overlapMinutes(aStart, aEnd, bStart, bEnd) > 0; },
+  overlapHours(aStart, aEnd, bStart, bEnd) { return this.overlapMinutes(aStart, aEnd, bStart, bEnd) / 60; },
+  // The configured period by name, or null. Callers need its window, not just its name.
+  servicePeriodByName(name) {
+    if (!name) return null;
+    return (this.servicePeriods() || []).find(p => (p.name || '') === name) || null;
+  },
   // The service period whose time window contains "now" — drives the Open-the-Floor
   // auto-pick. Handles a window that wraps past midnight (Late Night); skips an
   // all-day catch-all unless nothing else matches; falls back to the most recently
