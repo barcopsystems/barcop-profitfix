@@ -124,23 +124,35 @@ S.LaborLogHours = {
     const v = val => (val != null && val !== '') ? val : '';
     const shiftOpts = this.SHIFTS.map(s =>
       '<option value="' + s + '"' + (a && a.shift_type === s ? ' selected' : '') + '>' + (s || 'Select shift...') + '</option>').join('');
-    return '<div class="form-row data-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Date</label>'
+    /* ⛔ SIX EQUAL COLUMNS ON THE PAGE FORM (Kyle, 2026-09-06). The cells were 140/170/120/130/
+       90/110/120 — seven different widths, so Staff was nearly twice Hours.
+       ⚠ THERE ARE SEVEN CELLS, NOT SIX. The Role picker is `display:none` unless the staff
+       member is cross-trained (a secondary role at a second rate), so six is what an operator
+       normally sees and six is the column count. A hidden cell takes no space, and when Role does
+       appear the seventh wraps onto column one of a second row — which is why `flex-wrap:wrap` is
+       forced on here: `.data-row` is `flex-wrap:nowrap`, and seven cells at a sixth each would
+       otherwise overflow the card rather than wrap.
+       ⚠ THE SAME CELLS BUILD THE `loe-` EDIT POP-UP, a narrower modal, so `cw` hands that layout
+       back the widths it always had — the same arrangement as sc-walked-tabs and sc-maintenance. */
+    const inline = p === 'lo-';
+    const cw = w => inline ? 'flex:0 0 calc((100% - 60px) / 6);min-width:0;' : w;
+    return '<div class="form-row data-row" style="gap:12px;' + (inline ? 'flex-wrap:wrap;' : '') + '">'
+      + '<div class="f" style="' + cw('flex:1 1 140px;min-width:0;') + '"><label>Date</label>'
       + '<input type="date" id="' + p + 'date" value="' + esc(a?.date || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="flex:1 1 170px;min-width:0;"><label>Staff</label>'
+      + '<div class="f" style="' + cw('flex:1 1 170px;min-width:0;') + '"><label>Staff</label>'
       + '<select id="' + p + 'staff">' + App.staffOptions(a ? a.staff_id : '') + '</select></div>'
       // Role picker: only shown for a cross-trained staff member (one with a
       // secondary role + rate), so single-role staff see no extra field. Picking
       // the secondary role costs the hours at the secondary wage.
-      + '<div class="f" id="' + p + 'pos-wrap" style="flex:1 1 120px;min-width:0;' + (a && this._hasSecondary(a.staff_id) ? '' : 'display:none;') + '"><label>Role</label>'
+      + '<div class="f" id="' + p + 'pos-wrap" style="' + cw('flex:1 1 120px;min-width:0;') + '' + (a && this._hasSecondary(a.staff_id) ? '' : 'display:none;') + '"><label>Role</label>'
       + '<select id="' + p + 'pos">' + (a && this._hasSecondary(a.staff_id) ? this.roleOptionsFor(a.staff_id, a.position_id) : '') + '</select></div>'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Shift</label>'
+      + '<div class="f" style="' + cw('flex:1 1 130px;min-width:0;') + '"><label>Shift</label>'
       + '<select id="' + p + 'shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 90px;min-width:0;"><label>Hours</label>'
+      + '<div class="f" style="' + cw('flex:1 1 90px;min-width:0;') + '"><label>Hours</label>'
       + '<input type="number" id="' + p + 'hours" min="0" step="0.25" value="' + v(a?.hours) + '"/></div>'
-      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Wage</label>'
+      + '<div class="f" style="' + cw('flex:1 1 110px;min-width:0;') + '"><label>Wage</label>'
       + '<div class="f-display" style="color:var(--t1);" id="' + p + 'c-wage">-</div></div>'
-      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Labor Cost</label>'
+      + '<div class="f" style="' + cw('flex:1 1 120px;min-width:0;') + '"><label>Labor Cost</label>'
       + '<div class="f-display" style="color:var(--t1);" id="' + p + 'c-cost">-</div></div>'
       + '</div>'
       + App.noteField({ id: p + 'notes', value: a?.notes });
