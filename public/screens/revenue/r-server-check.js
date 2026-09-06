@@ -762,9 +762,11 @@ S.RevenueServerCheck = {
     /* ⚠ AND THE FALLBACK BLAMED COLUMNS THAT WERE FINE. Every branch above demands `nSkip` be zero,
        so ANY unmatched or blank name sent a mixed file here — printing "check that the file has
        server, covers, and sales columns" directly above "Not matched to your roster: …" and
-       "Skipped, no readable date: Sam P.", which name the real causes. The twin door
-       (sc-dashboard) already words this as the ROW requirement rather than a column fault, which is
-       true in every combination; this door kept the older wording. Same sentence now. */
+       "Skipped, no readable date: Sam P.", which name the real causes. The wording below states the
+       ROW requirement rather than a column fault, which is true in every combination.
+       ⚠ THE TWIN DOOR IT WAS COPIED FROM IS GONE. This used to read "the twin door (sc-dashboard)
+         already words this as…"; `sc-dashboard` was deleted with the six cockpits, so the sentence
+         is now the only copy of that wording and there is nothing to keep it in step with. */
     else                head = 'No rows imported. Each row needs a server name Bar Cop can match, a date, covers, and sales.';
     const note = t => '<div style="font-size:11px;color:var(--t3);line-height:1.5;margin-top:6px;">' + t + '</div>';
     const list = a => a.slice(0, 8).map(esc).join(', ') + (a.length > 8 ? ', and ' + (a.length - 8) + ' more' : '');
@@ -839,13 +841,16 @@ S.RevenueServerCheck = {
       onComplete: rows => this._openServerReview(rows)
     });
   },
-  /* ⭐⭐⭐ ONE VERDICT-TO-ROW MAPPING, SHARED WITH THE SHIFT COCKPIT'S PER-SERVER ZONE.
-     `sc-dashboard`'s per-server drop and this screen read the identical `PosIngest.build('server')`
-     and show the identical columns, so the verdict-to-row mapping is the one part that must not
-     drift — two copies of a decision is exactly how a screen ends up promising a number the write
-     does not honour. The FRAME stays per-door (`ImportConfirm.panel` with its own ids, lead and
-     verb): the shell owns the frame, the door owns its columns. Here both doors' columns are the
-     same, so they come from one function instead of two.
+  /* ⭐⭐ ONE VERDICT-TO-ROW MAPPING FOR THIS DOOR'S IMPORT.
+     ⛔⛔ IT WAS SHARED WITH A SECOND DOOR AND THAT DOOR IS DELETED (T105, corrected 2026-09-06).
+     This header used to read "SHARED WITH THE SHIFT COCKPIT'S PER-SERVER ZONE" and justified the
+     function's existence by `sc-dashboard`'s per-server drop reading the identical
+     `PosIngest.build('server')`. `sc-dashboard` went with the six cockpits, so there is ONE caller
+     now. That is worth stating rather than deleting: a future reader who found the old note would
+     either keep a phantom in step or "simplify" on a premise that stopped being true.
+     ⚠ IT STILL EARNS ITS PLACE as one function — the FRAME is per-door (`ImportConfirm.panel` with
+     its own ids, lead and verb) and the columns are this door's; the shell owns the frame, the door
+     owns its columns. Keep that split if a second consumer ever arrives again.
      ⛔⛔ IT LIVES HERE AND NOT ON `PosIngest`, AND THE REASON WAS MEASURED. That component's charter
      is parse / match / dedup / commit; this is display. Putting it there gave the intake component a
      dependency on `esc` and on `ImportConfirm` — which loads AFTER it in index.html — and 60
@@ -1014,7 +1019,8 @@ S.RevenueServerCheck = {
          App.putRecord reverts the array slot on a genuine refusal, so what is still in memory IS
          what landed; re-running is safe because buildServer dedupes on staff + date + shift (an
          identical row comes back as "already logged"; a differing one asks or replaces).
-         (The cockpit door does the same probe — sc-dashboard.importServer.) */
+         (This used to note that the cockpit door ran the same probe. That door, sc-dashboard, is
+          deleted — T105, 2026-09-06 — so this is the only copy of the probe.) */
       if (ok) added = toAdd.length;
       else {
         // IDENTITY, not id: App.putRecord assigns the exact object on success and restores the

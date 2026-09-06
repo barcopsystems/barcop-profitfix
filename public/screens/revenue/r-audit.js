@@ -390,6 +390,22 @@ S.RevenueAudit = {
       { h: 'The readiness checklist', p: ['Before you generate, the top card shows what the audit reads and checks off each slice you already have: hours logged, menu items priced with units sold, server checks logged, events booked, and the week confirmed. Any row you are missing taps through to the step that fills it. You can still run with gaps, they just read N/A, so the checklist is a heads-up, not a lock.'] },
       { h: 'The steps', p: ['1. Get your week in: confirm the week in Close The Week and keep your counts, hours and drawer counts logged. 2. Generate. If no week is closed yet, enter last week\'s bar and food sales when Bar Cop asks. Sections with no data show N/A and fill in over time.'] },
       { h: 'Reading your results', p: ['Generate gives you a scored breakdown: an overall score up top, a score for each of the five areas (N/A where there is no data yet), and a Recoverable Per Month figure with its annualized number. Below that sit your Action Items, ranked by dollar impact, each naming the work and what closing it is worth a month. Bar Cop Briefing is a short written read of where you stand, and Export PDF saves the whole audit. Run it whenever you want a fresh read; it scores your trailing four weeks, and Bar Cop keeps one record a day so you can watch the score trend on the audit landing.'] },
+      /* ⛔ THIS TOPIC IS THE ONLY PLACE THE APP EXPLAINS "Building" (T81, Kyle 2026-09-06: *"explain
+         it in the profit and revenue audit i help sections.. that is where the recoverable numbers
+         live now"*). `AuditUI.recoveredItem` prints the word instead of a dollar figure while the
+         bar is inside its first weeks, and `recoveredBasis` — the line that says what the number
+         measures — RETURNS EMPTY in exactly that state, so the screen said nothing at all about why.
+         ⚠ EVERY FIGURE HERE IS READ OFF recovery.js, not remembered: BASELINE_WEEKS is 3 and
+           MIN_MEASURE is 1, so four operating weeks before any number. `dollars` is summed over
+           EVERY measurement week, which is why it is cumulative and why a bad week subtracts.
+         ⛔ DO NOT ADD "it matures at four measurement weeks". `MATURE_MEASURE` is computed into a
+           `mature` flag that NOTHING reads — a census found zero consumers — so telling an operator
+           about it would name a mechanism the app does not have. Nor the 8-week window: that drives
+           the ANNUALIZED run-rate, not this figure. */
+      { h: 'Recovered To Date, and why it says Building', p: [
+        'Recovered To Date sits in the money strip beside your recoverable figure. It is the measured change in these numbers since Bar Cop started watching them, and it counts every improvement whatever caused it: a tighter pour, a supplier price drop, a better season.',
+        'It reads Building for your first four weeks, and that is not a zero. Your own first three weeks set the baseline, and Bar Cop needs at least one week past that before it can put a number on anything. It measures you against where you started rather than against an industry average, so it has to watch you run before it can say you improved.',
+        'After that it is cumulative, not a snapshot. Every week since your baseline adds whatever it beat the baseline by, so the figure grows the longer you hold a gain, a bad week subtracts, and it can go negative if you settle below where you began.' ] },
       { h: 'The honest rule', p: ['Cost savings (labor) and revenue growth (check average, menu, servers, events) are kept separate, never blended into one number. Every figure is computed in code from your real data.'] }
     ]);
   },
