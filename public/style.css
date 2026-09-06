@@ -728,7 +728,22 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 .mp-stat-val{font-size:16px;font-weight:700;color:var(--t1);line-height:1;}
 .mp-brief p{font-size:12px;line-height:1.6;color:var(--t2);margin:0 0 8px;}
 .mp-brief p:last-child{margin-bottom:12px;}
-.mp-move{background:#202C36;border-radius:var(--r2);padding:12px 14px;margin-top:auto;min-height:104px;display:flex;flex-direction:column;gap:10px;}
+/* ONE HEIGHT FOR EVERY MOVE BOX (Kyle, 2026-09-06: *"all of the MOVE boxes need to be the same
+   height... one height for all of them"*). `margin-top:auto` already pinned them to the bottom of
+   their tile, but the 104px floor was under the real copy, so a Move that ran one line longer made
+   a taller box: MEASURED across 78 tiles, 58 came out at 106px and 20 at 125px.
+   ⚠ 163px IS NOT THE TALLEST BOX ON ONE SCREEN, IT IS THE TALLEST THE GRID CAN PRODUCE. The text
+     wraps more as the tile narrows, and .mp-grid is minmax(280px,1fr): measured maxima are 125px
+     at a 375px tile, 144px at 309px, and 163px at the 280px minimum. A floor set to what looks
+     even on a wide screen comes apart the moment the window narrows, which is uniformity by
+     coincidence rather than by construction.
+   ⚠ THE TRADE IS AIR ON A WIDE SCREEN. At a 375px tile a two-line Move now carries ~38px of empty
+     panel under its link. That is the price of the guarantee; drop the floor to 125px if the air
+     matters more than the narrow-window case, but then say so here rather than leaving the number
+     looking measured.
+   ⛔ NEVER CLAMP `.mp-move-txt` TO BUY THE HEIGHT BACK. That copy is the advice the tile exists to
+     give, and a clipped Move is a wrong answer rendered tidily. */
+.mp-move{background:#202C36;border-radius:var(--r2);padding:12px 14px;margin-top:auto;min-height:163px;display:flex;flex-direction:column;gap:10px;}
 .mp-move-txt{flex:1;font-size:12px;line-height:1.6;color:var(--t2);}
 .mp-move-lbl{font-weight:700;color:var(--t1);}
 .mp-act{align-self:flex-start;cursor:pointer;font-size:12px;font-weight:600;color:var(--t1);user-select:none;}
