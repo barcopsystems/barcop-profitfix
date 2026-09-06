@@ -3964,7 +3964,7 @@ S.HubSettings = {
        ⚠ Seeded per SEEDED WEEK, not on a hand-written day list: `tipShareForStaffInWeek`
        treats every pool in the week as that week's tips, so a week with no pool silently falls
        back to the raw log. */
-    const seedPoolsFor = (baseAgo, scale, openFrom) => {
+    const seedPoolsFor = (baseAgo, scale) => {
       const byDay = {};
       poolTipped.forEach(st => weekShifts(st, scale).forEach(sh => {
         const b2 = (byDay[sh.day] = byDay[sh.day] || {});
@@ -3983,28 +3983,25 @@ S.HubSettings = {
                                             : +(pot * wOf[d] / (totW || 1)).toFixed(2);
         handed = +(handed + amt).toFixed(2);
         if (amt <= 0) return;
-        const pool = mkPool(baseAgo + 6 - SHIFT_DAYS.indexOf(d), amt, byDay[d], '');
-        // Everything up to yesterday was closed out that night. Today is still open, which is
-        // the state a manager actually walks into.
-        if (openFrom && pool.date >= openFrom) pool.tip_shift_open = true;
-        lcTipPools.push(pool);
+        /* ⛔ NO OPEN FLAG. A close-out used to be stamped open from today forward, so the demo
+           landed on a live shift. The Tip Log has no lock any more (Kyle: *"get rid of the locked
+           screens"*), and `App.settledTips` — which Books, Week in Review, Year End and Labor
+           Reports all read — DROPS a row flagged open. Leaving the stamp in would have hidden
+           this week's tips from four screens with nothing on any of them to say why. */
+        lcTipPools.push(mkPool(baseAgo + 6 - SHIFT_DAYS.indexOf(d), amt, byDay[d], ''));
       });
     };
     ANCHL.weeks.forEach(a => seedPoolsFor(sunOff + ANCHS.endAgo(a), lcHoursScale(a)));
     // The current week gets its own close-outs, same as it gets its own hours.
     const poolCurL = ANCHL.weeks.reduce((m, a) => (ANCHS.endAgo(a) < ANCHS.endAgo(m) ? a : m), ANCHL.weeks[0]);
-    /* ⭐ ONLY THE CURRENT WEEK CARRIES AN OPEN SHIFT, and it opens at TODAY. Every closed week
-       behind it is closed; Monday through yesterday of this week are closed with tips entered;
-       today is open, which is where a manager picks the screen up.
-       ⚠ THE REST OF THE WEEK KEEPS ITS TIPS, and that is deliberate rather than an oversight.
-       The hours seed writes all seven days (the demo runs ahead of today, disclosed in the
-       banner), and tip-credit makeup is measured over a whole week of hours — so tips for only
-       the elapsed days would make every $2.13 server look far below the minimum and print
-       makeup dollars the bar does not owe. Blank future days and honest labor money cannot both
-       be had; the same trap took prime cost to 91.7% the last time part of a week was gated
-       (see verify-seed-future-days). They are OPEN, not entered-and-closed, which is the part
-       that reads correctly on the screen. */
-    if (poolCurL) seedPoolsFor(sunOff - 7, lcHoursScale(poolCurL), App.todayLocal());
+    /* The current week gets its own close-outs, same as it gets its own hours.
+       ⚠ THE WHOLE WEEK IS ENTERED, including the days after today, and that is deliberate rather
+       than an oversight. The hours seed writes all seven days (the demo runs ahead of today,
+       disclosed in the banner), and tip-credit makeup is measured over a WHOLE week of hours — so
+       tips for only the elapsed days would make every $2.13 server look far below the minimum and
+       print makeup dollars the bar does not owe. The same trap took prime cost to 91.7% the last
+       time part of a week was gated (see verify-seed-future-days). */
+    if (poolCurL) seedPoolsFor(sunOff - 7, lcHoursScale(poolCurL));
     App.laborData.lc_tip_pools = lcTipPools;
 
     const seededHrs = {}, seededOT = {}, seededMakeup = {}, seededCost = {};
@@ -4362,10 +4359,7 @@ S.HubSettings = {
              appears, which is the same reasoning the seeded week's `saved_at` carries.
              ⛔ `toISOString()` is right for the VALUE here — this is a timestamp, not a YMD,
              so [[local-date-convention]]'s ban on `toISOString().slice(0,10)` does not apply. */
-          /* The open flag lives on the ROWS, because that is what `App.tipShiftOpen` reads and
-             what the Tip Log's Close Shift button writes. It rides down from the pool so a
-             shift is open or closed as a whole, never half of each. */
-          tip_shift_open: pool.tip_shift_open ? true : undefined,
+
           hours:p.hours, notes:'', created_at:new Date(pool.date + 'T23:00:00').toISOString() });
       });
     });
