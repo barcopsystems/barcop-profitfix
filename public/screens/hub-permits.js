@@ -206,7 +206,7 @@ S.HubPermits = {
     const col = 'flex:0 0 calc((100% - 56px) / 5);min-width:0;';
 
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('hpa-add', 'Record Permit')
+      + App.collapsibleCardTitle('hpa-add', 'Record Permit', '<button class="btn btn-ghost btn-sm no-print" id="hpa-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
       /* ⛔ FIVE EQUAL COLUMNS (Kyle, 2026-09-06). They were 120-flex/220/120/150/150, so Name grew
@@ -271,7 +271,15 @@ S.HubPermits = {
     // Export button rides the chips row inside the list region.
     document.getElementById('hpa-save')?.addEventListener('click', () => this._saveAdd());
     document.getElementById('hpa-clear')?.addEventListener('click', () => this._clearAdd());
-    this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => App.toggleCollapse(e.currentTarget));
+    document.getElementById('hpa-print-blank')?.addEventListener('click', () => this.printBlank());
+    /* ⚠ THE GUARD IS NEW AND IT IS LOAD-BEARING. The Worksheet button lives INSIDE the collapse
+       head, so without it every press would print the sheet AND fold the form shut underneath.
+       Every other card with a title button (sc-incidents, sc-maintenance, sc-walked-tabs) carries
+       the same `!closest('.btn')` test; this screen had no title button until now. */
+    this.container.querySelector('.card-collapse-head')?.addEventListener('click', (e) => {
+      if (e.target.closest('.btn')) return;
+      App.toggleCollapse(e.currentTarget);
+    });
     App.applyCollapsed(this.container);
     App.wireCustomSelects(this.container);
     this.container.querySelectorAll('.hp-renew').forEach(btn => {
@@ -404,6 +412,25 @@ S.HubPermits = {
   },
 
   // ── Add / Edit modal ────────────────────────────────────────────────────
+  /* A blank sheet for a walk of the office wall: write down every permit and licence you
+     actually hold and when it renews, then enter them here so Bar Cop watches the dates.
+     ⚠ ISSUING AGENCY IS A COLUMN even though the form keeps it in Notes — on paper it is the
+       thing you are reading off the certificate, and it is where the renewal call starts. */
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Permits and Licenses',
+      subtitle: 'Walk your permits and write down what you hold and when each renews. Enter them into Bar Cop and it watches the renewal dates for you. It does not verify them and is not legal advice.',
+      columns: [
+        { label: 'Name',            width: '24%' },
+        { label: 'Type',            width: '16%' },
+        { label: 'Issuing Agency',  width: '20%' },
+        { label: 'Recurrence',      width: '12%' },
+        { label: 'Last Renewed',    width: '14%' },
+        { label: 'Next Renewal',    width: '14%' }
+      ],
+      rows: 14
+    });
+  },
   _openModal(record) {
     const isEdit = !!record;
     const rec = record || {
