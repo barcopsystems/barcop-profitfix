@@ -147,6 +147,15 @@
      ⚠ AND IT IS NOT `--sel-active-bg`: that is the CHIP colour and is a different decision. A
      shared token here would mean a filter chip could never be retuned without moving a price. */
   --sel-plan-bg: #2E3D4A;                  /* the chosen plan on a subscription picker. */
+  /* ⛔ ITS OWN TOKEN TOO, FOR THE REASON STATED DIRECTLY ABOVE (Kyle, 2026-09-06). The row being
+     dragged on the Set Locations arrange lists was the literal #0F1A21 — DARKER than the --zone
+     fill the row already carries, so the thing being moved sank into the page instead of lifting
+     off it, and the hex belonged to no palette. Kyle: *"it changes the background to weird color
+     not part of the color palette.. change it to #2E3D4A"*.
+     ⚠ NOT --sel-active-bg AND NOT --sel-plan-bg, even though all three carry this hex today. A
+       filter chip, a chosen plan and a row under the cursor are three separate decisions; one
+       shared token would mean none of them could be retuned without moving the other two. */
+  --drag-row-bg: #2E3D4A;                  /* the row being dragged on a drag-to-arrange list. */
   --red:       #DA4D3E;
   --red-bg:    rgba(192,56,40,0.13);
   --red-soft:  rgba(192,56,40,0.72);    /* Tier-2 red for status indicators (off-target scores, off-target metric values) so the full --red can be reserved for true attention/action signals */
@@ -1070,11 +1079,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
 
 /* Set Locations "Products In This Location" arrange list: a .row-list whose drag
    grip sits OUTSIDE the pill (first cell transparent, the pill starts at the 2nd
-   cell), like the checklist template. The row being dragged just fills #0F1A21 —
-   no border, no box-shadow (its own drag class, not the gold-tint .dr-dragging). */
+   cell), like the checklist template. The row being dragged just fills --drag-row-bg —
+   no border, no box-shadow (its own drag class, not the gold-tint .dr-dragging).
+   ⚠ ONE RULE, BOTH ARRANGE LISTS ON THAT SCREEN. ic-locations.js wires DragReorder twice with
+     dragClass:'il-drag' — once for the order of the LOCATIONS themselves and once for the
+     PRODUCTS inside one location. They are the same control and they stay the same colour. */
 .row-list.il-arrange tbody td.dr-handle{background:transparent;border-radius:0;padding-left:0;}
 .row-list.il-arrange tbody td:nth-child(2){border-radius:6px 0 0 6px;}
-.row-list.il-arrange tbody tr.il-drag td{background:#0F1A21;}
+.row-list.il-arrange tbody tr.il-drag td{background:var(--drag-row-bg);}
 .row-list.il-arrange tbody tr.il-drag td.dr-handle{background:transparent;}
 /* Financial-statement pill rows (.pnl-list) — the on-screen Income Statement and
    Sales Tax snapshots (the real export is the spreadsheet). Like .row-list pills
