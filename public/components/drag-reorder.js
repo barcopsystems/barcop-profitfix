@@ -70,6 +70,70 @@ const DragReorder = {
       try { onCommit(ids); } catch (e) { console.error(e); }
     };
 
+    /* ⛔⛔ MOVE / UP / CANCEL LIVE ON THE DOCUMENT, NOT ON THE HANDLE, AND THAT IS LOAD-BEARING.
+       They used to be bound per handle, which reads fine and is wrong, because `pointermove`
+       reorders with `parent.insertBefore(dragRow, ...)` — that detaches and reinserts the dragged
+       row, and the handle is INSIDE it, so Chrome drops the handle's pointer capture on the very
+       first reorder. Everything after that goes to whatever sits under the cursor.
+       MEASURED on the deployed build (Set Locations > Main Bar, drag row 3, release over a cell):
+         pointerdown:<svg> -> lostpointercapture:dr-handle -> pointerup:row-list il-arrange
+         and the row kept its drag class permanently, because no handle listener ever ran.
+       Release over another row's HANDLE and it cleaned up by luck — the drag state is shared
+       across all the handles in one wire() call — which is why this only bit some of the time.
+       ⚠ ADDED ON POINTERDOWN, REMOVED IN finish(), NEVER AT WIRE TIME. wire() runs on every
+         render of the list, so document listeners bound here would pile up one set per render and
+         outlive the DOM they were made for. Binding them for the life of ONE drag keeps the count
+         at zero whenever a drag is not in progress.
+       ⚠ setPointerCapture STAYS. It is no longer what makes the drag work, but it still suppresses
+         text selection and native touch behaviour up until the first reorder, and finish() now
+         releases it explicitly rather than relying on a pointerup that may never arrive. */
+    let activePointerId = null;
+
+    const onMove = ev => {
+      if (!dragRow) return;
+      lastY = ev.clientY;
+      // Hide pointer events on the dragged row so elementFromPoint returns
+      // the row underneath, not itself.
+      dragRow.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      dragRow.style.pointerEvents = '';
+      if (!el) return;
+      const targetRow = findRow(el);
+      if (!targetRow || targetRow === dragRow || targetRow.parentNode !== parent) return;
+      const rect = targetRow.getBoundingClientRect();
+      const after = (ev.clientY - rect.top) > rect.height / 2;
+      if (after) parent.insertBefore(dragRow, targetRow.nextSibling);
+      else       parent.insertBefore(dragRow, targetRow);
+    };
+
+    /* Function declarations so finish() can name them above their own definition — finish removes
+       the very listeners that call it, and the pair is easier to read next to each other. */
+    function onUp()     { finish(true); }
+    function onCancel() { finish(false); }
+
+    const finish = (commit) => {
+      // ⚠ UNBIND FIRST, AND UNCONDITIONALLY. An early return on !dragRow before this line would
+      //   strand a document listener for the rest of the session.
+      document.removeEventListener('pointermove',   onMove);
+      document.removeEventListener('pointerup',     onUp);
+      document.removeEventListener('pointercancel', onCancel);
+      if (!dragRow) return;
+      if (dragClass) { dragRow.classList.remove(dragClass); }
+      else { dragRow.style.opacity = ''; dragRow.style.background = ''; }
+      if (activeHandle) {
+        activeHandle.style.cursor = 'grab';
+        if (activePointerId != null) { try { activeHandle.releasePointerCapture(activePointerId); } catch (_) {} }
+      }
+      document.body.style.cursor = '';
+      stopScroll();
+      const shouldCommit = commit;
+      dragRow = null;
+      activeHandle = null;
+      parent = null;
+      activePointerId = null;
+      if (shouldCommit) commitOrder();
+    };
+
     handles.forEach(handle => {
       handle.addEventListener('pointerdown', ev => {
         if (ev.button != null && ev.button !== 0) return;
@@ -80,47 +144,17 @@ const DragReorder = {
         parent = row.parentNode;
         activeHandle = handle;
         lastY = ev.clientY;
+        activePointerId = ev.pointerId;
         try { handle.setPointerCapture(ev.pointerId); } catch (_) {}
         if (dragClass) { row.classList.add(dragClass); }
         else { row.style.opacity = '0.45'; row.style.background = 'var(--surface)'; }
         handle.style.cursor = 'grabbing';
         document.body.style.cursor = 'grabbing';
+        document.addEventListener('pointermove',   onMove);
+        document.addEventListener('pointerup',     onUp);
+        document.addEventListener('pointercancel', onCancel);
         autoScrollTimer = requestAnimationFrame(tickScroll);
       });
-
-      handle.addEventListener('pointermove', ev => {
-        if (!dragRow) return;
-        lastY = ev.clientY;
-        // Hide pointer events on the dragged row so elementFromPoint returns
-        // the row underneath, not itself.
-        dragRow.style.pointerEvents = 'none';
-        const el = document.elementFromPoint(ev.clientX, ev.clientY);
-        dragRow.style.pointerEvents = '';
-        if (!el) return;
-        const targetRow = findRow(el);
-        if (!targetRow || targetRow === dragRow || targetRow.parentNode !== parent) return;
-        const rect = targetRow.getBoundingClientRect();
-        const after = (ev.clientY - rect.top) > rect.height / 2;
-        if (after) parent.insertBefore(dragRow, targetRow.nextSibling);
-        else       parent.insertBefore(dragRow, targetRow);
-      });
-
-      const finish = (commit) => {
-        if (!dragRow) return;
-        if (dragClass) { dragRow.classList.remove(dragClass); }
-        else { dragRow.style.opacity = ''; dragRow.style.background = ''; }
-        if (activeHandle) activeHandle.style.cursor = 'grab';
-        document.body.style.cursor = '';
-        stopScroll();
-        const shouldCommit = commit;
-        dragRow = null;
-        activeHandle = null;
-        parent = null;
-        if (shouldCommit) commitOrder();
-      };
-
-      handle.addEventListener('pointerup',     ev => { try { handle.releasePointerCapture(ev.pointerId); } catch (_) {} finish(true); });
-      handle.addEventListener('pointercancel', ev => { try { handle.releasePointerCapture(ev.pointerId); } catch (_) {} finish(false); });
     });
   }
 };
