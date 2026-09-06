@@ -131,7 +131,20 @@ S.LaborTipLog = {
        ⚠ THIS IS ONLY SAFE BECAUSE THE SAVE UPSERTS. Keying a save `date|Dinner` while a `date|`
        record exists for the same person used to slip past the duplicate guard and write a SECOND
        row, which Form 8027 and the tip-credit check would both have counted. */
-    const periods = ['', ...((typeof App !== 'undefined' && App.SHIFT_TYPES) || [])];
+    /* ⛔ "ALL DAY" IS NOT A PERIOD, IT IS A LEGACY ONE. Kyle: *"i think the all day needs to go,
+       it's confusing"* — and he is right that it does not belong beside four real dayparts, not
+       least because a day can then read CLOSED on All Day while every real period reads open.
+       ⚠ IT CANNOT SIMPLY BE DELETED. Every tip row written before the shift selector existed carries
+       a blank period, and with no chip that selects them those records become unreachable: still in
+       the books, still in the list below, and impossible to open or correct.
+       ⭐ SO IT RETIRES ITSELF. The chip appears only on a day that actually HAS blank-period rows.
+       A bar starting today never sees it; a day with old records still opens; and the moment the
+       last one is re-entered under a real daypart it disappears on its own, with nothing to
+       remember and nothing to migrate. */
+    const hasLegacyDay = !!this._addDate
+      && this.tips().some(t => t.date === this._addDate && !(t.shift_type || ''));
+    const real = (typeof App !== 'undefined' && App.SHIFT_TYPES) || [];
+    const periods = (hasLegacyDay || !real.length ? [''] : []).concat(real);
     const shiftChips = periods.map(p => {
       const on = (this._addShiftType || '') === p;
       return '<button type="button" class="btn btn-sm ' + prefix + '-shift" data-shift="' + esc(p) + '" style="'
@@ -732,11 +745,42 @@ S.LaborTipLog = {
 
      ⭐ A PERSON ALREADY SAVED LOADS WITH THEIR FIGURES, so the screen is the shift rather than the
      remainder of it, and `saveBatch` updates their record instead of refusing it as a duplicate. */
+  /* Which period is actually selectable on a given day. "All Day" exists only where blank-period
+     rows do, so on every other day a blank selection has to resolve to a real daypart — otherwise
+     nothing is selected, `servicePeriodByName('')` returns null, and the crew filter below quietly
+     falls back to the whole day, which is the defect this all came from. */
+  _validShiftFor(date, want) {
+    const real = (typeof App !== 'undefined' && App.SHIFT_TYPES) || [];
+    if (!real.length) return '';                                   // no periods configured at all
+    if (want && real.indexOf(want) >= 0) return want;
+    const legacy = date && this.tips().some(t => t.date === date && !(t.shift_type || ''));
+    if (!want && legacy) return '';                                // the day still has old records
+    // Land on the daypart covering now, which is the one a manager closing out is standing in.
+    const byTime = (typeof App !== 'undefined' && App.servicePeriodByTime) ? App.servicePeriodByTime() : null;
+    return (byTime && real.indexOf(byTime.name) >= 0) ? byTime.name : real[0];
+  },
+
   preloadFromDate(date, period) {
     this._addDate = date || '';
     if (period != null) this._addShiftType = period;
+    this._addShiftType = this._validShiftFor(this._addDate, this._addShiftType);
     if (!date) { this._addRows = []; return; }
-    // Scheduled tipped staff for that day -> scheduled hours (the hours fallback).
+    /* ⛔⛔⛔ THE CREW IS THE PEOPLE WHOSE SHIFT TOUCHES THE PICKED PERIOD, NOT EVERYBODY ON THE DAY.
+       Kyle, 2026-09-05, on the first build of this: *"all the staff names stay on every shift, just
+       their hours change... priya works 5-11, so dinner and 1 hour into late night, but she is
+       still listed on lunch and happy hour. Why?"* Because the period was being passed to the
+       HOURS lookup and to nothing else, so every daypart returned the same day-wide list.
+       MEASURED on the demo before the fix: eight identical names on all five periods, including
+       Brianna K. (09:30-15:00) on Late Night and Priya N. (17:00-23:00) on Lunch.
+       ⭐ AND THE HOURS ARE THE OVERLAP, not the whole shift. A pool divides by hours, so charging a
+       five-hour lunch with somebody's whole eight-hour day pays them for dinner out of the lunch
+       crew's pot. `App.overlapHours` is the portion that actually falls inside the period.
+       ⚠ A SHIFT WITH NO TIMES still counts, because `start`/`end` are optional on a schedule row
+       and dropping those people would silently shrink the crew on exactly the bars that do not fill
+       times in ([[the-loop]] #30 — when the data cannot answer, do not infer; include them). */
+    // `periodWin`, not `period`: this member already takes a `period` argument, and shadowing it
+    // here would silently change what the hours lookup below is scoped to.
+    const periodWin = App.servicePeriodByName(this._addShiftType || '');
     const schedHrs = new Map();
     const sched = this.scheduleForDate(date);
     if (sched) {
@@ -745,7 +789,12 @@ S.LaborTipLog = {
         if (sh.day !== dayName || !sh.staff_id) return;
         const st = this.staffById(sh.staff_id);
         if (!st || !App.isTipped(st)) return;
-        schedHrs.set(sh.staff_id, (schedHrs.get(sh.staff_id) || 0) + this.schedHours(sh));
+        let hrs = this.schedHours(sh);
+        if (periodWin && sh.start && sh.end) {
+          if (!App.windowsOverlap(sh.start, sh.end, periodWin.start, periodWin.end)) return;   // not on this shift
+          hrs = App.overlapHours(sh.start, sh.end, periodWin.start, periodWin.end);
+        }
+        schedHrs.set(sh.staff_id, (schedHrs.get(sh.staff_id) || 0) + hrs);
       });
     }
     // Call-out adjustments for this date (loosely matched on period): a caller-out
