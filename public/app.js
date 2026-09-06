@@ -6556,12 +6556,13 @@ const App = {
     return Math.max(cut(as, ae, bs, be), cut(as, ae, bs + 1440, be + 1440), cut(as + 1440, ae + 1440, bs, be));
   },
   windowsOverlap(aStart, aEnd, bStart, bEnd) { return this.overlapMinutes(aStart, aEnd, bStart, bEnd) > 0; },
-  overlapHours(aStart, aEnd, bStart, bEnd) { return this.overlapMinutes(aStart, aEnd, bStart, bEnd) / 60; },
-  // The configured period by name, or null. Callers need its window, not just its name.
-  servicePeriodByName(name) {
-    if (!name) return null;
-    return (this.servicePeriods() || []).find(p => (p.name || '') === name) || null;
-  },
+  /* ⚠ `overlapHours` AND `servicePeriodByName` WERE RETIRED HERE (2026-09-05). Both existed for
+     one caller: the Tip Log's per-daypart crew filter, which scoped a shift's hours to the period
+     being closed out. Tips track per day again, so nothing asks either question, and a helper
+     with no caller is a member somebody rediscovers and wires to the wrong thing.
+     `overlapMinutes` and `windowsOverlap` STAY — `ServicePeriods._overlap` and the seed both
+     read them, and the midnight-wrap arithmetic in `overlapMinutes` is the part worth keeping
+     in one place. 🔧 verify-no-retired-code.js is what caught these two. */
   // The service period whose time window contains "now" — drives the Open-the-Floor
   // auto-pick. Handles a window that wraps past midnight (Late Night); skips an
   // all-day catch-all unless nothing else matches; falls back to the most recently
