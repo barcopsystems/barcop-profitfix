@@ -108,7 +108,8 @@ S.LaborCalloutLog = {
       { h: 'Logging A Call-Out', p: ['Fill the row at the top: date, staff member, what happened, the shift, and whether it got covered and by whom. Reason is optional but worth a line if it might matter later.'] },
       { h: 'Schedule Connection', p: ['Pick the staff member and the date and Bar Cop reads the posted schedule for that week. If they were on the floor that day it reads "Scheduled [day] [time]. Needs cover." in amber, so you can see at a glance what shift just opened up. If they were not on the schedule that day it says so. When you then name who is covering, Bar Cop checks the same schedule and warns "[name] is also scheduled that day" so you do not patch one hole by double-booking somebody already working.'] },
       { h: 'Repeat Flags', p: ['When someone has more than one call-out in the last 60 days, the list flags the count in red next to their name, so a pattern is easy to spot before it becomes a problem.'] },
-      { h: 'Coverage', p: ['Set Shift Covered? to Covered or Not Covered, and pick the coverer from the Covered By list, which is your roster. That builds a record of who picks up the slack and who left you short, useful at review time and the spot where the double-booked warning fires.'] }
+      { h: 'Coverage', p: ['Set Shift Covered? to Covered or Not Covered, and pick the coverer from the Covered By list, which is your roster. That builds a record of who picks up the slack and who left you short, useful at review time and the spot where the double-booked warning fires.'] },
+      { h: 'Worksheet', p: ['Worksheet prints a blank sheet to keep by the phone. Whoever takes the call writes down who called out, which shift, and whether it got covered; the manager enters the rows here after close.'] }
     ]);
   },
 
@@ -170,7 +171,7 @@ S.LaborCalloutLog = {
     }
 
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-callout-log', 'Log Call-Out')
+      + App.collapsibleCardTitle('lc-callout-log', 'Log Call-Out', '<button class="btn btn-ghost btn-sm no-print" id="co-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + this.formCells(null)
       + '</div></div>'
@@ -215,6 +216,7 @@ S.LaborCalloutLog = {
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#co-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#co-startover')) { this._draft = null; this.renderList(); return; }
       if (ev.target.closest('#co-save')) { this.save('co-'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
@@ -241,6 +243,24 @@ S.LaborCalloutLog = {
   },
 
   // Edit in a focused pop-up (own coe- ids). Cancel closes it; Delete pushed right.
+  /* A blank sheet for beside the phone: whoever takes the call writes the row down, the
+     manager enters it after close. Columns follow the form, Reason last because it is the
+     one free-text field and wants the width. */
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Call-Out Log',
+      subtitle: 'Take the details when someone calls out. The manager enters each row into Bar Cop after the shift.',
+      columns: [
+        { label: 'Date',       width: '11%' },
+        { label: 'Staff',      width: '18%' },
+        { label: 'Type',       width: '13%' },
+        { label: 'Shift',      width: '13%' },
+        { label: 'Covered By', width: '17%' },
+        { label: 'Reason',     width: '28%' }
+      ],
+      rows: 16
+    });
+  },
   openEditModal(id) {
     if (!App.canEdit('lc-callout-log')) return;
     const c = this.callouts().find(x => x.id === id);

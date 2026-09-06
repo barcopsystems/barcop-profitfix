@@ -50,7 +50,8 @@ S.LaborTimeOff = {
       { p: ['Time Off is where requested and planned absences live before they happen: a day off someone asked for, vacation, a medical leave. It is the forward-looking partner to the Call-Out Log, which records absences after the fact.'] },
       { h: 'Logging Time Off', p: ['Fill the row at the top: the staff member, the From and To dates (use the same date for a single day), the type, and the status. Set the status to Approved once you grant it. A note is optional but worth a line for context.'] },
       { h: 'It Protects The Schedule', p: ['An Approved entry feeds Build Schedule. When you try to put a shift on someone during their approved time off, the cell flags and you get a warning before you post, so you never accidentally schedule a person you already gave the day off. Requested and Denied entries sit in the log but do not block the schedule until you approve them.'] },
-      { h: 'Recurring Days Off', p: ['For a standing day someone never works (a server who is always off Sundays), set their Regular Days Off on the Staff Roster instead. That blocks every one of those weekdays automatically without logging each week here.'] }
+      { h: 'Recurring Days Off', p: ['For a standing day someone never works (a server who is always off Sundays), set their Regular Days Off on the Staff Roster instead. That blocks every one of those weekdays automatically without logging each week here.'] },
+      { h: 'Worksheet', p: ['Worksheet prints a blank request sheet for the wall or the office clipboard. Staff write the dates and the reason down as they ask; you enter the approved ones here afterwards, which is what actually blocks the schedule.'] }
     ]);
   },
 
@@ -108,7 +109,7 @@ S.LaborTimeOff = {
     }
 
     const addCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('lc-time-off', 'Log Time Off')
+      + App.collapsibleCardTitle('lc-time-off', 'Log Time Off', '<button class="btn btn-ghost btn-sm no-print" id="to-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + this.formCells(null)
       + '</div></div>'
@@ -153,6 +154,7 @@ S.LaborTimeOff = {
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
       if (head) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#to-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#to-startover')) { this._draft = null; this.renderList(); return; }
       if (ev.target.closest('#to-save')) { this.save('to-'); return; }
       if (ev.target.closest('[data-show-older]')) { App.handleShowOlder(ev.target, () => this.renderList()); return; }
@@ -173,6 +175,24 @@ S.LaborTimeOff = {
     App.applyCollapsed(this.container);
   },
 
+  /* A blank request sheet, the same shape Incidents and Maintenance print. The columns are
+     this form's own fields in its own order, so a sheet filled by hand types straight in.
+     ⚠ NO STATUS COLUMN. Status is the manager's decision made in the app (a new row opens as
+     Requested), not something a person writes on a paper request. */
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Time Off Requests',
+      subtitle: 'Staff write their requests here. The manager enters the approved ones into Bar Cop, which is what blocks the schedule.',
+      columns: [
+        { label: 'Staff',    width: '22%' },
+        { label: 'From',     width: '14%' },
+        { label: 'To',       width: '14%' },
+        { label: 'Type',     width: '18%' },
+        { label: 'Notes',    width: '32%' }
+      ],
+      rows: 14
+    });
+  },
   openEditModal(id) {
     if (!App.canEdit('lc-time-off')) return;
     const r = this.records().find(x => x.id === id);
