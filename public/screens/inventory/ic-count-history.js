@@ -445,7 +445,14 @@ S.InventoryCountHistory = {
       + meta('Count Date', this.fmtDate(count.date))
       + '</div></div>'
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
-      + '<select id="ch-compare" class="il-copysel" style="max-width:240px;">' + cmpOpts + '</select>'
+      /* ⚠ THE ORDINARY SELECT, NOT THE CHIP. Kyle, 2026-09-06: *"change the compare count drop
+         down style to the normal drop down selector with the grey arrow."* It wore `il-copysel`,
+         which is the small uppercase letterspaced chip with a filled 8x5 triangle — it read as a
+         button sitting next to Export PDF rather than as something you pick from.
+         `form-input` + `pop-select` is what every other standalone select in the app uses (see
+         hub-support, hub-report-bug): the input fill and border, and the same stroked grey
+         chevron `.f select` paints inside a form. */
+      + '<select id="ch-compare" class="form-input pop-select" style="max-width:240px;cursor:pointer;">' + cmpOpts + '</select>'
       + '<button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div>'
       + bodyTable + bodyNote
       + '</div>';
