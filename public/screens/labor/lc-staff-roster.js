@@ -103,8 +103,14 @@ S.LaborStaffRoster = {
   },
 
   // The profile cells shared by the inline add form and the edit profile form
-  // so they never drift. One data row (Name, Position, Pay Type, Wage/Salary,
-  // Status) plus a second row (Phone, Email, Shift Lead). Pay Type swaps the pay
+  // so they never drift.
+  /* ⛔ TEN CELLS, FIVE TO A ROW, ALL ONE WIDTH (Kyle, 2026-09-06: *"make the data cells into two
+     rows into 5 equal columns"*). Each row already held five, but on flex bases of 140/150/92/110/92
+     and 150/110/130/150/200 — so every cell was a different width and nothing lined up between the
+     rows. One basis for all ten makes them share equally, and `.data-row` is `flex-wrap:nowrap`, so
+     five stay on the line and shrink together.
+     ⚠ REGULAR DAYS OFF IS NOT PART OF IT and is left exactly as it was — it is a full-width chip
+     row below the grid, not an eleventh cell. */
   // field between an hourly Wage and an Annual Salary; salaried = exempt.
   profileFormCells(s) {
     // Oldest-first: lc_positions is row-per-record now and loads NEWEST-first, which put the
@@ -134,17 +140,17 @@ S.LaborStaffRoster = {
       : (s ? ((s.wage != null && s.wage !== '') ? s.wage : '')
            : (defaultPos && defaultPos.default_wage != null ? defaultPos.default_wage : ''));
     return '<div class="form-row data-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1 1 140px;min-width:0;"><label>Name</label>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Name</label>'
       + '<input type="text" id="sr-name" value="' + esc(s?.name || '') + '" placeholder="Full name"/></div>'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Position</label>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Position</label>'
       + '<select id="sr-pos">' + posOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Pay Type</label><select id="sr-paytype">'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Pay Type</label><select id="sr-paytype">'
       + '<option' + (!isSal ? ' selected' : '') + '>Hourly</option>'
       + '<option' + (isSal ? ' selected' : '') + '>Salary</option></select></div>'
-      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label id="sr-pay-label">' + (isSal ? 'Annual Salary' : 'Wage') + '</label>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label id="sr-pay-label">' + (isSal ? 'Annual Salary' : 'Wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-pay" min="0" step="0.01" '
       + 'value="' + payVal + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="flex:1 1 92px;min-width:0;"><label>Status</label><select id="sr-status">'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Status</label><select id="sr-status">'
       + '<option' + (!s || s.status !== 'Inactive' ? ' selected' : '') + '>Active</option>'
       + '<option' + (s && s.status === 'Inactive' ? ' selected' : '') + '>Inactive</option></select></div>'
       + '</div>'
@@ -155,21 +161,21 @@ S.LaborStaffRoster = {
       // .f wrapper on purpose: the global `.f input` rule forces appearance:none,
       // which kills the native checkbox; a plain div keeps it rendering normally.
       + '<div class="form-row data-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Secondary Role <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Secondary Role <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
       + '<select id="sr-pos2"><option value="">None</option>'
       + positions.map(p => '<option value="' + p.id + '"' + (s && s.secondary_position_id === p.id ? ' selected' : '') + '>' + esc(posLabel(p)) + '</option>').join('')
       + '</select></div>'
-      + '<div class="f" style="flex:1 1 110px;min-width:0;"><label>Secondary Wage</label>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Secondary Wage</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="sr-wage2" min="0" step="0.01" value="' + (s && s.secondary_wage != null && s.secondary_wage !== '' ? s.secondary_wage : '') + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Phone</label>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Phone</label>'
       + '<input type="text" id="sr-phone" value="' + esc(s?.phone || '') + '" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1 1 150px;min-width:0;"><label>Email</label>'
+      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Email</label>'
       + '<input type="text" id="sr-email" value="' + esc(s?.email || '') + '" placeholder="Optional"/></div>'
-      + '<div style="flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:5px;">'
+      + '<div style="flex:1 1 120px;min-width:0;display:flex;flex-direction:column;gap:5px;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);">Shift Lead</div>'
       + '<label style="display:flex;align-items:center;gap:8px;min-height:38px;font-size:12px;color:var(--t2);cursor:pointer;">'
       + '<input type="checkbox" class="bc-check" id="sr-lead"' + (s && s.shift_lead ? ' checked' : '') + '/>'
-      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize like a manager.</span></label></div>'
+      + '<span style="min-width:0;color:var(--t3);font-size:11px;line-height:1.3;overflow-wrap:anywhere;">Can run shifts and authorize.</span></label></div>'
       + '</div>'
       + '<div class="form-row" style="gap:12px;margin-bottom:18px;"><div style="flex:1 1 100%;min-width:0;">'
       + '<div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:7px;">Regular Days Off</div>'
