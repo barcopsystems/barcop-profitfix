@@ -1086,9 +1086,26 @@ S.InventoryVendors = {
     this.wireDeliveryChips(this.container);
   },
 
+  /* ⛔ ONE GRID, TWO CARDS (Kyle, 2026-09-06: *"the columns need aligned with each other from one
+     card to the next.. so size and product.. par and old cost.. unit cost and new cost"*).
+     The products tables were fixed-layout on 240px + three equal, and Recent Price Changes was on
+     AUTO layout with five content-sized columns, so nothing lined up: MEASURED at 409/683/957
+     against 363/646/821 on a 1062px card.
+     ⭐ THE THREE LEAD WIDTHS LIVE HERE AND NOWHERE ELSE. Both cards start from this string, so
+       columns 1-4 land on the same x by construction rather than by two sets of numbers being
+       kept in step by hand. Price Changes has a fifth column (Change) with no counterpart above
+       it; it and New Cost split what is left, and the products table's last column takes the same
+       remainder on its own.
+     ⚠ SIZED FROM THE CONTENT OF BOTH TABLES, not one of them: 240 is the product NAME (216px
+       measured) which also carries the Date; 240 is the Size label and the Product name-over-
+       category stack; 150 covers Par and Old Cost with room. Re-measure before trimming any of
+       them, because each width has to clear the widest cell in TWO tables. */
+  COL_LEAD: '<col style="width:240px;"/><col style="width:240px;"/><col style="width:150px;"/>',
+
   renderProductsCard(prods) {
     if (prods.length === 0) {
-      return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list"><thead><tr>'
+      return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + '<colgroup>' + this.COL_LEAD + '<col/></colgroup><thead><tr>'
         + '<th>Product</th><th>Size</th><th>Par</th><th>Unit Cost</th>'
         + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No products are linked to this vendor yet. Set the Primary Vendor field on a product in the Products screen.</td></tr></tbody></table></div>';
     }
@@ -1110,7 +1127,7 @@ S.InventoryVendors = {
     const tables = cats.map(c => {
       const catProds = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + '<colgroup><col style="width:240px;"/><col/><col/><col/></colgroup>'
+        + '<colgroup>' + this.COL_LEAD + '<col/></colgroup>'
         + '<thead><tr><th>' + esc(c) + '</th><th>Size</th><th>Par</th><th>Unit Cost</th></tr></thead>'
         + '<tbody>' + catProds.map(rowHtml).join('') + '</tbody></table></div>';
     }).join('');
@@ -1150,11 +1167,13 @@ S.InventoryVendors = {
 
     const heading = '<div class="sh" style="margin-top:24px;">Recent Price Changes</div>';
     if (recent.length === 0) {
-      return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+      return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+        + '<colgroup>' + this.COL_LEAD + '<col/><col/></colgroup><thead><tr>'
         + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
         + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No price changes recorded yet for this vendor. Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</td></tr></tbody></table></div>';
     }
-    return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
+    return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + '<colgroup>' + this.COL_LEAD + '<col/><col/></colgroup><thead><tr>'
       + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
       + '</tr></thead><tbody>'
       + recent.map(r => '<tr>'
