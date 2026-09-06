@@ -286,14 +286,22 @@ S.RevenueServerCheck = {
           ? '<option value="' + esc(curShift) + '" selected>' + esc(curShift) + ' (not on your shift list)</option>' : '');
     // narrow = the two-column modal layout (widths come from .narrow-form CSS);
     // otherwise the always-on page form flows as one fixed-width horizontal row.
-    const w = px => narrow ? '' : (' style="width:' + px + ';flex-shrink:0;"');
+  /* ⛔ FIVE EQUAL COLUMNS ON THE PAGE FORM (Kyle, 2026-09-06). The five cells were 148/150/220/
+     110/150 — Server nearly twice Covers — so the row read as five different boxes.
+     ⚠ `flex:0 0 calc((100% - 56px) / 5)` — a fifth minus the four 14px gaps, with no grow.
+     ⚠ THE ARGUMENT WENT WITH THE PIXELS. `w` took the width to emit; it now emits one width for
+     every cell, and a parameter that is accepted and ignored is how the next person spends ten
+     minutes wondering which number is winning.
+     ⚠ THE NARROW BRANCH IS UNCHANGED and still returns '': inside the edit pop-up the widths come
+     from `.narrow-form`'s 2-up grid, which a fifth-of-the-row share would fight. */
+    const w = () => narrow ? '' : (' style="flex:0 0 calc((100% - 56px) / 5);min-width:0;"');
     const rowOpen = narrow ? '<div class="form-row">' : '<div class="form-row" style="gap:14px;align-items:flex-end;flex-wrap:wrap;">';
     return rowOpen
-        + '<div class="f"' + w('148px') + '><label>Date</label><input class="form-input" type="date" id="' + p + '-date" value="' + esc(f.date || '') + '"/></div>'
-        + '<div class="f"' + w('150px') + '><label>Shift</label><select class="form-input" id="' + p + '-shift">' + shiftOpts + '</select></div>'
-        + '<div class="f"' + w('220px') + '><label>Server</label><select class="form-input" id="' + p + '-server">' + serverOpts + '</select></div>'
-        + '<div class="f"' + w('110px') + '><label>Covers</label><input class="form-input" type="number" id="' + p + '-cov" value="' + esc(f.cov || '') + '"/></div>'
-        + '<div class="f"' + w('150px') + '><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + p + '-sales" value="' + esc(f.sales || '') + '"/></div></div>'
+        + '<div class="f"' + w() + '><label>Date</label><input class="form-input" type="date" id="' + p + '-date" value="' + esc(f.date || '') + '"/></div>'
+        + '<div class="f"' + w() + '><label>Shift</label><select class="form-input" id="' + p + '-shift">' + shiftOpts + '</select></div>'
+        + '<div class="f"' + w() + '><label>Server</label><select class="form-input" id="' + p + '-server">' + serverOpts + '</select></div>'
+        + '<div class="f"' + w() + '><label>Covers</label><input class="form-input" type="number" id="' + p + '-cov" value="' + esc(f.cov || '') + '"/></div>'
+        + '<div class="f"' + w() + '><label>Total Sales</label><div class="fw"><span class="pre">$</span><input class="form-input pre" type="number" id="' + p + '-sales" value="' + esc(f.sales || '') + '"/></div></div>'
       + '</div>'
       + '<div id="' + p + '-result" style="margin-top:16px;">'
         + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
