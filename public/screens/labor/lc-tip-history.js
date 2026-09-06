@@ -293,10 +293,19 @@ S.LaborTipHistory = {
       + '<td>' + (pt.hours != null ? this.fmtHours(pt.hours) : '-') + '</td>'
       + '<td class="val">' + App.fmtCurrency(pt.share || 0, 2) + '</td></tr>').join('');
     const html = '<div class="card form-card" id="th-pview-card" style="margin:0;">'
-      + '<div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
-        + '<span>Tip Pool &middot; ' + this.fmtDate(p.date) + '</span>'
-        + '<button class="btn btn-ghost btn-sm no-print" id="th-pview-export">Export PDF</button>'
-      + '</div>'
+      /* ⛔ NOTHING SITS IN A MODAL'S TITLE BAR, BECAUSE THAT IS WHERE THE CORNER X IS. Kyle,
+         2026-09-06: *"it opens it up in a modal with an export button over the x to close the
+         modal... either have the view open on a page to keep the export button or get rid of it
+         from the modal."* `App.openModal` paints `.app-modal-x` absolutely into the card's
+         top-right on every modal it opens, so a right-aligned action in the title lands under it.
+         ⚠ AND `noClose: true` BELOW NEVER SUPPRESSED IT. openModal reads `opts.noX`; `noClose` is
+         not an option it has ever had. MEASURED: 40 call sites pass it and it has never done
+         anything on any of them (ic-product-setup caught the same thing once and says so). It is
+         dropped here rather than app-wide, which is a sweep nobody has asked for.
+         ⚠ THE PER-POOL PDF GOES WITH THE BUTTON. The Tip Pools tab's own Export PDF still saves
+         the list; what is lost is one pool's split as its own file. Kyle's call, offered as one
+         of his two options — the other was a full page, which this list screen does not have. */
+      + '<div class="card-title">Tip Pool &middot; ' + this.fmtDate(p.date) + '</div>'
       + '<div class="calc" style="margin-bottom:14px;">'
         + '<div class="calc-item"><div class="calc-label">Method</div><div class="calc-val">' + (p.method === 'equal' ? 'Equal Split' : 'By Hours') + '</div></div>'
         + '<div class="calc-item"><div class="calc-label">Pool Amount</div><div class="calc-val">' + App.fmtCurrency(p.pool_amount || 0, 2) + '</div></div>'
@@ -305,12 +314,6 @@ S.LaborTipHistory = {
       + '<div style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Staff</th><th>Hours</th><th>Tip Share</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
-    App.openModal(html, { id: 'th-pview-modal', maxWidth: 520, noClose: true });
-    // This one pool's split and lc-tip-log's whole Tip Pool LOG both saved as
-    // BarCop_TipPool_<today>.pdf, from two different screens. Name it after the pool.
-    document.getElementById('th-pview-export')?.addEventListener('click', () => App.exportPDF({
-      title: 'Tip Pool', root: document.getElementById('th-pview-card'),
-      fileTag: 'Tip Pool ' + (String(p.date || '').slice(0, 10) || 'Detail')
-    }));
+    App.openModal(html, { id: 'th-pview-modal', maxWidth: 520 });
   }
 };
