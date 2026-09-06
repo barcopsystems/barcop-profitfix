@@ -2128,31 +2128,6 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
   .ing-tbl.pill tbody td .row-actions .rd-flag-msg{text-align:left!important;align-self:stretch!important;}
 }
 
-/* A NINE-COLUMN BUILDER RUNS OUT OF ROOM LONG BEFORE 680px. `.pill-wrap` above compresses then
-   stacks, and 680 is right for a five- or six-column builder (Receive Delivery, Order Sheet). Log
-   Tips with tip-out on has nine: staff, hours, cash, card, sales, tip-out, received, net, remove.
-   MEASURED on a phone — the headers bleed into each other (`th` is white-space:nowrap, and under
-   `table-layout:fixed` a nowrap header overflows its own cell instead of widening the column) and
-   the Remove button, which will not go below ~60px, hangs outside the card.
-   ⚠ THE RULES ARE REPEATED RATHER THAN SHARED, and that is a container-query constraint, not a
-   preference: the container is the wrap itself, so a second threshold needs a second block. Every
-   selector carries `.wide`, so a standard pill builder is untouched by it. */
-@container (max-width:900px){
-  .pill-wrap.wide .ing-tbl.pill{border-spacing:0;display:block;width:100%;}
-  .pill-wrap.wide .ing-tbl.pill thead{display:none;}
-  .pill-wrap.wide .ing-tbl.pill tbody{display:block;width:100%;}
-  .pill-wrap.wide .ing-tbl.pill tbody tr{display:block;background:var(--zone);border:1px solid var(--b-edge);border-radius:8px;padding:6px 14px 12px;margin:10px 0;}
-  .pill-wrap.wide .ing-tbl.pill tbody td{display:block;background:transparent;border:none;border-radius:0;padding:6px 0;width:auto!important;text-align:left!important;}
-  .pill-wrap.wide .ing-tbl.pill tbody td::before{content:attr(data-label);display:block;color:var(--t3);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
-  .pill-wrap.wide .ing-tbl.pill tbody td[data-label=""]::before{content:none;}
-  /* An empty spacer cell (the support row's four blanks) would otherwise render as a gap. */
-  .pill-wrap.wide .ing-tbl.pill tbody td[data-label=""]:empty{display:none;}
-  .pill-wrap.wide .ing-tbl.pill tbody td .form-input{width:100%;}
-  .pill-wrap.wide .ing-tbl.pill tbody td[data-label=""] .btn{width:100%;margin-top:4px;}
-}
-/* Above the stack threshold this builder is still tight, so its headers may wrap. */
-.pill-wrap.wide .ing-tbl th{white-space:normal;}
-
 /* ══ PROG BAR ══ */
 .prog{height:3px;background:var(--track);border-radius:2px;overflow:hidden;}
 .prog-fill{height:100%;background:var(--gold);border-radius:2px;transition:width 0.3s;}
