@@ -1695,11 +1695,30 @@ S.HubOperatingExpenses = {
     } else {
       // ⭐ THE MANUAL HALF OF THE SAME ASK. The chips always render on this branch, so the line
       //   always does too — see the note on the import branch above.
+      // A sixth of the row minus the five 14px gaps, with NO grow, shared by every cell in the row.
+      const eq6 = 'flex:0 0 calc((100% - 70px) / 6);min-width:0;';
       bodyInner = segToggle
         + intro('No statement to drop? Key it in by hand. Pick the log type first: an operating expense lands on your income statement, a cash outflow does not. Then the amount, and save.')
+        /* ⛔ SIX EQUAL COLUMNS, AND THE CASH BRANCH SITS ON THE FIRST FIVE (Kyle, 2026-09-06).
+           Operating Expense shows Date Submitted / Due Date / Log Type / Category / Vendor /
+           Amount; Cash Outflow shows Date Submitted / Due Date / Log Type / Kind / Amount, so the
+           sixth column is simply empty on that branch — which is what he asked for and what NO
+           GROW delivers for free. A `flex:1 1 <basis>` would spread the five across the full row
+           and the two branches would line up with nothing.
+           ⚠ AND IT WAS ALREADY WRAPPING. The seven cells carried seven pixel widths (150/150/190/
+             230/230/240/140); on the expense branch the six visible ones plus five 14px gaps came
+             to 1170px against a 1062px row, so Amount dropped to a SECOND LINE. Measured on the
+             deployed build before this change — it only looked right on a wider window.
+           ⚠ THE HIDDEN CELLS KEEP `display:none` IN THEIR INLINE STYLE and _applyLogType still
+             clears it with `style.display = ''`, so the toggle is untouched. A hidden cell is out
+             of the flex flow entirely, which is why the visible five close up rather than leaving
+             a gap where Category would have been.
+           ⚠ min-width:0 is load-bearing: without it the Log Type select holds its intrinsic width
+             for "Operating Expense" and pushes the row off its sixths. Measured after: all six at
+             165px on one line (shared bottom 263), and no control overflows its cell. */
         + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-        +   '<div class="f" style="width:150px;"><label>Date Submitted</label><input type="date" value="' + App.todayLocal() + '" disabled title="When you logged this. Always today."/></div>'
-        +   '<div class="f" style="width:150px;"><label>Due Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
+        +   '<div class="f" style="' + eq6 + '"><label>Date Submitted</label><input type="date" value="' + App.todayLocal() + '" disabled title="When you logged this. Always today."/></div>'
+        +   '<div class="f" style="' + eq6 + '"><label>Due Date</label><input type="date" id="oexa-date" value="' + App.todayLocal() + '"/></div>'
         /* ⭐⭐ ITEM 19 STAGE 2 — LOG TYPE DECIDES WHICH STORE THIS ROW GOES TO, AND THE OPERATOR SAYS
            SO INSTEAD OF BAR COP GUESSING. Until now "is this a cash outflow?" was worked out by
            READING THE CATEGORY NAME, which is the collision that produced the worst defect on this
@@ -1713,21 +1732,21 @@ S.HubOperatingExpenses = {
            five, so nothing of it can reach the shared list.
            ⚠ SHOW/HIDE, NOT A RE-RENDER. Nothing typed can be lost if nothing is rebuilt, which is
            simpler and safer than capturing and restoring a draft on every change of type. */
-        +   '<div class="f" style="width:190px;"><label>Log Type</label><select id="oexa-logtype" class="form-input">'
+        +   '<div class="f" style="' + eq6 + '"><label>Log Type</label><select id="oexa-logtype" class="form-input">'
         +     '<option value="">Select Type...</option>'
         +     '<option value="expense">Operating Expense</option>'
         +     '<option value="cash">Cash Outflow</option>'
         +   '</select></div>'
-        +   '<div class="f" id="oexa-cat-wrap" style="width:230px;display:none;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES, blank: true, blankLabel: 'Select category...' }) + '</div>'
+        +   '<div class="f" id="oexa-cat-wrap" style="' + eq6 + 'display:none;"><label>Category' + App.manageListLink('expense_category') + '</label>' + App.customSelect({ id: 'oexa-cat', key: 'expense_category', builtin: this.CATEGORIES, blank: true, blankLabel: 'Select category...' }) + '</div>'
         /* ⛔ `addCustom: false` — THE FIVE ARE A CLOSED SET, NOT A LIST TO EXTEND. They map to the
            stored outflow `type`, so a typed-in kind has no type to become. Measured on the live app
            before this flag existed: "Equipment Lease" saved `type: ''` and came back as "Other Cash
            Outflow" — the name gone, the record degraded. */
-        +   '<div class="f" id="oexa-kind-wrap" style="width:230px;display:none;"><label>Kind</label>' + App.customSelect({ id: 'oexa-kind', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), blank: true, blankLabel: 'Select kind...', addCustom: false }) + '</div>'
+        +   '<div class="f" id="oexa-kind-wrap" style="' + eq6 + 'display:none;"><label>Kind</label>' + App.customSelect({ id: 'oexa-kind', builtin: this.CASH_ONLY_CATEGORIES.map(c => c.name), blank: true, blankLabel: 'Select kind...', addCustom: false }) + '</div>'
         // ⚠ VENDOR IS AN EXPENSE FIELD. A draw has no vendor, and leaving the box on the cash branch
         // would collect something the outflow record has nowhere to put — silent loss on save.
-        +   '<div class="f" id="oexa-vendor-wrap" style="width:240px;display:none;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
-        +   '<div class="f" style="width:140px;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
+        +   '<div class="f" id="oexa-vendor-wrap" style="' + eq6 + 'display:none;"><label>Vendor</label><input type="text" id="oexa-vendor" placeholder="Who did you pay"/></div>'
+        +   '<div class="f" style="' + eq6 + '"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="oexa-amount" step="0.01" min="0" placeholder="0.00"/></div></div>'
         + '</div>'
         /* ⭐⭐⭐ BUILD ORDER C — RECURRING IS A CASH-OUTFLOW CONTROL NOW, AND ONLY THAT. A BILL is
            recurring because it keeps happening: `deriveRecurringBills` reads it off the ledger and
