@@ -555,21 +555,32 @@ S.VendorTracker = {
     if (!discId) {
       const pf = (this._vd && this._vd.prefill) || {};
       const typeOpts = TYPES.map(t => '<option value="' + t + '"' + (t === (pf.type || 'Price Overcharge') ? ' selected' : '') + '>' + t + '</option>').join('');
+      // A third of the row minus the two 12px gaps, with NO grow, so every row keeps its thirds.
+      const eq3 = 'flex:0 0 calc((100% - 24px) / 3);min-width:0;';
       card.innerHTML = '<div class="card-title">File Discrepancy</div>'
+        /* ⛔ THREE EQUAL COLUMNS ON ALL THREE ROWS (Kyle, 2026-09-06). They were 3 / 2 / 4 cells on
+           mixed widths, so nothing lined up down the modal.
+           ⚠ UNITS MOVED from the head of the money row to the tail of the item row. That is the only
+             arrangement that fills three rows of three with nothing wrapping, and it groups the way
+             the claim reads: who and when, then what, then the money.
+           ⭐ TAB ORDER IS UNCHANGED — Units already sat between Type and Agreed Price in DOM order,
+             so moving it across the row boundary does not move it in the sequence.
+           ⚠ min-width:0 replaces the old 80-200px floors on purpose: a floor lets a cell refuse to
+             shrink and knocks the row off its thirds when the modal is narrow. */
         + '<div class="form-row" style="gap:12px;">'
-          + '<div class="f" style="width:160px;"><label>Date</label><input type="date" id="vdm-date" value="' + esc(pf.date || App.todayLocal()) + '"/></div>'
-          + '<div class="f" style="flex:1;min-width:160px;"><label>Vendor</label><input type="text" id="vdm-vendor" value="' + esc(pf.vendor || '') + '"' + (pf.vendor ? ' readonly' : '') + '/></div>'
-          + '<div class="f" style="width:160px;"><label>Invoice / Reference</label><input type="text" id="vdm-ref" value="' + esc(pf.reference || '') + '"/></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Date</label><input type="date" id="vdm-date" value="' + esc(pf.date || App.todayLocal()) + '"/></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Vendor</label><input type="text" id="vdm-vendor" value="' + esc(pf.vendor || '') + '"' + (pf.vendor ? ' readonly' : '') + '/></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Invoice / Reference</label><input type="text" id="vdm-ref" value="' + esc(pf.reference || '') + '"/></div>'
         + '</div>'
         + '<div class="form-row" style="gap:12px;">'
-          + '<div class="f" style="flex:1;min-width:200px;"><label>Product</label><input type="text" id="vdm-product" value="' + esc(pf.sku || '') + '"/></div>'
-          + '<div class="f" style="width:180px;"><label>Type</label><select id="vdm-type">' + typeOpts + '</select></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Product</label><input type="text" id="vdm-product" value="' + esc(pf.sku || '') + '"/></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Type</label><select id="vdm-type">' + typeOpts + '</select></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Units</label><input type="number" id="vdm-units" step="1" value="' + (pf.units != null ? esc(String(pf.units)) : '') + '"/></div>'
         + '</div>'
         + '<div class="form-row" style="gap:12px;">'
-          + '<div class="f" style="flex:1;min-width:80px;"><label>Units</label><input type="number" id="vdm-units" step="1" value="' + (pf.units != null ? esc(String(pf.units)) : '') + '"/></div>'
-          + '<div class="f" style="flex:1.3;min-width:110px;"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-agreed" step="0.01" value="' + (pf.agreed_price != null ? parseFloat(pf.agreed_price).toFixed(2) : '') + '"/></div></div>'
-          + '<div class="f" style="flex:1.3;min-width:110px;"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-invoiced" step="0.01" value="' + (pf.invoiced_price != null ? parseFloat(pf.invoiced_price).toFixed(2) : '') + '"/></div></div>'
-          + '<div class="f" style="flex:1.5;min-width:120px;"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-over" step="0.01" value="' + (pf.overcharge != null ? parseFloat(pf.overcharge).toFixed(2) : '0.00') + '"/></div></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Agreed Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-agreed" step="0.01" value="' + (pf.agreed_price != null ? parseFloat(pf.agreed_price).toFixed(2) : '') + '"/></div></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Invoiced Price</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-invoiced" step="0.01" value="' + (pf.invoiced_price != null ? parseFloat(pf.invoiced_price).toFixed(2) : '') + '"/></div></div>'
+          + '<div class="f" style="' + eq3 + '"><label>Overcharge / Loss</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="vdm-over" step="0.01" value="' + (pf.overcharge != null ? parseFloat(pf.overcharge).toFixed(2) : '0.00') + '"/></div></div>'
         + '</div>'
         + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Notes</label><input type="text" id="vdm-notes" value="' + esc(pf.notes || '') + '" placeholder="What was wrong, and who you contacted"/></div></div>'
         + '<div id="vdm-err" style="color:var(--red);font-size:12px;margin-bottom:6px;display:none;"></div>'
