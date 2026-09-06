@@ -445,14 +445,21 @@ S.InventoryCountHistory = {
       + meta('Count Date', this.fmtDate(count.date))
       + '</div></div>'
       + '<div class="no-print" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 10px;flex-wrap:wrap;">'
-      /* ⚠ THE ORDINARY SELECT, NOT THE CHIP. Kyle, 2026-09-06: *"change the compare count drop
-         down style to the normal drop down selector with the grey arrow."* It wore `il-copysel`,
-         which is the small uppercase letterspaced chip with a filled 8x5 triangle — it read as a
-         button sitting next to Export PDF rather than as something you pick from.
-         `form-input` + `pop-select` is what every other standalone select in the app uses (see
-         hub-support, hub-report-bug): the input fill and border, and the same stroked grey
-         chevron `.f select` paints inside a form. */
-      + '<select id="ch-compare" class="form-input pop-select" style="max-width:240px;cursor:pointer;">' + cmpOpts + '</select>'
+      /* ⛔ WRAPPED IN A `.f`, AND THE WRAPPER IS THE WHOLE FIX. Kyle asked for "the normal drop
+         down selector with the grey arrow"; this wore `il-copysel`, the small uppercase chip with
+         a filled triangle, and read as a button beside Export PDF.
+         ⚠ THE OBVIOUS SWAP — `class="form-input pop-select"` — SHIPS A SELECT WITH NO ARROW, and
+         `.pop-select` cannot draw one on any screen. `.app select` (style.css) sets the `background`
+         SHORTHAND, which resets `background-image` to none, and at (0,1,1) it outranks `.pop-select`
+         at (0,1,0). Source order never gets a say. Measured on the live detail screen: three rules
+         match, computed `background-image` is `none`. It only appears to work in a scratch element
+         parked outside `.app` — which is exactly how I mis-measured it the first time.
+         ⭐ `.f select` is ALSO (0,1,1), and it is declared after `.app select`, so it wins on order
+         and paints the chevron — the same path as the Select staff... picker. The wrapper carries
+         the width because a `.f` sizes to content and this select had `width:100%` from `.form-input`.
+         ⚠ `.pop-select` is still on hub-report-bug.js and hub-support.js, both arrow-less for this
+           same reason. Not swept here: Kyle names design changes one at a time. */
+      + '<div class="f" style="width:240px;flex-shrink:0;"><select id="ch-compare" style="cursor:pointer;">' + cmpOpts + '</select></div>'
       + '<button class="btn btn-ghost btn-sm" id="ch-export">Export PDF</button></div>'
       + bodyTable + bodyNote
       + '</div>';
