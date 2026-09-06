@@ -1016,6 +1016,35 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
      same on every product list (Add Products, Set Locations). */
   .row-list tbody td.cb-left{justify-content:flex-start;}
 }
+/* ⛔⛔ FORMS STACK ON THE CARD'S WIDTH TOO, WHICH IS THE SAME MEASURING STICK THE LIST ABOVE
+   USES. Kyle, 2026-09-06: *"why don't forms break and stack for mobile at the same time as the
+   data rows below?"* Because they were measured against different things — the list against its
+   CARD (the container query above), the form against the VIEWPORT (a 768px media query, still
+   present further down). The card is smaller than the viewport by a fixed amount:
+       sidebar 220 + .screen padding 2x28 + .card padding 2x20 = 316px
+   so a card crosses 700px when the viewport is at 1016px, while the form waited for 768. For
+   ~250px of window width the lists were stacked label/value cards and the forms above them were
+   still squeezed into truncated columns, which is what Kyle photographed.
+   ⚠ SCOPED TO `.content`, WHICH KEEPS MODALS OUT. `App.openModal` appends to `#app-modal-host`
+   on `document.body`, outside `.content` — so a pop-up card never becomes a container, its
+   `@container` rules never match, and `.narrow-form`'s 2-up grid is untouched. Without that
+   scope every 540px edit pop-up in the app would have dropped to one field per row.
+   ⚠ THE 768px MEDIA RULE STAYS as the floor for any form NOT inside a card. It now only ever
+   fires after this one has, so it changes nothing that this rule already caught.
+   ⚠ CONTAINMENT MAKES THE CARD A CONTAINING BLOCK for absolutely-positioned descendants, which
+   is why the list cards were checked before they got it. Checked again here: `App.customSelect`
+   renders a NATIVE `<select>` (the browser draws that popup outside page layout entirely), and
+   every `position:fixed` rule in this file is chrome — nav, rail, overlays, auth — none of it
+   inside a form card. */
+.content .card:has(.form-row){container-type:inline-size;}
+@container (max-width:700px){
+  .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+  /* #mi-adaptive and #ip-divisor-wrap cells live one level deeper (display:contents), so the
+     direct-child rule above misses them; stack them full-width too. */
+  .form-row > #mi-adaptive > .f,
+  .form-row > #ip-divisor-wrap > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+}
+
 /* Set Locations "Products In This Location" arrange list: a .row-list whose drag
    grip sits OUTSIDE the pill (first cell transparent, the pill starts at the 2nd
    cell), like the checklist template. The row being dragged just fills #0F1A21 —
@@ -2394,8 +2423,12 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
      attribute selector above does not catch it. */
   .metric-grid{grid-template-columns:1fr 1fr !important;}
 
-  /* Form rows stack vertically on narrow widths so fields get full width
-     instead of squeezing into truncated columns. */
+  /* Form rows stack vertically on narrow widths so fields get full width instead of squeezing
+     into truncated columns.
+     ⚠ THE CONTAINER QUERY NEXT TO `.row-list` IS THE PRIMARY ONE NOW (2026-09-06) — it fires on
+     the CARD's width, so it catches a squeezed form ~250px of viewport earlier than this does.
+     This stays as the floor for a form that is not inside a card, where there is no container to
+     query. It cannot conflict: by the time the viewport is 768 the card is long past 700. */
   .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
   /* #mi-adaptive and #ip-divisor-wrap cells live one level deeper (display:contents),
      so the direct-child rule above misses them; stack them full-width too. */
