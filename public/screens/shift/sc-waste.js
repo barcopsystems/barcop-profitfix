@@ -165,8 +165,17 @@ S.ShiftWaste = {
       + '</div>'
       + '<div class="pill-wrap" style="margin-bottom:12px;">'
       + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+      /* ⚠ COST IS 7%, NOT 13% (Kyle, 2026-09-06: *"the Reason is too far away from the cost"*).
+         Every other pair in this row sits 20px apart, control to control. Cost is a read-only
+         figure, left-aligned, 29-55px wide depending on the number — so a 13% (154px) column left
+         the figure ending 125px short of the Reason select while every other gap stayed at 20.
+         7% is 83px, a 63px content area, which still holds $12,345.67 at 55px with room to spare,
+         and it matches the 85px ic-prep-batches gives Unit Cost / Line Cost.
+         ⭐ THE 6% GOES TO REASON, so Reason moves LEFT and keeps its right edge where it was.
+         ⚠ The widths must still total 100 — 28 + 13 + 10 + 7 + 31 + 11. This is table-layout:fixed,
+           so a total under 100 leaves a dead strip and over 100 silently squeezes Product. */
       + '<th style="width:28%;">Product</th><th style="width:13%;">Units</th><th style="width:10%;">Unit</th>'
-      + '<th style="width:13%;">Cost</th><th style="width:25%;">Reason</th><th style="width:11%;"></th>'
+      + '<th style="width:7%;">Cost</th><th style="width:31%;">Reason</th><th style="width:11%;"></th>'
       + '</tr></thead><tbody id="wlb-rows">' + rowsHtml + '</tbody></table></div>'
       + '<button class="btn btn-ghost btn-sm" id="wlb-add" type="button" style="margin-bottom:14px;">+ Add Line</button>'
       + App.noteField({ id: 'wlb-notes' });
