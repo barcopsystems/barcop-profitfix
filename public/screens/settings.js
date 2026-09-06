@@ -3955,7 +3955,10 @@ S.HubSettings = {
         const st = lcStaff.find(s => s.name === nm);
         return st ? { staff_id:st.id, name:st.name, hours:crew[nm] } : null;
       }).filter(Boolean);
-      const totH = parts.reduce((s, p) => s + p.hours, 0) || 1;
+      /* ⚠ ROUNDED, BECAUSE IT IS STORED AND SHOWN. Summing tenths in binary floating point
+         gives 16.799999999999997 and 5.800000000000001, and Tip Pool prints `total_hours`
+         straight out of the record. MEASURED on the pushed demo: 134 of 350 pools carried it. */
+      const totH = +(parts.reduce((s, p) => s + p.hours, 0)).toFixed(1) || 1;
       let handed = 0;
       parts.forEach((p, i) => {
         p.share = (i === parts.length - 1) ? +(amount - handed).toFixed(2)
@@ -4006,13 +4009,18 @@ S.HubSettings = {
       if (!keys.length) return;
       const hoursOf = k => Object.keys(buckets[k]).reduce((s, n) => s + buckets[k][n], 0);
       const pot = +(keys.reduce((s, k) => s + hoursOf(k), 0) * TIP_POOL_RATE).toFixed(2);
-      // Renormalise each day's daypart weights over the periods that day actually trades.
-      const dayNorm = {};
-      keys.forEach(k => { const d = k.split('|')[0];
-        dayNorm[d] = (dayNorm[d] || 0) + (TIP_PERIOD_W[k.split('|')[1]] || 0); });
+      /* ⛔ A SHORT DAY EARNS LESS; IT DOES NOT CONCENTRATE. This renormalised each day's daypart
+         weights over the periods that day actually trades, which sounds careful and is wrong:
+         Monday closes at 22:00, so its dinner absorbed the late-night share and came out ahead
+         of a Wednesday that trades four dayparts. MEASURED on the pushed demo — Monday dinner
+         $226.17 against Wednesday's $203.55, and $26.00 a tipped hour against Saturday's $13.19.
+         A Monday out-earning a Saturday is the first thing an operator would call.
+         ⭐ The raw weights are right: `dayW` already says Monday does 10% of the week BECAUSE it
+         shuts early, so multiplying by the dayparts it runs is the whole answer. Everything is
+         then divided by the real total, so the pot is still spent to the cent. */
       let totW = 0; const wOf = {};
       keys.forEach(k => { const d = k.split('|')[0], per = k.split('|')[1];
-        wOf[k] = (dayW[SHIFT_DAYS.indexOf(d)] || 0.12) * ((TIP_PERIOD_W[per] || 0) / (dayNorm[d] || 1));
+        wOf[k] = (dayW[SHIFT_DAYS.indexOf(d)] || 0.12) * (TIP_PERIOD_W[per] || 0);
         totW += wOf[k]; });
       // The last pool absorbs the remainder, so the week's close-outs total the pot to the cent.
       let handed = 0;
