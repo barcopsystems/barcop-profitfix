@@ -116,47 +116,16 @@ S.LaborTipLog = {
         + (on ? 'background:var(--sel-active-bg);border:1px solid var(--b-edge);color:var(--t1);font-weight:700;'
               : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">' + wd + ' ' + d.getDate() + '</button>';
     }
-    /* ⛔⛔⛔ THE SHIFT ROW. A tip-out is owed to the SUPPORT CREW WHO WORKED THAT SHIFT, and that
-       crew changes between dayparts, so the tip-out has to be figured per shift even though a
-       server counts their bank once. Kyle, 2026-09-05: *"a server or bartender works 3 hours of
-       lunch and 3 hours of dinner... the manager could enter their sales up to that point, get the
-       tip out amount to the lunch staff receiving it, close it out, then open the dinner shift."*
-       ⭐ NOTHING NEW HAD TO BE BUILT FOR THIS. `App.SHIFT_TYPES` is a getter derived from the
-       operator's own service periods, the records have always carried `shift_type`, and
-       `App.tipShiftKey(date, shift_type)` has always grouped on it. Tips were flattened to per-day
-       and the plumbing was left intact underneath.
-       ⚠ ALL DAY IS A REAL OPTION, NOT A PLACEHOLDER. Every tip row written before today carries a
-       blank period, so blank has to stay selectable or two years of records become unreachable —
-       and a house that runs one close a night wants it. It is also the default.
-       ⚠ THIS IS ONLY SAFE BECAUSE THE SAVE UPSERTS. Keying a save `date|Dinner` while a `date|`
-       record exists for the same person used to slip past the duplicate guard and write a SECOND
-       row, which Form 8027 and the tip-credit check would both have counted. */
-    /* ⛔ "ALL DAY" IS NOT A PERIOD, IT IS A LEGACY ONE. Kyle: *"i think the all day needs to go,
-       it's confusing"* — and he is right that it does not belong beside four real dayparts, not
-       least because a day can then read CLOSED on All Day while every real period reads open.
-       ⚠ IT CANNOT SIMPLY BE DELETED. Every tip row written before the shift selector existed carries
-       a blank period, and with no chip that selects them those records become unreachable: still in
-       the books, still in the list below, and impossible to open or correct.
-       ⭐ SO IT RETIRES ITSELF. The chip appears only on a day that actually HAS blank-period rows.
-       A bar starting today never sees it; a day with old records still opens; and the moment the
-       last one is re-entered under a real daypart it disappears on its own, with nothing to
-       remember and nothing to migrate. */
-    const hasLegacyDay = !!this._addDate
-      && this.tips().some(t => t.date === this._addDate && !(t.shift_type || ''));
-    const real = (typeof App !== 'undefined' && App.SHIFT_TYPES) || [];
-    const periods = (hasLegacyDay || !real.length ? [''] : []).concat(real);
-    const shiftChips = periods.map(p => {
-      const on = (this._addShiftType || '') === p;
-      return '<button type="button" class="btn btn-sm ' + prefix + '-shift" data-shift="' + esc(p) + '" style="'
-        + (on ? 'background:var(--sel-active-bg);border:1px solid var(--b-edge);color:var(--t1);font-weight:700;'
-              : 'background:transparent;border:1px solid var(--b1);color:var(--t2);') + '">'
-        + esc(p || 'All Day') + '</button>';
-    }).join('');
+    /* ⛔ NO DAYPART ROW. Tips track per DAY (Kyle, 2026-09-05), so the anchor is the week and the
+       day, and nothing else. A per-shift build sat here for a day: four chips, four crews and
+       four close-outs a night. It reconciled, and it was more accurate about who was owed what.
+       It was also confusing on a screen whose whole job is one envelope at the end of the night,
+       and a house that counts once should not be asked to count four times.
+       ⚠ `shift_type` STAYS ON THE RECORD, BLANK, and `App.tipShiftKey(date, '')` still groups on
+       it — the same shape every row written before the selector existed already carries. Nothing
+       to migrate, and if a per-shift option is ever wanted again it is a chip, not a rebuild. */
     return '<div style="margin-bottom:16px;">' + weekRow
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:18px;">' + dayChips + '</div>'
-      + (periods.length > 1
-          ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + shiftChips + '</div>'
-          : '')
       + '</div>';
   },
 
@@ -403,8 +372,7 @@ S.LaborTipLog = {
       /* ⚠ SWITCHING SHIFT RELOADS THE CREW, it does not filter what is on screen. A different
          daypart is a different set of people, different hours and a different saved record, so
          anything typed and not saved belongs to the shift it was typed on and does not travel. */
-      const shiftChip = ev.target.closest('.tl-b-shift');
-      if (shiftChip) { this._addShiftType = shiftChip.dataset.shift || ''; this.preloadFromDate(this._addDate, this._addShiftType); this.renderList(); return; }
+
       if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Log', root: this.container, lists: [['lc', 'tip']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
@@ -463,15 +431,11 @@ S.LaborTipLog = {
     const tbl = (head, body) => '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
-    /* Only rendered for somebody genuinely on two shifts, so an ordinary night carries no extra
-       line. The figure is their cash and card across the whole day, which is what they banked. */
-    const splits = this.daySplitNotes();
-    const splitNote = splits.length
-      ? '<div style="margin-top:12px;font-size:12px;color:var(--t2);line-height:1.6;">'
-        + splits.map(s => esc(s.name) + ' worked ' + esc(s.shifts.join(' and '))
-            + '. Day total ' + App.fmtCurrency(s.total, 2) + '.').join('<br/>')
-        + '</div>'
-      : '';
+    /* ⚠ THE SPLIT-SHIFT NOTE WENT WITH THE DAYPARTS. It named anyone who appeared on two shifts
+       the same day and gave their day total, which mattered when a night could be closed out four
+       times. A day is the shift now, so a person cannot be on two of them and the note could only
+       ever render empty — a line of dead markup pretending to be a feature. */
+    const splitNote = '';
 
     if (!on) {
       const body = rows.map((r, i) => this.batchRowHtml(r, i)).join('');
@@ -615,38 +579,6 @@ S.LaborTipLog = {
      Tips or Close Tips, that closes all the staff at one time and done."*
      Save is per person as they check out; CLOSE is the one action at the end that turns the whole
      shift into a settled record. Until then nothing downstream counts it. */
-  /* ⛔⛔⛔ A PERSON ON TWO SHIFTS IN ONE DAY IS THE ONE WAY TO SILENTLY DOUBLE THEIR TIP INCOME.
-     Kyle's workflow puts a server who works lunch and dinner on BOTH sheets, which is right: the
-     tip-out is owed to whichever support crew was on, and those are different people. But their own
-     cash and card are ONE night's money, split across the two rows, and nothing stops a manager
-     typing the full $300 on each.
-     ⛔ IT IS NOT A DISPLAY PROBLEM. `App.tipShareForStaffInWeek` sums every row for that person, and
-     it decides whether a $2.13 server cleared minimum wage and therefore how much MAKEUP PAY they
-     are owed. Form 8027 sums the same rows per employee. A doubled night lands on both.
-     ⭐ SO THE SCREEN SHOWS THE DAY TOTAL, and the manager reconciles it against the bank-out the
-     same way they reconcile Collected against the envelope. It only appears for somebody who is
-     actually on more than one shift, so an ordinary night says nothing extra. */
-  daySplitNotes() {
-    const date = this._addDate;
-    if (!date) return [];
-    const here = new Set((this._addRows || []).map(r => r.staff_id).filter(Boolean));
-    const byStaff = new Map();
-    this.tips().forEach(t => {
-      if (t.date !== date || !t.staff_id || !here.has(t.staff_id)) return;
-      const e = byStaff.get(t.staff_id) || { shifts: new Set(), total: 0 };
-      e.shifts.add(t.shift_type || '');
-      e.total += (parseFloat(t.cash_tips) || 0) + (parseFloat(t.card_tips) || 0);
-      byStaff.set(t.staff_id, e);
-    });
-    const out = [];
-    byStaff.forEach((e, id) => {
-      if (e.shifts.size < 2) return;                       // one shift is the ordinary case
-      const st = this.staffById(id);
-      out.push({ name: (st && st.name) || '', shifts: [...e.shifts].map(s => s || 'All Day'), total: e.total });
-    });
-    return out.sort((a, b) => a.name.localeCompare(b.name));
-  },
-
   /* A saved row opens its SHIFT rather than a private editor. There is one way to change a tip
      record now: land on its day and period, Re-open if it is closed, and fix it in the same
      table the night was entered on. Kyle: "keeping two ways to edit would be confusing." */
@@ -656,8 +588,8 @@ S.LaborTipLog = {
     this._mode = 'log';
     this._addDate = t.date;
     this._addWeekStart = this.mondayOf(t.date);
-    this._addShiftType = t.shift_type || '';
-    this.preloadFromDate(this._addDate, this._addShiftType);
+    this._addShiftType = '';
+    this.preloadFromDate(this._addDate, '');
     this.renderList();
   },
   shiftRows(date, period) {
@@ -745,42 +677,22 @@ S.LaborTipLog = {
 
      ⭐ A PERSON ALREADY SAVED LOADS WITH THEIR FIGURES, so the screen is the shift rather than the
      remainder of it, and `saveBatch` updates their record instead of refusing it as a duplicate. */
-  /* Which period is actually selectable on a given day. "All Day" exists only where blank-period
-     rows do, so on every other day a blank selection has to resolve to a real daypart — otherwise
-     nothing is selected, `servicePeriodByName('')` returns null, and the crew filter below quietly
-     falls back to the whole day, which is the defect this all came from. */
-  _validShiftFor(date, want) {
-    const real = (typeof App !== 'undefined' && App.SHIFT_TYPES) || [];
-    if (!real.length) return '';                                   // no periods configured at all
-    if (want && real.indexOf(want) >= 0) return want;
-    const legacy = date && this.tips().some(t => t.date === date && !(t.shift_type || ''));
-    if (!want && legacy) return '';                                // the day still has old records
-    // Land on the daypart covering now, which is the one a manager closing out is standing in.
-    const byTime = (typeof App !== 'undefined' && App.servicePeriodByTime) ? App.servicePeriodByTime() : null;
-    return (byTime && real.indexOf(byTime.name) >= 0) ? byTime.name : real[0];
-  },
-
+  /* ⛔ THE CREW IS EVERYONE SCHEDULED THAT DAY. Tips track per day (Kyle, 2026-09-05), so there
+     is no period to filter on and the hours are the whole scheduled shift.
+     ⚠ WHAT THIS REPLACED, BECAUSE THE REASONING STILL HOLDS IF DAYPARTS EVER COME BACK: the crew
+     was filtered to the people whose shift touched the picked period, and their hours were the
+     OVERLAP, not the whole shift. A pool divides by hours, so charging a five-hour lunch with
+     somebody's eight-hour day pays them for dinner out of the lunch crew's pot. `period` is kept
+     in the signature and ignored: every call site passes it, and a silent arity change is how a
+     caller ends up passing a date into a slot that used to hold something else.
+     ⚠ A SHIFT WITH NO TIMES still counts — `start`/`end` are optional on a schedule row, and
+     dropping those people would silently shrink the crew on exactly the bars that do not fill
+     times in ([[the-loop]] #30 — when the data cannot answer, do not infer; include them). */
   preloadFromDate(date, period) {
     this._addDate = date || '';
-    if (period != null) this._addShiftType = period;
-    this._addShiftType = this._validShiftFor(this._addDate, this._addShiftType);
+    this._addShiftType = '';                 // tips track per day; the daypart stays blank
+    void period;
     if (!date) { this._addRows = []; return; }
-    /* ⛔⛔⛔ THE CREW IS THE PEOPLE WHOSE SHIFT TOUCHES THE PICKED PERIOD, NOT EVERYBODY ON THE DAY.
-       Kyle, 2026-09-05, on the first build of this: *"all the staff names stay on every shift, just
-       their hours change... priya works 5-11, so dinner and 1 hour into late night, but she is
-       still listed on lunch and happy hour. Why?"* Because the period was being passed to the
-       HOURS lookup and to nothing else, so every daypart returned the same day-wide list.
-       MEASURED on the demo before the fix: eight identical names on all five periods, including
-       Brianna K. (09:30-15:00) on Late Night and Priya N. (17:00-23:00) on Lunch.
-       ⭐ AND THE HOURS ARE THE OVERLAP, not the whole shift. A pool divides by hours, so charging a
-       five-hour lunch with somebody's whole eight-hour day pays them for dinner out of the lunch
-       crew's pot. `App.overlapHours` is the portion that actually falls inside the period.
-       ⚠ A SHIFT WITH NO TIMES still counts, because `start`/`end` are optional on a schedule row
-       and dropping those people would silently shrink the crew on exactly the bars that do not fill
-       times in ([[the-loop]] #30 — when the data cannot answer, do not infer; include them). */
-    // `periodWin`, not `period`: this member already takes a `period` argument, and shadowing it
-    // here would silently change what the hours lookup below is scoped to.
-    const periodWin = App.servicePeriodByName(this._addShiftType || '');
     const schedHrs = new Map();
     const sched = this.scheduleForDate(date);
     if (sched) {
@@ -789,12 +701,7 @@ S.LaborTipLog = {
         if (sh.day !== dayName || !sh.staff_id) return;
         const st = this.staffById(sh.staff_id);
         if (!st || !App.isTipped(st)) return;
-        let hrs = this.schedHours(sh);
-        if (periodWin && sh.start && sh.end) {
-          if (!App.windowsOverlap(sh.start, sh.end, periodWin.start, periodWin.end)) return;   // not on this shift
-          hrs = App.overlapHours(sh.start, sh.end, periodWin.start, periodWin.end);
-        }
-        schedHrs.set(sh.staff_id, (schedHrs.get(sh.staff_id) || 0) + hrs);
+        schedHrs.set(sh.staff_id, (schedHrs.get(sh.staff_id) || 0) + this.schedHours(sh));
       });
     }
     // Call-out adjustments for this date (loosely matched on period): a caller-out
@@ -907,7 +814,7 @@ S.LaborTipLog = {
           const hoursInp = ev.target.closest('.tl-line')?.querySelector('.tl-b-hours');
           const date = this.batchDate();
           if (hoursInp && !hoursInp.value && date) {
-            const hrs = App.hoursFor(ev.target.value, date, this._addShiftType);
+            const hrs = App.hoursFor(ev.target.value, date);
             if (hrs != null && hrs > 0) hoursInp.value = hrs;
           }
           // Reshape the row to the picked staff's role (earner = Sales box,
@@ -1210,11 +1117,7 @@ S.LaborTipLog = {
       if (ev.target.closest('.tp-wk-now')) { this.collectPool(); this._addWeekStart = this.mondayOf(App.todayLocal()); this.renderPool(); return; }
       const dayChip = ev.target.closest('.tp-day');
       if (dayChip) { this.loadPoolDay(dayChip.dataset.ymd); return; }
-      /* ⛔ WIRED, NOT DECORATIVE. The shift row lives on the shared anchor, so it renders on this
-         tab too — and an unwired chip is the dead-row class this project has shipped three times.
-         It reloads the crew for the picked shift, the same as the Log Tips side. */
-      const poolShift = ev.target.closest('.tp-shift');
-      if (poolShift) { this._addShiftType = poolShift.dataset.shift || ''; this.loadPoolDay(this._addDate); return; }
+
       if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Pool', root: this.container, lists: [['lc', 'tip_pool']], reRender: () => this.renderPool(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlankPool(); return; }
       const tpRange = ev.target.closest('.tl-range-chip');
