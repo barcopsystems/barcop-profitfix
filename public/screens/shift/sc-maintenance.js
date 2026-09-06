@@ -74,14 +74,23 @@ S.ShiftMaintenance = {
     const statOpts = this.STATUSES.map(s => '<option' + ((r ? r.status : 'Open') === s ? ' selected' : '') + '>' + s + '</option>').join('');
     // Row 1: the metadata (date, equipment, location, priority, status, who).
     // Row 2: the Issue description, two rows tall. Row 3: the resolution.
+    /* ⛔ SEVEN EQUAL COLUMNS ON THE INLINE FORM (Kyle, 2026-09-06: *"same with maintenance, 7
+       equal columns"*). They were 150/flex:1/150/120/130/160/flex:1 — two cells growing into
+       whatever was left and five fixed, so nothing lined up.
+       ⚠ THE SAME SEVEN CELLS BUILD THE EDIT POP-UP (`mte-`), a narrower modal where a seventh of
+       the row would be unusable, so `cw` hands that layout back the widths it always had. Same
+       arrangement as sc-walked-tabs, which shares its cells the same way.
+       ⚠ `flex:0 0 calc((100% - 72px) / 7)` — a seventh minus the six 12px gaps, with no grow. */
+    const inline = p === 'mt-';
+    const cw = w => inline ? 'flex:0 0 calc((100% - 72px) / 7);min-width:0;' : w;
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date Reported</label><input type="date" id="' + p + 'date" value="' + esc(r?.date_reported || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" autocomplete="off" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Priority</label><select id="' + p + 'priority">' + prioOpts + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Assigned To</label><input type="text" id="' + p + 'assigned" autocomplete="off" value="' + esc(r?.assigned_to || '') + '" placeholder="Staff member or vendor name"/></div>'
+      + '<div class="f" style="' + cw('width:150px;flex-shrink:0;') + '"><label>Date Reported</label><input type="date" id="' + p + 'date" value="' + esc(r?.date_reported || App.todayLocal()) + '"/></div>'
+      + '<div class="f" style="' + cw('flex:1;min-width:150px;') + '"><label>Equipment / Item</label><input type="text" id="' + p + 'equip" autocomplete="off" value="' + esc(r?.equipment || '') + '" placeholder="e.g. Walk-in cooler"/></div>'
+      + '<div class="f" style="' + cw('width:150px;flex-shrink:0;') + '"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Kitchen"/></div>'
+      + '<div class="f" style="' + cw('width:120px;flex-shrink:0;') + '"><label>Priority</label><select id="' + p + 'priority">' + prioOpts + '</select></div>'
+      + '<div class="f" style="' + cw('width:130px;flex-shrink:0;') + '"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
+      + '<div class="f" style="' + cw('width:160px;flex-shrink:0;') + '"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="' + cw('flex:1;min-width:160px;') + '"><label>Assigned To</label><input type="text" id="' + p + 'assigned" autocomplete="off" value="' + esc(r?.assigned_to || '') + '" placeholder="Vendor or Staff Name"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>Issue</label>'
