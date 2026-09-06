@@ -113,22 +113,35 @@ S.InventoryVendors = {
   formFieldsHTML(v) {
     const minUnit = (v && v.order_minimum_unit) || '$';
     const numVal = x => (x != null && x !== '' ? x : '');
+    /* ⛔ SIX EQUAL COLUMNS, AND ROW TWO SITS ON THEM (Kyle, 2026-09-06: *"the 1st row make 6 equal
+       columns and then the 2nd row 4 equal columns that align with the 1st row"*).
+       ⚠ ROW ONE RAN 1.7 / 1 / 1 / 1 / 1 / 1, so Vendor Name took most of a column and a half while
+         the five beside it shared what was left; row two was worse, four FIXED widths (130/120/
+         130/160) that lined up with nothing above them.
+       ⭐ BOTH ROWS COMPUTE THE SAME COLUMN — a sixth of the row minus the five 12px gaps — so the
+         four cells in row two land on columns 1-4 by construction, not by a second set of numbers
+         that has to be kept in step. Same idiom as lc-positions' tipped row.
+       ⚠ NO GROW. Grow is exactly what would stretch row two's four cells across the full width and
+         break the alignment, which is why a plain `flex:1 1 <basis>` is wrong here.
+       ⚠ FLEX, NOT GRID. A 6-track grid would ignore `.form-row > .f{flex:1 1 100% !important}`,
+         the app's own phone rule, and leave six ~50px columns on a handset. */
+    const eq = 'flex:0 0 calc((100% - 60px) / 6);min-width:0;';
     return '<div class="form-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1.7 1 160px;"><label>Vendor Name</label><input type="text" id="iv-name" value="' + esc(v?.name || '') + '" placeholder="Republic National"/></div>'
-      + '<div class="f" style="flex:1 1 110px;"><label>Rep Name</label><input type="text" id="iv-rep" value="' + esc(v?.rep || '') + '" placeholder="Sales rep"/></div>'
-      + '<div class="f" style="flex:1 1 110px;"><label>Phone</label><input type="text" id="iv-phone" value="' + esc(v?.phone || '') + '" placeholder="(555) 123-4567"/></div>'
-      + '<div class="f" style="flex:1 1 110px;"><label>Email</label><input type="email" id="iv-email" value="' + esc(v?.email || '') + '" placeholder="rep@distributor.com"/></div>'
-      + '<div class="f" style="flex:1 1 110px;"><label>Terms' + App.manageListLink('payment_term') + '</label>' + App.customSelect({ id: 'iv-terms', key: 'payment_term', builtin: this.TERMS.filter(t => t), selected: (v ? v.payment_terms : ''), blank: true, blankLabel: 'Select terms...' }) + '</div>'
-      + '<div class="f" style="flex:1 1 110px;"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Vendor Name</label><input type="text" id="iv-name" value="' + esc(v?.name || '') + '" placeholder="Republic National"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Rep Name</label><input type="text" id="iv-rep" value="' + esc(v?.rep || '') + '" placeholder="Sales rep"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Phone</label><input type="text" id="iv-phone" value="' + esc(v?.phone || '') + '" placeholder="(555) 123-4567"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Email</label><input type="email" id="iv-email" value="' + esc(v?.email || '') + '" placeholder="rep@distributor.com"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Terms' + App.manageListLink('payment_term') + '</label>' + App.customSelect({ id: 'iv-terms', key: 'payment_term', builtin: this.TERMS.filter(t => t), selected: (v ? v.payment_terms : ''), blank: true, blankLabel: 'Select terms...' }) + '</div>'
+      + '<div class="f" style="' + eq + '"><label>Account #</label><input type="text" id="iv-account" value="' + esc(v?.account_number || '') + '" placeholder="Account #"/></div>'
       + '</div>'
       // Divider between contact fields and the ordering details.
       + '<div style="border-top:1px solid var(--b2);margin:16px 0 0;"></div>'
       // Ordering economics: minimum (+ any unit), delivery fee, free-delivery threshold.
       + '<div class="form-row" style="gap:12px;margin-top:16px;align-items:flex-end;">'
-      +   '<div class="f" style="flex:0 0 130px;"><label>Order Minimum</label><input type="number" id="iv-min" min="0" step="1" value="' + numVal(v?.order_minimum) + '" placeholder="0"/></div>'
-      +   '<div class="f" style="flex:0 0 120px;"><label>Unit' + App.manageListLink('order_min_unit') + '</label>' + App.customSelect({ id: 'iv-min-unit', key: 'order_min_unit', builtin: this.MIN_UNITS, selected: minUnit }) + '</div>'
-      +   '<div class="f" style="flex:0 0 130px;"><label>Delivery Fee</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="iv-fee" min="0" step="0.01" value="' + numVal(v?.delivery_fee) + '" placeholder="0.00"/></div></div>'
-      +   '<div class="f" style="flex:0 0 160px;"><label>Free Delivery Over</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="iv-free" min="0" step="1" value="' + numVal(v?.free_delivery_over) + '" placeholder="0"/></div></div>'
+      +   '<div class="f" style="' + eq + '"><label>Order Minimum</label><input type="number" id="iv-min" min="0" step="1" value="' + numVal(v?.order_minimum) + '" placeholder="0"/></div>'
+      +   '<div class="f" style="' + eq + '"><label>Unit' + App.manageListLink('order_min_unit') + '</label>' + App.customSelect({ id: 'iv-min-unit', key: 'order_min_unit', builtin: this.MIN_UNITS, selected: minUnit }) + '</div>'
+      +   '<div class="f" style="' + eq + '"><label>Delivery Fee</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="iv-fee" min="0" step="0.01" value="' + numVal(v?.delivery_fee) + '" placeholder="0.00"/></div></div>'
+      +   '<div class="f" style="' + eq + '"><label>Free Delivery Over</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="iv-free" min="0" step="1" value="' + numVal(v?.free_delivery_over) + '" placeholder="0"/></div></div>'
       + '</div>'
       // Delivery Days (chip picker) — last row.
       + '<div class="form-row" style="gap:12px;margin-top:18px;">' + this.deliveryDayChipsHTML(v) + '</div>'
