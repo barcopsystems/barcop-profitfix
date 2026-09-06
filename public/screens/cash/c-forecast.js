@@ -17,7 +17,25 @@ S.CashForecast = {
   _scAmt: null,
   _scRecurring: false,
   // Shared column layout for the in/out timeline tables, so they line up.
-  CFCOLS: '<colgroup><col style="width:13%"><col style="width:24%"><col style="width:21%"><col style="width:21%"><col style="width:21%"></colgroup>',
+  /* ⛔ ONE COLUMN GRID FOR ALL THREE CARDS ON THIS SCREEN (Kyle, 2026-09-06: *"the 13 weeks, bills
+     due and event money coming in.. columns need to be aligned from card to card"*). Bills Due and
+     Event Money already shared it through fixed5(); the 13-week table was plain auto layout with no
+     colgroup at all, so its columns were set by whatever text landed in them. MEASURED on the
+     deployed build, a 1062px card: 169/422/624/821/1026 against the event card's 169/307/562/785/
+     1008 — out by 115px on the second column.
+     ⚠ THE 13-WEEK TABLE HAS FOUR COLUMNS WHEN THERE IS NO CASH ON HAND, because Balance only
+       renders once `opening` is set — a real day-one state, guarded at line ~95. Under
+       table-layout:fixed a 5-col group over a 4-col table does NOT leave the fifth width unused:
+       the shortfall is redistributed in PROPORTION to the widths given, which would move every
+       column and break exactly the alignment this exists to hold. So cfCols(n) hands the LAST
+       column whatever the columns beyond it were carrying — 4 cols come out 13/24/21/42, whose
+       starts are 13/37/58, identical to the 5-col case. */
+  CFCOL_W: [13, 24, 21, 21, 21],
+  cfCols(n) {
+    const w = this.CFCOL_W.slice(0, n);
+    w[n - 1] = this.CFCOL_W.slice(n - 1).reduce((a, b) => a + b, 0);
+    return '<colgroup>' + w.map(x => '<col style="width:' + x + '%">').join('') + '</colgroup>';
+  },
 
   cashOnHand() { return CashEngine.openingCash(); },
 
@@ -36,7 +54,7 @@ S.CashForecast = {
   statItem(label, val, cls) { return '<div class="calc-item"><div class="calc-label">' + label + '</div><div class="calc-val lg ' + (cls || '') + '">' + val + '</div></div>'; },
   fixed5(headerCells, bodyRows) {
     return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + this.CFCOLS + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>';
+      + this.cfCols(5) + '<thead><tr>' + headerCells + '</tr></thead><tbody>' + bodyRows + '</tbody></table></div>';
   },
   // A NET (a change), where the plus carries meaning. Its sibling for a BALANCE is
   // App.fmtBal: no plus, minus outside the '$'. Pick by what the number IS.
@@ -241,7 +259,11 @@ S.CashForecast = {
         + (opening != null ? '<td data-label="Balance" class="val" style="font-weight:600;color:' + (r.balance < 0 ? 'var(--red)' : 'var(--t1)') + ';">' + App.fmtBal(r.balance) + '</td>' : '')
         + '</tr>';
     }).join('');
-    return '<div style="overflow-x:auto;margin-top:0;"><table class="row-list"><thead><tr>' + headers + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    // ⚠ THE COUNT COMES OFF THE HEADERS THAT WERE ACTUALLY BUILT, not a literal 5, so the
+    //   no-cash-on-hand case (four columns, no Balance) gets the four-column grid.
+    const cols = (headers.match(/<th>/g) || []).length;
+    return '<div style="overflow-x:auto;margin-top:0;"><table class="row-list" style="table-layout:fixed;width:100%;">'
+      + this.cfCols(cols) + '<thead><tr>' + headers + '</tr></thead><tbody>' + body + '</tbody></table></div>';
   },
 
   // ── Stress test: slow-season chips + "Can I afford it" what-if ────────────────
