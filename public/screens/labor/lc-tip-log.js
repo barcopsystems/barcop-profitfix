@@ -29,8 +29,7 @@ S.LaborTipLog = {
   _poolAmount: '',         // pool dollar amount (operator-entered)
   _poolMethod: 'hours',    // 'hours' | 'equal'
   _poolEditId: null,       // id of a saved pool being edited (null = building a new one)
-  // Tip-pool EDIT pop-up state ('tpe-' ids; separate from the on-page builder).
-  _peEditId: null, _peDate: '', _peAmount: '', _peMethod: 'hours', _peRows: null,
+
 
   pools() {
     if (!App.laborData) App.laborData = {};
@@ -375,8 +374,12 @@ S.LaborTipLog = {
       /* ⛔ IT CLEARS THE AMOUNTS, NOT THE CREW. Kyle: *"the start over button clears the entire
          list of staff and you have to click the day pill again to reload them, I thought start
          over was just supposed to clear the entered tips/sales."* It emptied `_addRows`, which is
-         the crew, so the fix is to keep every row and blank what was typed into it. Renamed with
-         it, because "Start Over" is what described the old behaviour. */
+         the crew, so the fix is to keep every row and blank what was typed into it.
+         ⚠ AND IT KEEPS THE NAME. I renamed it "Clear Amounts" with the fix, which Kyle refused:
+         *"the entire app uses start over to start over entered data, just like tip pool does. You
+         created a new button not used anywhere else in the app."* Right — Tip Pool's own button
+         two tabs over says Start Over, and inventing a second word for one screen is how an app
+         stops feeling like one app. The behaviour was wrong; the label never was. */
       if (ev.target.closest('#tl-startover')) {
         this.collectBatch();
         (this._addRows || []).forEach(r => { r.cash = ''; r.card = ''; r.sales = ''; r.received = ''; });
@@ -417,7 +420,10 @@ S.LaborTipLog = {
     // Two inset divider lines (not full-bleed) separate the three parts: the
     // toggle, the day picker, and the entry below. No boxes around each part.
     const divLine = '<div style="border-top:1px solid var(--b2);margin:14px 0 16px;"></div>';
-    const header = divLine + '<div id="tl-b-anchor">' + this.tlAnchor('tl-b', this._addWeekStart, this._addDate) + '</div>' + divLine;
+    /* ⚠ ONE RULE, UNDER THE PICKER. There were two, which framed the week + day rows as their own
+       band back when a third row of daypart chips sat inside it. The chips are gone and the top
+       rule was left drawing a line immediately under the card title, boxing nothing. */
+    const header = '<div id="tl-b-anchor">' + this.tlAnchor('tl-b', this._addWeekStart, this._addDate) + '</div>' + divLine;
     const addBtn = '<button type="button" class="btn btn-ghost btn-sm" id="tl-b-add">+ Add Staff</button>';
     const rows = this._addRows || [];
     /* ⛔ THE "N ALREADY ENTERED" NOTE IS GONE, and so is the "still need tips entered" wording.
@@ -442,7 +448,7 @@ S.LaborTipLog = {
 
     if (!on) {
       const body = rows.map((r, i) => this.batchRowHtml(r, i)).join('');
-      const table = '<div id="tl-b-rows">' + tbl('<th style="width:200px;">Staff</th><th style="width:110px;">Tippable Hours</th><th style="width:110px;">Cash Tips</th><th style="width:110px;">Card Tips</th><th style="width:100px;">Total</th><th style="width:90px;"></th>', body) + '</div>';
+      const table = '<div id="tl-b-rows">' + tbl('<th style="width:28%;">Staff</th><th style="width:15%;">Tippable Hours</th><th style="width:15%;">Cash Tips</th><th style="width:15%;">Card Tips</th><th style="width:14%;">Total</th><th style="width:13%;"></th>', body) + '</div>';
       return header + table + addBtn + splitNote;
     }
 
@@ -461,8 +467,16 @@ S.LaborTipLog = {
        briefly carried has gone with the filter. */
     const sBody = support.map((r, j) => this.batchSupportRow(r, earners.length + j)).join('')
       || '<tr><td colspan="9" style="color:var(--t3);font-size:12px;padding:8px 10px;">No staff on schedule. Add staff below if one worked.</td></tr>';
-    const grid = '<th style="width:150px;">Pays / Receives Tip-Out</th><th style="width:70px;">Hours</th><th style="width:90px;">Cash Tips</th><th style="width:90px;">Card Tips</th><th style="width:100px;">Total Sales</th><th style="width:90px;">Tip-Out</th><th style="width:90px;">Received</th><th style="width:90px;">Net</th><th style="width:70px;"></th>';
-    const sGrid = '<th style="width:150px;">Receives Tip-Out</th><th style="width:70px;">Hours</th><th style="width:90px;"></th><th style="width:90px;"></th><th style="width:100px;"></th><th style="width:90px;"></th><th style="width:90px;">Received</th><th style="width:90px;"></th><th style="width:70px;"></th>';
+    /* ⛔ PERCENTAGES, NOT PIXELS. Kyle: *"log tips breaks out of the container when minimizing
+       screen to mobile."* These were fixed px widths summing to 840 on a `table-layout:fixed`
+       table, so the builder could not compress at all — and `.pill-wrap`'s container query only
+       stacks the rows into cards below 680px. Between 840 and 680 the table simply ran out the
+       side of the card, which is the band a phone in landscape and a narrow window both sit in.
+       ⭐ THE STACK WAS ALWAYS THERE; nothing could reach it. The style.css comment says this
+       builder should "compress then stack, never horizontal-scroll through the cramped middle
+       zone" — percentages are what makes the compress half true, so no CSS had to move. */
+    const grid = '<th style="width:18%;">Pays / Receives Tip-Out</th><th style="width:8%;">Hours</th><th style="width:11%;">Cash Tips</th><th style="width:11%;">Card Tips</th><th style="width:12%;">Total Sales</th><th style="width:10%;">Tip-Out</th><th style="width:11%;">Received</th><th style="width:11%;">Net</th><th style="width:8%;"></th>';
+    const sGrid = '<th style="width:18%;">Receives Tip-Out</th><th style="width:8%;">Hours</th><th style="width:11%;"></th><th style="width:11%;"></th><th style="width:12%;"></th><th style="width:10%;"></th><th style="width:11%;">Received</th><th style="width:11%;"></th><th style="width:8%;"></th>';
     const eTable = tbl(grid, eBody);
     const sTable = tbl(sGrid, sBody);
     const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
@@ -486,13 +500,16 @@ S.LaborTipLog = {
   batchRowHtml(r, i) {
     r = r || {};
     const total = (parseFloat(r.cash) || 0) + (parseFloat(r.card) || 0);
+    /* ⚠ `data-label` IS WHAT THE STACKED VIEW PRINTS. Under 680px `.ing-tbl.pill` drops the
+       header row and each cell shows `attr(data-label)` above its input; without it the row
+       stacks into an unlabelled column of boxes. Every other pill builder supplies these. */
     return '<tr class="tl-line" data-idx="' + i + '">'
-      + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
-      + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
-      + '<td><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">' + (total > 0 ? App.fmtCurrency(total, 2) : '-') + '</div></td>'
-      + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
+      + '<td data-label="Staff"><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td data-label="Tippable Hours"><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
+      + '<td data-label="Cash Tips"><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td data-label="Card Tips"><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td data-label="Total"><div class="tl-b-total" style="font-weight:600;color:var(--t1);">' + (total > 0 ? App.fmtCurrency(total, 2) : '-') + '</div></td>'
+      + '<td data-label="" style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
   // Earner row: Staff / Hours / Cash Tips / Card Tips / Total Sales / Tip-Out
@@ -501,15 +518,15 @@ S.LaborTipLog = {
   batchEarnerRow(r, i) {
     r = r || {};
     return '<tr class="tl-line" data-idx="' + i + '">'
-      + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
-      + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
-      + '<td><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><input class="form-input tl-b-sales" type="number" min="0" step="0.01" value="' + (r.sales != null && r.sales !== '' ? r.sales : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><div class="tl-b-tipout" style="font-weight:600;color:var(--t3);">-</div></td>'
-      + '<td><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td><div class="tl-b-total" style="font-weight:600;color:var(--t1);">-</div></td>'
-      + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
+      + '<td data-label="Staff"><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td data-label="Hours"><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
+      + '<td data-label="Cash Tips"><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td data-label="Card Tips"><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td data-label="Total Sales"><input class="form-input tl-b-sales" type="number" min="0" step="0.01" value="' + (r.sales != null && r.sales !== '' ? r.sales : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td data-label="Tip-Out"><div class="tl-b-tipout" style="font-weight:600;color:var(--t3);">-</div></td>'
+      + '<td data-label="Received"><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td data-label="Net"><div class="tl-b-total" style="font-weight:600;color:var(--t1);">-</div></td>'
+      + '<td data-label="" style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
   // Support row on the SAME 9-column grid as the earner row (Staff/Hours line up
@@ -517,13 +534,16 @@ S.LaborTipLog = {
   // Received sits under the Received column.
   batchSupportRow(r, i) {
     r = r || {};
+    /* ⚠ THE FOUR EMPTY CELLS CARRY `data-label=""` DELIBERATELY. Stacked, a cell with no label
+       and no content still renders as an empty block; the blank attribute is what the CSS reads
+       to suppress the heading, and `display:none` on them would break the column count above. */
     return '<tr class="tl-line" data-idx="' + i + '">'
-      + '<td><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
-      + '<td><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
-      + '<td></td><td></td><td></td><td></td>'
-      + '<td><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
-      + '<td></td>'
-      + '<td style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
+      + '<td data-label="Staff"><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td data-label="Hours"><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
+      + '<td data-label=""></td><td data-label=""></td><td data-label=""></td><td data-label=""></td>'
+      + '<td data-label="Received"><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
+      + '<td data-label=""></td>'
+      + '<td data-label="" style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
       + '</tr>';
   },
 
@@ -1038,8 +1058,8 @@ S.LaborTipLog = {
     const rowsBlock = rows.length
       ? '<div class="pill-wrap" style="margin-bottom:12px;">'
         + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
-        + '<th style="width:240px;">Staff</th><th style="width:120px;">Hours</th>'
-        + '<th style="width:130px;">Tip Share</th><th></th><th style="width:100px;"></th>'
+        + '<th style="width:34%;">Staff</th><th style="width:17%;">Hours</th>'
+        + '<th style="width:19%;">Tip Share</th><th></th><th style="width:15%;"></th>'
         + '</tr></thead><tbody id="tp-rows">' + rowHtml + '</tbody></table></div>'
       : '<div class="card" style="padding:14px 20px;margin-bottom:12px;"><div id="tp-rows" style="font-size:12px;color:var(--t3);">No participants yet. Pick a day above to load the crew, or add one below.</div></div>';
     const calcAndHeads = rows.length
@@ -1144,7 +1164,7 @@ S.LaborTipLog = {
       const hedit = ev.target.closest('.tp-hedit');
       const hdel = ev.target.closest('.tp-hdel');
       if (hdel) { ev.stopPropagation(); this.confirmDelPool(hdel.dataset.id); }
-      else if (hedit) { ev.stopPropagation(); this.openPoolEditModal(hedit.dataset.id); }
+      else if (hedit) { ev.stopPropagation(); this.goToPool(hedit.dataset.id); }
     };
     App.applyCollapsed(this.container);
     document.getElementById('tl-f-from')?.addEventListener('change', e => { this.collectPool(); this.filterFrom = e.target.value || ''; this.renderPool(); });
@@ -1155,11 +1175,11 @@ S.LaborTipLog = {
   poolRowHtml(r, i, equal) {
     r = r || {};
     return '<tr class="tp-row" data-idx="' + i + '">'
-      + '<td><select class="form-input tp-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
-      + '<td><input class="form-input tp-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
-      + '<td><div class="tp-share" style="font-weight:600;color:var(--t1);">-</div></td>'
-      + '<td></td>'
-      + '<td><button class="btn btn-ghost btn-sm tp-remove" type="button">Remove</button></td>'
+      + '<td data-label="Staff"><select class="form-input tp-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
+      + '<td data-label="Hours"><input class="form-input tp-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
+      + '<td data-label="Tip Share"><div class="tp-share" style="font-weight:600;color:var(--t1);">-</div></td>'
+      + '<td data-label=""></td>'
+      + '<td data-label=""><button class="btn btn-ghost btn-sm tp-remove" type="button">Remove</button></td>'
       + '</tr>';
   },
 
@@ -1190,6 +1210,31 @@ S.LaborTipLog = {
 
   // Shares for a set of rows. Defaults to the on-page builder's state; the edit
   // pop-up passes its own rows/amount/method.
+  /* ⛔ EDITING A POOL LOADS THE FORM, IT DOES NOT OPEN A SECOND ONE. Kyle, 2026-09-05: *"make tip
+     pool edit buttons jump back up to the form on page and get rid of the pop up modal it
+     currently opens, so both log tips and tip pool function the same way."*
+     ⚠ WHAT WENT WITH IT: a 120-line `tpe-` pop-up — its own date, amount, method, participant
+     table, Allocated/Unallocated strip, save and delete. A duplicate of the builder six inches
+     above it, with its own copy of every rule about how a pool splits, which is two places for
+     one calculation to drift apart. `savePool` already updates in place when `_poolEditId` is
+     set, so loading the record into the builder was all that was ever needed.
+     ⚠ Delete stays on the LIST row, where it was; it never lived in the builder. */
+  goToPool(id) {
+    if (!App.canEdit('lc-tip-log')) return;
+    const p = this.pools().find(x => x.id === id);
+    if (!p) return;
+    this._mode = 'pool';
+    this._poolEditId = id;
+    this._addDate = p.date || App.todayLocal();
+    this._addWeekStart = this.mondayOf(this._addDate);
+    this._poolAmount = (p.pool_amount != null) ? String(p.pool_amount) : '';
+    this._poolMethod = p.method || 'hours';
+    this._poolRows = (p.participants || []).map(pt => ({ staff_id: pt.staff_id || '', hours: (pt.hours != null ? pt.hours : '') }));
+    this.renderPool();
+    // After the render, or it scrolls to the element the render is about to replace.
+    const card = this.container && this.container.querySelector('.form-card');
+    if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
   computeShares(rows, amount, method) {
     rows = rows || this._poolRows || [];
     const pool = parseFloat(amount != null ? amount : this._poolAmount) || 0;
@@ -1294,132 +1339,6 @@ S.LaborTipLog = {
       if (btn) { btn.disabled = false; btn.textContent = this._poolEditId ? 'Update Tip Pool' : 'Save Tip Pool'; }
       fail('Save failed. Try again.');
     }
-  },
-
-  // Edit a saved pool in a focused pop-up (matches the Log Tips edit), own 'tpe-'
-  // ids so the modal's rows never collide with the on-page builder behind it.
-  openPoolEditModal(id) {
-    if (!App.canEdit('lc-tip-log')) return;
-    const p = this.pools().find(x => x.id === id);
-    if (!p) return;
-    this._peEditId = id;
-    this._peDate = p.date || App.todayLocal();
-    this._peAmount = (p.pool_amount != null) ? String(p.pool_amount) : '';
-    this._peMethod = p.method || 'hours';
-    this._peRows = (p.participants || []).map(pt => ({ staff_id: pt.staff_id || '', hours: (pt.hours != null ? pt.hours : '') }));
-    this.renderPoolEditModal();
-  },
-  renderPoolEditModal() {
-    const equal = this._peMethod === 'equal';
-    const rows = this._peRows || [];
-    const rowHtml = rows.map((r, i) => this.poolEditRowHtml(r, i, equal)).join('');
-    const html = '<div class="card form-card" style="margin:0;"><div class="card-title">Edit Tip Pool</div>'
-      + '<div class="form-row" style="gap:14px;">'
-        + '<div class="f" style="flex:1 1 0;min-width:0;"><label>Date</label>'
-          + '<input type="date" id="tpe-date" value="' + esc(this._peDate || App.todayLocal()) + '"/></div>'
-        + '<div class="f" style="flex:1 1 0;min-width:0;"><label>Pool Amount</label>'
-          + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="tpe-pool" min="0" step="0.01" value="' + esc(this._peAmount) + '"/></div></div>'
-        + '<div class="f" style="flex:1 1 0;min-width:0;"><label>Method</label>'
-          + '<select id="tpe-method"><option value="hours"' + (equal ? '' : ' selected') + '>By Hours Worked</option>'
-          + '<option value="equal"' + (equal ? ' selected' : '') + '>Equal Split</option></select></div>'
-      + '</div>'
-      + '<div style="max-height:38vh;overflow-y:auto;padding-right:8px;">'
-        + '<div style="overflow-x:auto;margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
-        + '<th>Staff</th><th style="width:80px;">Hours</th><th style="width:100px;">Tip Share</th><th style="width:96px;"></th>'
-        + '</tr></thead><tbody id="tpe-rows">' + rowHtml + '</tbody></table></div></div>'
-      + '<button class="btn btn-ghost btn-sm" id="tpe-add">+ Add Participant</button>'
-      + '<div class="calc" style="margin-top:14px;margin-bottom:0;">'
-        + '<div class="calc-item"><div class="calc-label">Allocated</div><div class="calc-val" id="tpe-c-alloc">$0</div></div>'
-        + '<div class="calc-item"><div class="calc-label">Unallocated</div><div class="calc-val" id="tpe-c-rem">$0</div></div>'
-      + '</div>'
-      + '<div class="card-actions">'
-        + '<button class="btn btn-primary" id="tpe-save">Update</button>'
-        + '<span id="tpe-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
-        + '<button class="btn btn-danger" id="tpe-del" style="margin-left:auto;">Delete</button>'
-      + '</div></div>';
-    App.openModal(html, { id: 'tp-edit-modal', maxWidth: 560, noClose: true });
-    const rowsEl = document.getElementById('tpe-rows');
-    if (rowsEl) {
-      rowsEl.addEventListener('input', () => { this.collectPoolEdit(); this.recalcPoolEdit(); });
-      rowsEl.addEventListener('change', ev => {
-        this.collectPoolEdit();
-        if (ev.target.classList && ev.target.classList.contains('tpe-staff')) {
-          const row = ev.target.closest('.tpe-row');
-          const idx = row ? parseInt(row.dataset.idx, 10) : -1;
-          const hoursInp = row && row.querySelector('.tpe-hours');
-          if (idx >= 0 && hoursInp && !hoursInp.value && this._peDate) {
-            const hrs = App.hoursFor(ev.target.value, this._peDate);
-            if (hrs != null && hrs > 0) { hoursInp.value = hrs; if (this._peRows[idx]) this._peRows[idx].hours = hrs; }
-          }
-        }
-        this.recalcPoolEdit();
-      });
-      rowsEl.addEventListener('click', ev => {
-        if (ev.target.closest('.tpe-remove')) { this.collectPoolEdit(); this._peRows.splice(parseInt(ev.target.closest('.tpe-row').dataset.idx, 10), 1); this.renderPoolEditModal(); }
-      });
-    }
-    document.getElementById('tpe-add')?.addEventListener('click', () => { this.collectPoolEdit(); this._peRows = this._peRows || []; this._peRows.push({ staff_id: '', hours: '' }); this.renderPoolEditModal(); });
-    document.getElementById('tpe-method')?.addEventListener('change', e => { this.collectPoolEdit(); this._peMethod = e.target.value; this.renderPoolEditModal(); });
-    document.getElementById('tpe-pool')?.addEventListener('input', () => { this._peAmount = document.getElementById('tpe-pool')?.value || ''; this.recalcPoolEdit(); });
-    document.getElementById('tpe-date')?.addEventListener('change', e => { this._peDate = e.target.value || this._peDate; });
-    document.getElementById('tpe-save')?.addEventListener('click', () => this.savePoolEdit());
-    document.getElementById('tpe-del')?.addEventListener('click', () => { const id = this._peEditId; this._peEditId = null; App.closeModal('tp-edit-modal'); this.confirmDelPool(id); });
-    this.recalcPoolEdit();
-  },
-  poolEditRowHtml(r, i, equal) {
-    r = r || {};
-    return '<tr class="tpe-row" data-idx="' + i + '">'
-      + '<td><select class="form-input tpe-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
-      + '<td><input class="form-input tpe-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
-      + '<td><div class="tpe-share" style="font-weight:600;color:var(--t1);">-</div></td>'
-      + '<td style="text-align:right;padding-right:12px;"><button class="btn btn-ghost btn-sm tpe-remove" type="button">Remove</button></td>'
-      + '</tr>';
-  },
-  collectPoolEdit() {
-    this._peAmount = document.getElementById('tpe-pool')?.value || '';
-    const rows = [...document.querySelectorAll('.tpe-row')];
-    if (rows.length) {
-      this._peRows = rows.map(r => ({ staff_id: r.querySelector('.tpe-staff')?.value || '', hours: r.querySelector('.tpe-hours')?.value || '' }));
-    }
-  },
-  recalcPoolEdit() {
-    const shares = this.computeShares(this._peRows, this._peAmount, this._peMethod);
-    const rowEls = [...document.querySelectorAll('.tpe-row')];
-    let alloc = 0;
-    rowEls.forEach((el, i) => { const s = shares[i]; if (!s) return; const shareEl = el.querySelector('.tpe-share'); if (shareEl) shareEl.textContent = s.staff_id ? App.fmtCurrency(s.share, 2) : '-'; alloc += s.share; });
-    const pool = parseFloat(this._peAmount) || 0;
-    const set = (id, v, cls) => { const el = document.getElementById(id); if (!el) return; el.textContent = v; if (cls !== undefined) el.className = 'calc-val' + (cls ? ' ' + cls : ''); };
-    set('tpe-c-alloc', App.fmtCurrency(alloc, 2));
-    const rem = pool - alloc;
-    set('tpe-c-rem', App.fmtCurrency(rem, 2), Math.abs(rem) > 0.01 ? 'warn' : 'good');
-  },
-  async savePoolEdit() {
-    this.collectPoolEdit();
-    const err = document.getElementById('tpe-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    const date = document.getElementById('tpe-date')?.value || this._peDate || '';
-    if (!date) { fail('Date is required.'); return; }
-    const pool = parseFloat(this._peAmount);
-    if (isNaN(pool) || pool <= 0) { fail('Enter the pool amount.'); return; }
-    const shares = this.computeShares(this._peRows, this._peAmount, this._peMethod).filter(s => s.staff_id);
-    if (shares.length === 0) { fail('Add at least one participant.'); return; }
-    if (this._peMethod === 'hours' && shares.every(s => s.hours <= 0)) { fail('Enter hours for the hours-based split.'); return; }
-    let totalHours = 0;
-    const participants = shares.map(s => { totalHours += s.hours; const staff = this.staffById(s.staff_id); return { staff_id: s.staff_id, name: staff ? staff.name : '', hours: s.hours, share: s.share }; });
-    const existing = this.pools().find(x => x.id === this._peEditId);
-    const rec = {
-      id: this._peEditId, shift_id: App.tipShiftKey(date, ''), date, shift_type: '',
-      method: this._peMethod, pool_amount: pool, total_hours: totalHours, participants,
-      created_at: (existing && existing.created_at) ? existing.created_at : new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    const btn = document.getElementById('tpe-save');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    const idx = this.pools().findIndex(x => x.id === this._peEditId);
-    if (idx >= 0) this.pools()[idx] = rec; else this.pools().push(rec);
-    const ok = await App.putRecord('lc', 'tip_pool', rec);
-    if (ok) { this._peEditId = null; App.closeModal('tp-edit-modal'); this.renderPool(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Update'; } fail('Save failed. Try again.'); }
   },
 
   // Saved Tip Pools: a stats strip + range filter (the same chips/Export/Worksheet
