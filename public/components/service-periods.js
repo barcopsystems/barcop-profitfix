@@ -48,16 +48,19 @@ window.ServicePeriods = {
      this control (add a preset, add a custom — which defaults to 16:00-18:00 — edit From, edit To),
      and a rule enforced at three of them is not enforced ([[the-loop]] #94/#133: one rule missing
      from N doors gets ONE census, never N patches). */
+  /* ⭐ ONE IMPLEMENTATION, ON App. The tip screen asks the same question when it decides whose
+     scheduled shift touches a service period, and two copies of a clock comparison — with the
+     midnight wrap in both — is exactly the drift this codebase pays for. `App.windowsOverlap`
+     handles the wrap and treats touching end-to-start as adjacent, which is the case this rule
+     exists to allow (11:00-15:00 beside 15:00-17:00).
+     ⚠ The local fallback is not defensive habit: this control is mounted from onboarding as well as
+     Settings, and a missing App there would silently permit every overlap rather than fail loudly. */
   _overlap(a, b) {
     if (!a.start || !a.end || !b.start || !b.end) return false;
-    // A window that ends at or before it starts wraps past midnight (Late Night 22:00-02:00), so
-    // it is measured on a 48-hour line. Touching end-to-start is NOT a crossing: 11-16 and 16-22
-    // are the adjacent dayparts this rule exists to allow.
-    const span = p => { const s = this._min(p.start); let e = this._min(p.end); if (e <= s) e += 1440; return [s, e]; };
-    const [as, ae] = span(a), [bs, be] = span(b);
-    const hit = (x1, x2, y1, y2) => Math.max(x1, y1) < Math.min(x2, y2);
-    // Compare both against each other's next-day copy too, or a wrapping window misses a morning one.
-    return hit(as, ae, bs, be) || hit(as, ae, bs + 1440, be + 1440) || hit(as + 1440, ae + 1440, bs, be);
+    if (typeof App === 'undefined' || !App.windowsOverlap) {
+      throw new Error('ServicePeriods._overlap needs App.windowsOverlap');
+    }
+    return App.windowsOverlap(a.start, a.end, b.start, b.end);
   },
   /* The period `cand` would collide with, or null. `cand` carries its own id so editing a period
      never reports it as conflicting with itself. */
