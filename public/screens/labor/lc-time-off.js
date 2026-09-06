@@ -69,16 +69,24 @@ S.LaborTimeOff = {
        is one click and is the manager's decision to make, not the form's. */
     const statusOpts = this.STATUSES.map(st =>
       '<option' + ((r ? r.status : 'Requested') === st ? ' selected' : '') + '>' + st + '</option>').join('');
+    /* ⛔ FIVE EQUAL COLUMNS ON THE PAGE FORM (Kyle, 2026-09-06). Staff carried `flex:1.2` against
+       the other four at `flex:1`, so it took a fifth more room than From, To, Type or Status and
+       the row read as one wide box and four narrower ones.
+       ⚠ `flex:0 0 calc((100% - 48px) / 5)` — a fifth minus the four 12px gaps, with no grow.
+       ⚠ THE SAME CELLS BUILD THE `toe-` EDIT POP-UP, so `cw` hands that narrower layout back the
+       widths it always had. */
+    const inline = p === 'to-';
+    const cw = w => inline ? 'flex:0 0 calc((100% - 48px) / 5);min-width:0;' : w;
     return '<div class="form-row data-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
+      + '<div class="f" style="' + cw('flex:1.2 1 150px;min-width:0;') + '"><label>Staff</label>'
         + '<select id="' + p + 'staff">' + staffOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>From</label>'
+      + '<div class="f" style="' + cw('flex:1 1 130px;min-width:0;') + '"><label>From</label>'
         + '<input type="date" id="' + p + 'from" value="' + esc(r?.start_date || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>To</label>'
+      + '<div class="f" style="' + cw('flex:1 1 130px;min-width:0;') + '"><label>To</label>'
         + '<input type="date" id="' + p + 'to" value="' + esc(r?.end_date || r?.start_date || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Type</label>'
+      + '<div class="f" style="' + cw('flex:1 1 130px;min-width:0;') + '"><label>Type</label>'
         + '<select id="' + p + 'type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Status</label>'
+      + '<div class="f" style="' + cw('flex:1 1 120px;min-width:0;') + '"><label>Status</label>'
         + '<select id="' + p + 'status">' + statusOpts + '</select></div>'
       + '</div>'
       + App.noteField({ id: p + 'notes', value: r?.notes });

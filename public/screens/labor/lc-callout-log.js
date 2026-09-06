@@ -124,19 +124,29 @@ S.LaborCalloutLog = {
       '<option' + ((c ? c.type : 'No-Show') === t ? ' selected' : '') + '>' + t + '</option>').join('');
     const shiftOpts = this.SHIFTS.map(s =>
       '<option value="' + s + '"' + (c && c.shift_type === s ? ' selected' : '') + '>' + (s || 'Select shift...') + '</option>').join('');
+    /* ⛔ SIX EQUAL COLUMNS ON THE PAGE FORM (Kyle, 2026-09-06). Staff and Covered By both carried
+       `flex:1.2` against the other four at `flex:1`, so two cells were a fifth wider than the
+       rest and nothing sat on a column.
+       ⚠ `flex:0 0 calc((100% - 60px) / 6)` — a sixth minus the five 12px gaps, with no grow.
+       ⚠ REASON IS NOT ONE OF THE SIX: it is a full-width textarea on its own row below, and the
+       schedule note line sits between them. Both are untouched.
+       ⚠ THE SAME CELLS BUILD THE `coe-` EDIT POP-UP, so `cw` hands that narrower layout back the
+       widths it always had. */
+    const inline = p === 'co-';
+    const cw = w => inline ? 'flex:0 0 calc((100% - 60px) / 6);min-width:0;' : w;
     return '<div class="form-row data-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Date</label>'
+      + '<div class="f" style="' + cw('flex:1 1 130px;min-width:0;') + '"><label>Date</label>'
         + '<input type="date" id="' + p + 'date" value="' + esc(c?.date || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Staff</label>'
+      + '<div class="f" style="' + cw('flex:1.2 1 150px;min-width:0;') + '"><label>Staff</label>'
         + '<select id="' + p + 'staff">' + staffOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Type</label>'
+      + '<div class="f" style="' + cw('flex:1 1 130px;min-width:0;') + '"><label>Type</label>'
         + '<select id="' + p + 'type">' + typeOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 120px;min-width:0;"><label>Shift</label>'
+      + '<div class="f" style="' + cw('flex:1 1 120px;min-width:0;') + '"><label>Shift</label>'
         + '<select id="' + p + 'shift">' + shiftOpts + '</select></div>'
-      + '<div class="f" style="flex:1 1 130px;min-width:0;"><label>Shift Covered?</label><select id="' + p + 'covered">'
+      + '<div class="f" style="' + cw('flex:1 1 130px;min-width:0;') + '"><label>Shift Covered?</label><select id="' + p + 'covered">'
         + '<option value="no"' + (!c || !c.covered ? ' selected' : '') + '>Not Covered</option>'
         + '<option value="yes"' + (c && c.covered ? ' selected' : '') + '>Covered</option></select></div>'
-      + '<div class="f" style="flex:1.2 1 150px;min-width:0;"><label>Covered By</label>'
+      + '<div class="f" style="' + cw('flex:1.2 1 150px;min-width:0;') + '"><label>Covered By</label>'
         + '<select id="' + p + 'coveredby">' + App.staffOptions(c?.covered_by_id || c?.covered_by, { placeholder: '(optional)' }) + '</select></div>'
       + '</div>'
       + '<div id="' + p + 'sched-note" class="co-sched-line" style="font-size:11px;line-height:1.5;"></div>'
