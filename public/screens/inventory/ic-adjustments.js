@@ -221,7 +221,12 @@ S.InventoryAdjustments = {
       { h: 'Logging Adjustments', p: ['Set the date, time, and who did it up top, then add a line for each adjustment off your sheet: pick the reason, confirm the direction (Loss for product that left, Found for stock that came back), then the product, quantity, and unit. Bar Cop shows the dollar value per line as you go, so you see what each loss actually cost you. Add a witness when a high-value write-off should have a second set of eyes on it. Add Line for another, and Save All writes them in one shot. Start Over clears the form.'] },
       { h: 'Reasons And Direction', p: ['Damage, Theft, and Expiration default to a Loss. Found defaults to an increase. Other lets you set the direction yourself. Use the right reason, because a write-off labeled Theft raises a Needs Attention row on the Hub and feeds the Operations Audit, while one labeled Damage does not. Honest reasons keep that signal clean.'] },
       { h: 'A Real Example', p: ['A barback at The Anchor drops a full bottle of Hennessy on the way to the well and it shatters. Add a line: reason Damage, direction Loss, product Hennessy, quantity one bottle. Bar Cop prices it off your cost, say a 750ml bottle that runs you about thirty dollars, and books a thirty dollar documented loss. Now when you run variance for the period, that thirty dollars is accounted for and does not get mistaken for product walking out the door.'] },
-      { h: 'It Does Not Touch Your Counts', p: ['Logging an adjustment does not change your last count or auto-subtract from variance. The Variance Report surfaces adjustments separately so you can see real shrinkage versus a documented cause. Your bookkeeper gets a clean shrinkage trail they can stand behind at tax time.'] },
+      /* ⚠ THE FIRST PARAGRAPH IS LOAD-BEARING AND IT IS THE ONLY PLACE THE APP SAYS THIS. It used
+         to be a line of explainer text on the form card; Kyle had it removed on 2026-09-06 and
+         asked that it live here instead. Do not trim it back to the second paragraph: that one
+         covers the LAST count and variance, and says nothing about on-hand staying put until the
+         NEXT count, which is what an operator has to know to read the reorder plan in between. */
+      { h: 'It Does Not Touch Your Counts', p: ['Logging an adjustment does not change your on-hand right now. The loss shows up in your next count, and the count is where on-hand moves. That is deliberate: the count already reveals the product is gone, so taking it off here as well would book the same loss twice. Until you count again, your reorder plan still reads the stock from your last one.', 'It does not change your last count or auto-subtract from variance either. The Variance Report surfaces adjustments separately so you can see real shrinkage versus a documented cause. Your bookkeeper gets a clean shrinkage trail they can stand behind at tax time.'] },
       { h: 'Filtering And History', p: ['Every adjustment drops into the list below. Use the range chips to pull up this month, the last few weeks, twelve weeks, or all of it, and edit or delete any entry to fix a mistake. The Worksheet button prints a clean grid you can carry into the storeroom during a damage or expiration walk-through, then enter the rows here after.'] }
     ]);
   },
@@ -241,14 +246,13 @@ S.InventoryAdjustments = {
         + '<div class="f" style="width:200px;flex-shrink:0;"><label>Witnessed By <span style="color:var(--t4);font-weight:400;">(optional)</span></label>'
           + '<select id="ajb-witness">' + App.staffOptions('', { placeholder: 'Optional' }) + '</select></div>'
       + '</div>'
-      /* ⚠ SAY WHAT AN ADJUSTMENT DOES AND DOES NOT DO (Q1, Kyle's call 2026-07-31). The model is
-         CORRECT and stays: on-hand moves on counts and dispositions only (app.js:6201), because
-         the next count already reveals the loss — subtracting it here as well would book it
-         twice. What was missing is that nothing on this screen said so, so between logging a
-         loss and the next count the reorder plan still reads the old stock and the operator has
-         no way to know that is deliberate. */
-      + '<div style="font-size:11px;color:var(--t3);line-height:1.6;margin:-4px 0 12px;">'
-        + 'Logged losses show up in your next count. They do not change on-hand right now.</div>'
+      /* ⚠ NO EXPLAINER LINE ON THE CARD (Kyle, 2026-09-06: *"remove the explainer text on the form
+         card.. just make sure it is in the i help page"*). The model itself is CORRECT and stays:
+         on-hand moves on counts and dispositions only, because the next count already reveals the
+         loss and subtracting it here as well would book it twice.
+         ⛔ THE FACT DID NOT GO AWAY WITH THE LINE — it is the first paragraph of the help topic
+           'It Does Not Touch Your Counts' above. If that paragraph is ever trimmed, the app stops
+           telling the operator why the reorder plan still reads the old stock after a logged loss. */
       + '<div class="pill-wrap" style="margin-bottom:12px;">'
       + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + '<th style="width:22%;">Product</th><th style="width:11%;">Qty</th><th style="width:13%;">Unit</th>'
