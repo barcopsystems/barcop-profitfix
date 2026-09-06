@@ -49,7 +49,7 @@ S.ShiftWalkedTabs = {
       { p: ['A walked tab is real money out the door: a customer who leaves without paying, a mis-billed check, a lost ticket. Log it while it is fresh so the loss lands on the right server and shift instead of evaporating into the weekly total.'] },
       { h: 'Logging one', p: ['Pick the server who had the table, the amount, the reason, and the manager who absorbed the loss. The reason codes (Walked, Mis-bill, Refused to Pay, Lost Check, Other) let you tell a dine-and-dash from a billing mistake.'] },
       { h: 'What it feeds', p: ['The log attributes losses to the right server and shift and surfaces a server walk-rate trend over time. It also feeds Books shrinkage attribution.'] },
-      { h: 'Filter and Export', p: ['Use the range chips (This Week, Last Week, This Month, Last 4 Weeks, All) or a custom date range, and the entry count and total loss update to match. Export PDF saves the filtered list.'] }
+      { h: 'Filter and Export', p: ['Use the range chips (This Week, Last Week, This Month, Last 4 Weeks, All) or a custom date range, and the entry count and total loss update to match. Export PDF saves the filtered list, and Worksheet prints a blank sheet to write a walked tab down at the bar while the check is still in hand.'] }
     ]);
   },
 
@@ -133,7 +133,7 @@ S.ShiftWalkedTabs = {
     const totalLoss = filtered.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
     const formCard = '<div class="card form-card">'
-      + App.collapsibleCardTitle('sc-walked-tabs', 'Record Walked Tab')
+      + App.collapsibleCardTitle('sc-walked-tabs', 'Record Walked Tab', '<button class="btn btn-ghost btn-sm no-print" id="wt-print-blank" type="button">Worksheet</button>')
       + '<div class="collapse-body">'
       + this.formFields(null)
       + '</div></div>'
@@ -189,6 +189,7 @@ S.ShiftWalkedTabs = {
     this.container.onclick = ev => {
       const head = ev.target.closest('.card-collapse-head');
       if (head && !ev.target.closest('.btn')) { App.toggleCollapse(head); return; }
+      if (ev.target.closest('#wt-print-blank')) { this.printBlank(); return; }
       const chip = ev.target.closest('.wt-range-chip');
       if (chip) {
         const v = chip.dataset.v;
@@ -232,6 +233,24 @@ S.ShiftWalkedTabs = {
   },
 
   // Edit in a focused pop-up (own wte- ids). Cancel closes it.
+  /* A blank sheet for the bar: a walked tab gets written down the moment it happens, while
+     the check is still in hand. Manager enters the rows after close. */
+  printBlank() {
+    App.printBlankSheet({
+      title: 'Walked Tabs',
+      subtitle: 'Write down a walked tab as it happens, with the check in hand. The manager enters each row into Bar Cop after close.',
+      columns: [
+        { label: 'Date',    width: '12%' },
+        { label: 'Time',    width: '10%' },
+        { label: 'Server',  width: '18%' },
+        { label: 'Amount',  width: '12%' },
+        { label: 'Check #', width: '12%' },
+        { label: 'Reason',  width: '16%' },
+        { label: 'Manager', width: '20%' }
+      ],
+      rows: 16
+    });
+  },
   openEditModal(id) {
     const r = this.tabs().find(x => x.id === id);
     if (!r) return;
