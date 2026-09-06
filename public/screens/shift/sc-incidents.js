@@ -72,20 +72,31 @@ S.ShiftIncidents = {
     const typeOpts = this.TYPES.map(x => '<option' + ((r ? r.type : '') === x ? ' selected' : '') + '>' + x + '</option>').join('');
     const sevOpts = this.SEVERITIES.map(x => '<option' + ((r ? r.severity : 'Medium') === x ? ' selected' : '') + '>' + x + '</option>').join('');
     const statOpts = this.STATUSES.map(s => '<option' + ((r ? r.status : 'Open') === s ? ' selected' : '') + '>' + s + '</option>').join('');
+    /* ⛔ FIVE AND FIVE, ON ONE COLUMN WIDTH. Kyle, 2026-09-06: *"make the top 2 rows 5 equal
+       columns... what happened and action taken stay as is."* The ten cells were split 6 and 4 at
+       eight bespoke widths (150/120/160/flex/120/130 then four flex:1s), so neither row was even
+       and the two never lined up.
+       ⭐ ONLY THE BREAK MOVED, not the reading order: Status was the sixth cell and is now the
+       first of row two, which keeps Date-Time-Location-Type-Severity together and puts Status
+       with the people who handled it.
+       ⚠ `flex:0 0 calc((100% - 48px) / 5)` — a fifth of the row minus its four 12px gaps, with no
+       grow, so a row that ever holds fewer than five still sits on the same columns. Flex, not
+       grid, so the app's phone rule (`.form-row > .f{flex:1 1 100%!important}`) still stacks it.
+       ⚠ WHAT HAPPENED and ACTION TAKEN are untouched: full-width textareas in their own rows. */
     return '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="width:150px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || '') + '"/></div>'
-      + '<div class="f" style="width:160px;flex-shrink:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Main bar"/></div>'
-      + '<div class="f" style="flex:1;min-width:160px;"><label>Type' + App.manageListLink('incident_type') + '</label>' + App.customSelect({ id: p + 'type', key: 'incident_type', builtin: this.TYPES, selected: (r ? r.type : ''), blank: true, blankLabel: 'Select type...' }) + '</div>'
-      + '<div class="f" style="width:120px;flex-shrink:0;"><label>Severity</label><select id="' + p + 'severity">' + sevOpts + '</select></div>'
-      + '<div class="f" style="width:130px;flex-shrink:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || '') + '"/></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Location</label><input type="text" id="' + p + 'loc" autocomplete="off" value="' + esc(r?.location || '') + '" placeholder="e.g. Main bar"/></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Type' + App.manageListLink('incident_type') + '</label>' + App.customSelect({ id: p + 'type', key: 'incident_type', builtin: this.TYPES, selected: (r ? r.type : ''), blank: true, blankLabel: 'Select type...' }) + '</div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Severity</label><select id="' + p + 'severity">' + sevOpts + '</select></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;flex-wrap:wrap;">'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>Confirmed By</label><select id="' + p + 'confirm">' + App.staffOptions(r?.confirmed_by_id || r?.confirmed_by, { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
-      + '<div class="f" style="flex:1;min-width:150px;"><label>People Involved</label><input type="text" id="' + p + 'people" autocomplete="off" value="' + esc(r?.people_involved || '') + '" placeholder="Guests and / or staff"/></div>'
-      + '<div class="f" style="flex:1;min-width:140px;"><label>Witnesses <span style="color:var(--t4);font-weight:400;">(optional)</span></label><input type="text" id="' + p + 'witnesses" autocomplete="off" value="' + esc(r?.witnesses || '') + '" placeholder="Who saw it"/></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Status</label><select id="' + p + 'status">' + statOpts + '</select></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Reported By</label><select id="' + p + 'by">' + App.staffOptions(r?.reported_by_id || r?.reported_by, { placeholder: 'Select staff...' }) + '</select></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Confirmed By</label><select id="' + p + 'confirm">' + App.staffOptions(r?.confirmed_by_id || r?.confirmed_by, { placeholder: 'Select manager...', audience: 'supervisor' }) + '</select></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>People Involved</label><input type="text" id="' + p + 'people" autocomplete="off" value="' + esc(r?.people_involved || '') + '" placeholder="Guests and / or staff"/></div>'
+      + '<div class="f" style="flex:0 0 calc((100% - 48px) / 5);min-width:0;"><label>Witnesses <span style="color:var(--t4);font-weight:400;">(optional)</span></label><input type="text" id="' + p + 'witnesses" autocomplete="off" value="' + esc(r?.witnesses || '') + '" placeholder="Who saw it"/></div>'
       + '</div>'
 
       + '<div class="form-row" style="gap:12px;"><div class="f" style="width:100%;"><label>What Happened</label>'
