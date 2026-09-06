@@ -192,23 +192,33 @@ S.HubPermits = {
       +   stat('Expired', expiredCt, expiredCt > 0 ? 'var(--red)' : '')
       + '</div></div>';
 
-    // Inline Add Permit form, on the page under the stats. Heads Up (the legal
-    // disclaimer) lives at the bottom inside the card; the buttons sit below it.
+    /* ⛔ THE HEADS UP BOX IS OFF THE FORM (Kyle, 2026-09-06: *"remove the Heads up box on the
+       form, keep it in the i help"*). It read: "Bar Cop tracks the dates you enter. It does not
+       verify them and is not legal advice. Confirm requirements and deadlines with your issuing
+       agency."
+       ⚠ NOTHING WAS LOST, AND THAT WAS CHECKED BEFORE IT WENT. `App._HUB_HELP.permits` already
+       carries the same disclaimer under "Good to know", in a fuller form — it names what is not
+       verified ("valid, current, or accepted by any agency"), which the box did not. The legal
+       posture is unchanged; it is stated once, where the operator goes to read. */
+    // Inline Add Permit form, on the page under the stats.
     const typeOpts  = this.TYPES.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
     const recurOpts = this.RECURRENCES.map(r => '<option value="' + esc(r) + '"' + (r === 'Annual' ? ' selected' : '') + '>' + esc(r) + '</option>').join('');
-    const headsUpInside = '<div style="border:1px solid var(--gold-tint-bord);background:var(--gold-tint);border-radius:6px;padding:12px 14px;margin-top:18px;">'
-      + '<div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:5px;">Heads Up</div>'
-      + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop tracks the dates you enter. It does not verify them and is not legal advice. Confirm requirements and deadlines with your issuing agency.</div>'
-      + '</div>';
+    const col = 'flex:0 0 calc((100% - 56px) / 5);min-width:0;';
+
     const addCard = '<div class="card form-card">'
       + App.collapsibleCardTitle('hpa-add', 'Record Permit')
       + '<div class="collapse-body">'
       + '<div class="form-row" style="gap:14px;flex-wrap:wrap;">'
-      +   '<div class="f" style="flex:1 1 120px;min-width:100px;"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
-      +   '<div class="f" style="width:220px;"><label>Type' + App.manageListLink('permit_type') + '</label>' + App.customSelect({ id: 'hpa-type', key: 'permit_type', builtin: this.TYPES, blank: true, blankLabel: 'Select type...' }) + '</div>'
-      +   '<div class="f" style="width:120px;"><label>Recurrence</label><select id="hpa-recurrence">' + recurOpts + '</select></div>'
-      +   '<div class="f" style="width:150px;"><label>Next Renewal Date</label><input type="date" id="hpa-renewal"/></div>'
-      +   '<div class="f" style="width:150px;"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
+      /* ⛔ FIVE EQUAL COLUMNS (Kyle, 2026-09-06). They were 120-flex/220/120/150/150, so Name grew
+         into whatever the four fixed cells left and the row read as one long box and four stubs.
+         ⚠ `flex:0 0 calc((100% - 56px) / 5)` — a fifth minus the four 14px gaps, no grow. These
+         cells are `hpa-` and single-use, so unlike the walked-tab and maintenance forms there is
+         no pop-up sharing them and no conditional needed. */
+      +   '<div class="f" style="' + col + '"><label>Name</label><input type="text" id="hpa-name" placeholder="Texas Mixed Beverage Permit"/></div>'
+      +   '<div class="f" style="' + col + '"><label>Type' + App.manageListLink('permit_type') + '</label>' + App.customSelect({ id: 'hpa-type', key: 'permit_type', builtin: this.TYPES, blank: true, blankLabel: 'Select type...' }) + '</div>'
+      +   '<div class="f" style="' + col + '"><label>Recurrence</label><select id="hpa-recurrence">' + recurOpts + '</select></div>'
+      +   '<div class="f" style="' + col + '"><label>Next Renewal Date</label><input type="date" id="hpa-renewal"/></div>'
+      +   '<div class="f" style="' + col + '"><label>Last Renewed</label><input type="date" id="hpa-last"/></div>'
       /* ⛔⛔ THE LAST COST BOX WAS HERE AND IT IS GONE (build piece 5). This tracker holds no money,
          same as `sc-maintenance` and `sc-incidents`: the status is the whole record. A permit fee is
          an ordinary operating expense logged at the one Money Out door and it reaches the P&L's
@@ -217,7 +227,6 @@ S.HubPermits = {
       + '</div>'
       + App.noteField({ id: 'hpa-notes', placeholder: 'Issuing agency, account number, contact' })
       + '<div id="hpa-err" style="display:none;font-size:11px;color:var(--red);margin-top:10px;"></div>'
-      + headsUpInside
       + '</div>'
       + '</div>';
     const addButtons = '<div data-collapse-group="hpa-add" style="margin:16px 0 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
