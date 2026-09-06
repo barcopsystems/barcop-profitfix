@@ -61,13 +61,23 @@ S.ShiftWalkedTabs = {
     const v = val => (val != null && val !== '') ? val : '';
     const reasonOpts = this.REASONS.map(rs => '<option' + (r && r.reason === rs ? ' selected' : '') + '>' + esc(rs) + '</option>').join('');
     const inline = p === 'wt-';
-    const dateCell   = '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>';
-    const timeCell   = '<div class="f" style="width:110px;flex-shrink:0;"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || this.nowTime()) + '"/></div>';
-    const serverCell = '<div class="f" style="flex:1;min-width:140px;"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>';
-    const amountCell = '<div class="f" style="width:120px;flex-shrink:0;"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>';
-    const checkCell  = '<div class="f" style="width:110px;flex-shrink:0;"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>';
-    const reasonCell = '<div class="f" style="width:145px;flex-shrink:0;"><label>Reason</label><select id="' + p + 'reason">' + reasonOpts + '</select></div>';
-    const mgrCell    = '<div class="f" style="width:165px;flex-shrink:0;"><label>Manager</label><select id="' + p + 'mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>';
+    /* ⛔ SEVEN EQUAL COLUMNS ON THE INLINE FORM (Kyle, 2026-09-06: *"walked tabs, 7 equal
+       columns"*). The cells were 140/110/flex:1/120/110/145/165 — seven different widths on one
+       row, so Server stretched into whatever was left and nothing lined up.
+       ⚠ THE SAME SEVEN CELLS BUILD THE EDIT POP-UP, which is a narrower modal and splits them
+       4 + 3. A seven-column share there would leave three cells huddled at the left of row two,
+       so `cw` hands the pop-up back exactly the widths it always had. One definition, two
+       layouts — which is why the widths live here and not on the rows.
+       ⚠ `flex:0 0 calc((100% - 72px) / 7)` — a seventh of the row minus its six 12px gaps, with
+       no grow, so nothing stretches to fill a short row. */
+    const cw = w => inline ? 'flex:0 0 calc((100% - 72px) / 7);min-width:0;' : w;
+    const dateCell   = '<div class="f" style="' + cw('width:140px;flex-shrink:0;') + '"><label>Date</label><input type="date" id="' + p + 'date" value="' + esc(r?.date || App.todayLocal()) + '"/></div>';
+    const timeCell   = '<div class="f" style="' + cw('width:110px;flex-shrink:0;') + '"><label>Time</label><input type="time" id="' + p + 'time" value="' + esc(r?.time || this.nowTime()) + '"/></div>';
+    const serverCell = '<div class="f" style="' + cw('flex:1;min-width:140px;') + '"><label>Server</label><select id="' + p + 'server">' + App.staffOptions(r?.server_id || r?.server, { placeholder: 'Select staff...', audience: 'service' }) + '</select></div>';
+    const amountCell = '<div class="f" style="' + cw('width:120px;flex-shrink:0;') + '"><label>Amount</label><div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'amount" min="0" step="0.01" value="' + v(r?.amount) + '" placeholder="0.00"/></div></div>';
+    const checkCell  = '<div class="f" style="' + cw('width:110px;flex-shrink:0;') + '"><label>Check #</label><input type="text" id="' + p + 'check" value="' + esc(r?.check_ref || '') + '" placeholder="Optional"/></div>';
+    const reasonCell = '<div class="f" style="' + cw('width:145px;flex-shrink:0;') + '"><label>Reason</label><select id="' + p + 'reason">' + reasonOpts + '</select></div>';
+    const mgrCell    = '<div class="f" style="' + cw('width:165px;flex-shrink:0;') + '"><label>Manager</label><select id="' + p + 'mgr">' + App.staffOptions(r?.manager_id || App.activeManagerId(), { placeholder: 'Select staff...', audience: 'supervisor' }) + '</select></div>';
     const notesRow   = App.noteField({ id: p + 'notes', value: r?.notes, placeholder: 'What happened. Did the customer leave during a rush? Anything that helps you spot patterns later.' });
     // Inline log form: every data cell on one row (wraps when narrow). The edit
     // pop-up is a narrower modal, so it keeps a two-row split.
