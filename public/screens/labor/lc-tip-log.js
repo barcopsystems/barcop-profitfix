@@ -257,26 +257,22 @@ S.LaborTipLog = {
     // it hides with the card.
     const modeBody = this.batchBody();
     const note = this._savedNote; this._savedNote = null;   // show once, after a save
-    const justClosed = this._closedNote; this._closedNote = null;
-    /* ⛔ TWO ACTIONS, AND THEY ARE NOT THE SAME THING. Save Tips banks one person as they check
-       out and can be pressed all night; CLOSE SHIFT is the single action at the end that turns the
-       whole shift into a settled record. Nothing downstream counts a shift until it is closed, so
-       the difference is the difference between a working note and a figure on a tax worksheet. */
-    const closed = this.shiftClosed(this._addDate, this._addShiftType);
+    /* ⛔⛔⛔ ONE BUTTON. Kyle, 2026-09-05, after using a build that had Save, Close Shift and
+       Re-open: *"get rid of the locked screens, and make it just like tip pool is now: you click
+       save, it saves the record; if I change something and click save it gives a prompt to
+       override what is already saved, and it changes the new entry. That is easier and less
+       friction for the user."*
+       ⚠ FOUR OF HIS SEVEN COMPLAINTS WERE ONE DEFECT. Edit landed on a locked form and could not
+       be typed in; closing after a re-open printed "Shift closed." twice (a persistent label AND
+       a one-shot banner, both rendering); and a re-opened shift showed Save beside Close with no
+       way to tell which one ended the night. A lock nobody asked for produced all of it.
+       ⭐ SAVING IS THE ONLY STATE-CHANGING ACT NOW, and it is the same act the Tip Pool tab has
+       always used: press it, the record exists; press it again and it asks before overwriting. */
     const actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-      + (closed
-          /* ⚠ A LABEL, NOT A SENTENCE. The first version explained here that a closed shift's tips
-             are in the books and reports, which is card PROSE and `verify-design-code` RULE 2b
-             refused it, correctly. The card carries the state; the explanation belongs in the
-             screen's own directions, where it now is. */
-          ? '<button class="btn btn-ghost" id="tl-reopen">Re-open Shift</button>'
-            + '<span style="font-size:12px;color:var(--t2);margin-left:4px;">Shift closed.</span>'
-          : '<button class="btn btn-primary" id="tl-save-all">Save Tips</button>'
-            + '<button class="btn btn-ghost" id="tl-close-shift">Close Shift</button>'
-            + '<button class="btn btn-ghost" id="tl-startover">Start Over</button>')
+      + '<button class="btn btn-primary" id="tl-save-all">Save Log Tips</button>'
+      + '<button class="btn btn-ghost" id="tl-startover">Clear Amounts</button>'
       + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '.</span>' : '')
-      + (justClosed ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Shift closed.</span>' : '')
       + '</div>';
     const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tl-print-blank" type="button">Worksheet</button>';
     // Tabs OUTSIDE the card, so they are the screen's first child (which is what
@@ -376,9 +372,16 @@ S.LaborTipLog = {
       if (ev.target.closest('#tl-export')) { const r = this.effectiveRange(); App.exportListPDF({ title: 'Tip Log', root: this.container, lists: [['lc', 'tip']], reRender: () => this.renderList(), range: App.chipRangeLabel(this.RANGE_CHIPS, this.filterPreset, r.from, r.to) }); return; }
       if (ev.target.closest('#tl-print-blank')) { this.printBlank(); return; }
       if (ev.target.closest('#tl-save-all')) { this.saveBatch(); return; }
-      if (ev.target.closest('#tl-close-shift')) { this.closeShift(); return; }
-      if (ev.target.closest('#tl-reopen')) { this.reopenShift(); return; }
-      if (ev.target.closest('#tl-startover')) { this._addRows = []; this._savedNote = null; this.renderList(); return; }
+      /* ⛔ IT CLEARS THE AMOUNTS, NOT THE CREW. Kyle: *"the start over button clears the entire
+         list of staff and you have to click the day pill again to reload them, I thought start
+         over was just supposed to clear the entered tips/sales."* It emptied `_addRows`, which is
+         the crew, so the fix is to keep every row and blank what was typed into it. Renamed with
+         it, because "Start Over" is what described the old behaviour. */
+      if (ev.target.closest('#tl-startover')) {
+        this.collectBatch();
+        (this._addRows || []).forEach(r => { r.cash = ''; r.card = ''; r.sales = ''; r.received = ''; });
+        this._savedNote = null; this.renderList(); return;
+      }
       const tlRange = ev.target.closest('.tl-range-chip');
       if (tlRange) {
         const v = tlRange.dataset.v;
@@ -591,49 +594,14 @@ S.LaborTipLog = {
     this._addShiftType = '';
     this.preloadFromDate(this._addDate, '');
     this.renderList();
+    /* ⚠ THE FORM IS ABOVE THE LIST, AND THE LIST IS WHERE EDIT WAS PRESSED. Kyle: *"when you
+       click edit on a staff it should jump back up to the form so you can see it."* Without this
+       the day loads correctly and the screen does not move, so the only visible effect of Edit is
+       that a chip changed colour somewhere off-screen.
+       ⚠ AFTER the render, or it scrolls to the element the render is about to replace. */
+    const card = this.container && this.container.querySelector('.form-card');
+    if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
-  shiftRows(date, period) {
-    const key = App.tipShiftKey(date || this._addDate, period != null ? period : this._addShiftType);
-    return this.tips().filter(t => App.tipShiftKey(t.date, t.shift_type) === key);
-  },
-  /* A shift is CLOSED once it has rows and none of them is still open. An EMPTY shift is not
-     closed, it is unstarted — otherwise a day nobody has touched would refuse its first save. */
-  shiftClosed(date, period) {
-    const rows = this.shiftRows(date, period);
-    return rows.length > 0 && rows.every(t => !App.tipShiftOpen(t));
-  },
-  async setShiftOpen(open) {
-    const rows = this.shiftRows();
-    if (!rows.length) return true;
-    let ok = true;
-    for (const t of rows) {
-      /* ⚠ WRITE THE WHOLE RECORD BACK, not a patch. `putRecord` replaces, and the in-memory row is
-         the one every other screen is already reading, so mutating it and saving the same object
-         keeps the two in step instead of leaving the store ahead of the array. */
-      t.tip_shift_open = !!open;
-      ok = (await App.putRecord('lc', 'tip', t)) && ok;
-    }
-    return ok;
-  },
-  async closeShift() {
-    const err = document.getElementById('tl-err');
-    const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
-    if (!this._addDate) { fail('Pick a day.'); return; }
-    // Save whatever is on screen first, so Close never silently drops the last person entered.
-    await this.saveBatch({ silent: true });
-    if (!this.shiftRows().length) { fail('Nothing to close on this shift yet.'); return; }
-    const btn = document.getElementById('tl-close-shift');
-    if (btn) { btn.disabled = true; btn.textContent = 'Closing...'; }
-    const ok = await this.setShiftOpen(false);
-    if (ok) { this._savedNote = null; this._closedNote = true; this.renderList(); }
-    else { if (btn) { btn.disabled = false; btn.textContent = 'Close Shift'; } fail('Could not close the shift. Try again.'); }
-  },
-  async reopenShift() {
-    if (!this.shiftRows().length) return;
-    const ok = await this.setShiftOpen(true);
-    if (ok) { this._closedNote = null; this.renderList(); }
-  },
-
   // Read the batch rows back into state for re-renders and save (the day + period
   // come from the anchor chips, not a form field).
   collectBatch() {
@@ -750,6 +718,22 @@ S.LaborTipLog = {
   },
 
   // Read the current rows from the DOM (shared by recalc + ready count).
+  /* What a person's hours are on a given day: what they LOGGED, else what they were SCHEDULED.
+     Two callers need the same answer — the day's preload and the row's staff picker — and having
+     them disagree is how a row ends up showing one person's hours under another person's name. */
+  hoursForStaffOnDate(staffId, date) {
+    if (!staffId || !date) return null;
+    const logged = App.hoursFor(staffId, date);
+    if (logged != null && logged > 0) return logged;
+    const sched = this.scheduleForDate(date);
+    if (!sched) return null;
+    const dayName = this.dayNameFor(date);
+    let h = 0;
+    (sched.shifts || []).forEach(sh => {
+      if (sh.day === dayName && sh.staff_id === staffId) h += this.schedHours(sh);
+    });
+    return h > 0 ? +h.toFixed(2) : null;
+  },
   batchDomRows() {
     return [...document.querySelectorAll('#tl-b-rows .tl-line')].map(el => ({
       staff_id: el.querySelector('.tl-b-staff')?.value || '',
@@ -790,7 +774,7 @@ S.LaborTipLog = {
     }
     const n = this.batchReadyCount();
     const btn = document.getElementById('tl-save-all');
-    if (btn && !btn.disabled) btn.textContent = n > 0 ? 'Save ' + n + ' Entr' + (n === 1 ? 'y' : 'ies') : 'Save Tips';
+    if (btn && !btn.disabled) btn.textContent = n > 0 ? 'Save ' + n + ' Entr' + (n === 1 ? 'y' : 'ies') : 'Save Log Tips';
   },
   batchReadyCount() {
     return this.computeTipOut(this.batchDomRows()).filter(o => o.staff_id && (o.cash + o.card > 0 || o.received > 0)).length;
@@ -809,13 +793,22 @@ S.LaborTipLog = {
     if (rowsEl) {
       rowsEl.addEventListener('input', () => { this.collectBatch(); this.recalcBatch(); });
       rowsEl.addEventListener('change', ev => {
-        // Picking a staff member auto-fills that row's hours from logged hours.
+        /* ⛔ THE HOURS FOLLOW THE PERSON, ALWAYS. Kyle: *"it loads a staff hours but if you
+           change the staff name the hours don't change with it, and some staff just says 'auto'
+           and never does anything."* Both came from one condition: `!hoursInp.value` meant the
+           lookup only ran on an EMPTY box, and every preloaded row already has hours — so picking
+           a different person left the previous person's hours sitting under their name, which is
+           what a pool divides by. The "Auto" placeholder was the other half: it promised a fill
+           that never came for anyone whose box was already full.
+           ⭐ AND IT FALLS BACK TO THE SCHEDULE. `App.hoursFor` only knows what was LOGGED, so
+           somebody rostered but not yet clocked returned null and the row stayed blank. The
+           schedule is the honest second answer and it is what the day's own preload uses. */
         if (ev.target.classList && ev.target.classList.contains('tl-b-staff')) {
           const hoursInp = ev.target.closest('.tl-line')?.querySelector('.tl-b-hours');
           const date = this.batchDate();
-          if (hoursInp && !hoursInp.value && date) {
-            const hrs = App.hoursFor(ev.target.value, date);
-            if (hrs != null && hrs > 0) hoursInp.value = hrs;
+          if (hoursInp && date) {
+            const hrs = this.hoursForStaffOnDate(ev.target.value, date);
+            hoursInp.value = (hrs != null && hrs > 0) ? hrs : '';
           }
           // Reshape the row to the picked staff's role (earner = Sales box,
           // support = Received box) by re-rendering, preserving entered values.
@@ -848,22 +841,13 @@ S.LaborTipLog = {
     const fail = m => { if (err) { err.textContent = m; err.style.display = 'inline'; } };
     const date = this._addDate || '';
     if (!date) { fail('Pick a day.'); return; }
-    /* ⛔ A CLOSED SHIFT IS LOCKED. Kyle's call: closing is the end of the night, so a stray save
-       afterwards must not quietly rewrite a settled record. Re-open is deliberate and one click.
-       ⚠ It refuses here rather than disabling the button alone, because a re-render rebuilds a
-       disabled button ENABLED ([[the-loop]] #85) — the disabled attribute is the courtesy, this is
-       the guard. */
-    if (this.shiftClosed(date, this._addShiftType)) {
-      fail('This shift is closed. Re-open it to change anything.');
-      return;
-    }
     const shiftType = this._addShiftType || '';
     const shiftId = App.tipShiftKey(date, shiftType);
     const managerId = App.activeManagerId ? App.activeManagerId() : '';
 
     const tipOutOn = App.tipOutEnabled();
     const out = this.computeTipOut(this._addRows || []);
-    const recs = [];
+    const recs = [], overwrites = [];
     /* ⛔⛔⛔ THIS UPSERTS. It used to REFUSE anyone already logged for the day and period, counting
        them as duplicates, which is what made the crew have to be filtered off the screen in the
        first place. With the whole shift on screen, pressing Save with nine people already entered
@@ -883,6 +867,7 @@ S.LaborTipLog = {
       // the screen all night (Kyle: they stay until closed out); they simply leave no row behind.
       if ((o.cash + o.card) <= 0 && o.received <= 0) return;
       const prior = this.tips().find(t => t.staff_id === staff.id && App.tipShiftKey(t.date, t.shift_type) === shiftId);
+      if (prior) overwrites.push(staff.name);
       const h = (r.hours !== '' && r.hours != null) ? parseFloat(r.hours) : null;
       const r2 = n => Math.round((n || 0) * 100) / 100;
       recs.push({
@@ -892,16 +877,40 @@ S.LaborTipLog = {
         sales: tipOutOn ? r2(o.sales) : 0,
         tip_out_paid: tipOutOn ? r2(o.paid) : 0,
         tip_out_received: tipOutOn ? r2(o.received) : 0,
-        /* ⛔ EVERY ROW SAVED HERE IS OPEN UNTIL THE SHIFT IS CLOSED. Save-as-you-go means a record
-           exists from the moment a server is checked out, so nothing can be lost on any device —
-           but a half-entered night must not reach the tip-credit check or Form 8027 until the
-           manager has reconciled the cash. `App.settledTips` is the one door that decides. */
-        tip_shift_open: true,
+        /* ⛔⛔ NOTHING WRITES `tip_shift_open` ANY MORE, AND REMOVING THE BUTTON WITHOUT REMOVING
+           THIS WOULD HAVE SHIPPED A SILENT HOLE. Six screens read `App.settledTips` — Books twice,
+           Week in Review, Year End twice, Labor Reports — and it drops any row flagged open. With
+           the row still stamped `true` and no Close button left to clear it, every tip saved from
+           today would have been invisible to all six, forever, with nothing on screen to say so.
+           ⭐ `App.settledTips` AND `App.tipShiftOpen` STAY. An absent flag reads as settled, which
+           is what every record written before the lock existed already does, so the six callers
+           keep working unchanged and the door survives if a close step is ever wanted again. */
         hours: (h != null && !isNaN(h)) ? h : null, notes: (prior && prior.notes) || '',
         created_at: (prior && prior.created_at) || new Date().toISOString()
       });
     });
     if (!recs.length) { if (!opts.silent) fail('Enter cash or card tips for at least one person.'); return; }
+
+    /* ⭐ ASK BEFORE REPLACING, WHICH IS WHAT THE POOL TAB ALREADY DOES. Kyle, 2026-09-05: *"if I
+       change something and click save it gives a prompt to override what is already saved, and it
+       changes the new entry. That is easier and less friction for the user."* This is what stands
+       in for the lock: one confirm at the moment something is actually about to be rewritten,
+       rather than a mode the whole screen sits in.
+       ⚠ IT ASKS ONLY WHEN THERE IS SOMETHING TO OVERWRITE. A first save, or a save that only adds
+       people to a day already part-entered, goes straight through — a prompt on every press is
+       the friction he asked me to remove, not the guard he asked for.
+       ⚠ AND IT RUNS BEFORE THE BUTTON IS DISABLED, so cancelling leaves nothing to restore. */
+    if (!opts.silent && overwrites.length) {
+      const okOver = await App.confirm({
+        title: 'Replace what is already saved?',
+        message: overwrites.length + ' entr' + (overwrites.length === 1 ? 'y is' : 'ies are') + ' already saved for '
+          + this.fmtDate(date) + ' (' + overwrites.slice(0, 4).join(', ')
+          + (overwrites.length > 4 ? ' and ' + (overwrites.length - 4) + ' more' : '')
+          + '). Saving replaces what is on file with what is on screen.',
+        confirmText: 'Replace', cancelText: 'Cancel', danger: false
+      });
+      if (!okOver) return;
+    }
 
     const btn = document.getElementById('tl-save-all');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
