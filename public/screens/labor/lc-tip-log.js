@@ -269,7 +269,7 @@ S.LaborTipLog = {
        always used: press it, the record exists; press it again and it asks before overwriting. */
     const actionRow = '<div data-collapse-group="lc-tip-log" style="margin:16px 0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn btn-primary" id="tl-save-all">Save Log Tips</button>'
-      + '<button class="btn btn-ghost" id="tl-startover">Clear Amounts</button>'
+      + '<button class="btn btn-ghost" id="tl-startover">Start Over</button>'
       + '<span id="tl-err" style="color:var(--red);font-size:12px;margin-left:8px;display:none;"></span>'
       + (note ? '<span style="color:var(--gold);font-size:12px;margin-left:8px;">Saved ' + note + ' tip entr' + (note === 1 ? 'y' : 'ies') + '.</span>' : '')
       + '</div>';
@@ -437,7 +437,12 @@ S.LaborTipLog = {
             ? 'No tipped staff were scheduled for this day. Add staff below if somebody worked.'
             : 'Pick a day above to load its scheduled tipped staff, or add staff by hand.') + '</div>' + addBtn;
     }
-    const tbl = (head, body) => '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+    /* ⛔ `wide`, BECAUSE NINE COLUMNS DO NOT COMPRESS TO A PHONE. Percentages stopped the table
+       running out the side, but the CONTENT still does: `.ing-tbl th` is `white-space:nowrap`, so
+       "Pays / Receives Tip-Out" bleeds into the Hours header, and a Remove button will not shrink
+       below about 60px. `.pill-wrap` stacks its rows into labelled cards at 680px, which is far
+       too late for this builder — the wide modifier stacks it at 900px instead. */
+    const tbl = (head, body) => '<div class="pill-wrap wide" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
     /* ⚠ THE SPLIT-SHIFT NOTE WENT WITH THE DAYPARTS. It named anyone who appeared on two shifts
@@ -921,13 +926,18 @@ S.LaborTipLog = {
        the friction he asked me to remove, not the guard he asked for.
        ⚠ AND IT RUNS BEFORE THE BUTTON IS DISABLED, so cancelling leaves nothing to restore. */
     if (!opts.silent && overwrites.length) {
+      /* ⚠ THE SAME SHAPE AS THE POOL'S, because it is the same question asked on the same screen.
+         Kyle: *"this is the tip pool warning prompt, make log tips the same style."* The title
+         names the state rather than asking one, the body says what a save does to the money, the
+         confirm reads "Save anyway", and it is a DANGER action because it overwrites a record. */
       const okOver = await App.confirm({
-        title: 'Replace what is already saved?',
-        message: overwrites.length + ' entr' + (overwrites.length === 1 ? 'y is' : 'ies are') + ' already saved for '
-          + this.fmtDate(date) + ' (' + overwrites.slice(0, 4).join(', ')
+        title: 'Tips are already saved for that day',
+        message: 'That day already has ' + overwrites.length + ' entr' + (overwrites.length === 1 ? 'y' : 'ies')
+          + ' on file (' + overwrites.slice(0, 4).join(', ')
           + (overwrites.length > 4 ? ' and ' + (overwrites.length - 4) + ' more' : '')
-          + '). Saving replaces what is on file with what is on screen.',
-        confirmText: 'Replace', cancelText: 'Cancel', danger: false
+          + '). Saving replaces what is stored with what is on screen, including the tip-credit check'
+          + ' and the payroll worksheet. Cancel unless you meant to change what was banked.',
+        confirmText: 'Save anyway', cancelText: 'Cancel', danger: true
       });
       if (!okOver) return;
     }
@@ -1056,7 +1066,7 @@ S.LaborTipLog = {
     const rows = this._poolRows || [];
     const rowHtml = rows.map((r, i) => this.poolRowHtml(r, i, equal)).join('');
     const rowsBlock = rows.length
-      ? '<div class="pill-wrap" style="margin-bottom:12px;">'
+      ? '<div class="pill-wrap wide" style="margin-bottom:12px;">'
         + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:34%;">Staff</th><th style="width:17%;">Hours</th>'
         + '<th style="width:19%;">Tip Share</th><th></th><th style="width:15%;"></th>'
@@ -1074,8 +1084,9 @@ S.LaborTipLog = {
           + '<div style="font-size:11px;color:var(--t2);line-height:1.6;">Bar Cop splits the pool by the method and hours you enter. It is a calculator, not legal or payroll advice. Tip pool eligibility, mandatory versus voluntary pooling, tip credit, and distribution rules vary by jurisdiction and change over time. Managers, owners, and some non-tipped roles may be barred from a pool. Verify who can participate and the rules for your jurisdiction before distributing tips.</div>'
         + '</div>'
       : '';
-    // Two inset divider lines (not full-bleed) separate the three parts: the
-    // toggle, the day picker, and the entry below. No boxes around each part.
+    /* ⚠ ONE RULE, UNDER THE PICKER — the same fix the Log Tips card got, and I missed this half.
+       Two lines framed the week + day rows as their own band; the top one now draws immediately
+       under the card title and boxes nothing. */
     const divLine = '<div style="border-top:1px solid var(--b2);margin:14px 0 16px;"></div>';
     const wsBtn = '<button class="btn btn-ghost btn-sm no-print" id="tl-print-blank" type="button">Worksheet</button>';
     // Same move as the Log Tips card: the tabs sit above it, not inside its collapse body.
@@ -1083,7 +1094,6 @@ S.LaborTipLog = {
       + '<div class="card form-card">'
       + App.collapsibleCardTitle('lc-tip-log', 'Tips', wsBtn)
       + '<div class="collapse-body">'
-      + divLine
       + '<div id="tp-anchor">' + this.tlAnchor('tp', this._addWeekStart, this._addDate) + '</div>'
       + divLine
       + '<div class="form-row" style="gap:16px;margin-bottom:14px;flex-wrap:wrap;">'
@@ -1179,7 +1189,9 @@ S.LaborTipLog = {
       + '<td data-label="Hours"><input class="form-input tp-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '"' + (equal ? ' disabled' : '') + ' style="width:100%;"/></td>'
       + '<td data-label="Tip Share"><div class="tp-share" style="font-weight:600;color:var(--t1);">-</div></td>'
       + '<td data-label=""></td>'
-      + '<td data-label=""><button class="btn btn-ghost btn-sm tp-remove" type="button">Remove</button></td>'
+      /* ⚠ RIGHT-ALIGNED, WHICH THE FIXED 100px COLUMN USED TO DO BY ACCIDENT. Widening it to a
+         percentage for the mobile fix left the button floating in the middle of a wide cell. */
+      + '<td data-label="" style="text-align:right;"><button class="btn btn-ghost btn-sm tp-remove" type="button">Remove</button></td>'
       + '</tr>';
   },
 
