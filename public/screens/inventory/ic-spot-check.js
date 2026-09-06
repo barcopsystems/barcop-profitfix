@@ -1373,7 +1373,9 @@ S.InventorySpotCheck = {
       + '<div style="display:flex;gap:8px;"><button class="btn btn-ghost btn-sm" id="sp-export">Export PDF</button></div></div>'
       + '<div class="card" style="overflow-x:auto;"><table class="row-list"><thead><tr>'
       + '<th>Product</th><th>Category</th><th>Pre</th><th>Post</th><th>Poured</th><th>POS Sold</th>'
-      + '<th>Variance</th><th>Variance $</th><th></th>'
+      /* ⚠ 'Status' NAMES THE BADGE COLUMN (Kyle, 2026-09-06), matching the variance reports. The
+         cell below it holds the High / Over flag, which had no header to sit under. */
+      + '<th>Variance</th><th>Variance $</th><th>Status</th>'
       + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '</div>';
 

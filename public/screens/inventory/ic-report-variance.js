@@ -719,7 +719,14 @@ S.InventoryVarianceReport = {
     }).join('');
 
     const headers = '<th>Category</th><th>Theoretical Sales</th><th>Actual POS Sales</th><th>Variance</th><th>Variance %</th><th>Last Period</th>';
-    return this.dataCard(headers, body);
+    /* ⚠ FIXED LAYOUT, OR THE INPUT DECIDES THE SPACING (Kyle, 2026-09-06: *"the column spacing is
+       off between the columns"*). On auto layout the Actual POS Sales cell carries a text input and
+       took 315px while Variance got 140 and Category 150 — MEASURED on a 1182px table. The columns
+       were sized by what happened to be in them, not by anything meaningful.
+       ⭐ Category is pinned wide enough for 'Bottle Beer' and the other five divide the rest evenly,
+         the same shape usageColgroup() gives the deep-dive tables. Measured after: 170 + 5 x 202. */
+    const cg = '<colgroup><col style="width:170px;"/><col/><col/><col/><col/><col/></colgroup>';
+    return this.dataCard(headers, body, cg);
   },
 
   recomputeQuickCheck() {
@@ -944,7 +951,16 @@ S.InventoryVarianceReport = {
       const field = isBottle ? 'bottles' : 'flag';
       const suffix = isBottle ? 'btl' : '%';
       const step = isBottle ? '1' : '0.5';
-      return '<div class="f" style="width:' + (isBottle ? 150 : 120) + 'px;flex-shrink:0;">'
+      /* ⛔ SEVEN EQUAL CELLS (Kyle, 2026-09-06). They were 120px each with By the Bottle at 150,
+         so the last standard read wider than the six beside it. `flex:1 1 0` makes all seven share
+         whatever the row has left, which lands them on one width without anyone having to know it.
+         ⚠ GROW IS DELIBERATE HERE, unlike the no-grow `calc()` idiom the page forms use. This row
+           always holds the same seven cells plus Save, so there is no short-row case to protect,
+           and sharing the remainder is what keeps SAVE exactly where it is: the button keeps its
+           own flex-shrink:0 box and the seven divide what is left of the row after it.
+         ⚠ min-width:0 is load-bearing — 'By the Bottle' is the longest label and would otherwise
+           hold its cell wider than the other six on its intrinsic width alone. */
+      return '<div class="f" style="flex:1 1 0;min-width:0;">'
         + '<label>' + esc(key) + '</label>'
         + '<div class="fw"><input class="suf vr-th" type="number" data-cat="' + esc(key) + '" data-key="' + field
         + '" min="0" step="' + step + '" value="' + this.thNum(t[key][field]) + '"/><span class="suf">' + suffix + '</span></div></div>';
@@ -1187,7 +1203,10 @@ S.InventoryVarianceReport = {
 
   tabSales() {
     const restHeaders = '<th>Register Sales</th><th>Theo Sales</th><th>Sales Variance</th>'
-      + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th></th>';
+      /* ⚠ 'Status' NAMES THE BADGE COLUMN (Kyle, 2026-09-06). It was an unlabelled <th>, and the
+         Over / High flags under it read as loose text hanging off Actual Profit. The six usageTbl
+         header lists and the spot check view carry the same word for the same column. */
+      + '<th>Variance %</th><th>Actual Cost %</th><th>Actual Profit</th><th>Status</th>';
     const rows = this.salesRows();
     if (!rows.length) {
       return this.dataCard('<th>Product</th>' + restHeaders, '<tr><td colspan="8" style="color:var(--t3);padding:14px 8px;">'
@@ -1338,7 +1357,7 @@ S.InventoryVarianceReport = {
         + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge(cat, varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', '$ Var', ''], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Btls Used', 'Oz Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableBottleWine(rows, label) {
     const body = rows.map(r => {
@@ -1353,7 +1372,7 @@ S.InventoryVarianceReport = {
         + this.dCell(r.dollarVar)
         + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', '$ Var', ''], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Btl Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableDraft(rows, label) {
     const body = rows.map(r => {
@@ -1367,7 +1386,7 @@ S.InventoryVarianceReport = {
         + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge('Draft Beer', varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', '$ Var', ''], body);
+    return this.usageTbl([label, 'Oz Sold', 'Oz Used', 'Pours', 'Kegs Used', 'Oz Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableBottleBeer(rows, label) {
     const body = rows.map(r => {
@@ -1387,7 +1406,7 @@ S.InventoryVarianceReport = {
         + this.dCell(r.dollarVar)
         + '<td>' + (bottlesUsed != null ? this.badge('By the Bottle', varPct, bottleVar, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', '$ Var', ''], body);
+    return this.usageTbl([label, 'Btls Sold', 'Btls Used', 'Cases', 'Case Var', 'Btl Var', 'Var %', '$ Var', 'Status'], body);
   },
   usageTableMisc(rows, label) {
     const body = rows.map(r => {
@@ -1402,7 +1421,7 @@ S.InventoryVarianceReport = {
         + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge('Misc', varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', '$ Var', ''], body);
+    return this.usageTbl([label, 'Recipe Qt', 'Counted Qt', 'Qt Var', 'Var %', '$ Var', 'Status'], body);
   },
   foodUnit(name) { const m = /\(([^)]+)\)\s*$/.exec(name || ''); return m ? m[1].trim() : 'unit'; },
   foodName(name) { return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim(); },
@@ -1421,7 +1440,7 @@ S.InventoryVarianceReport = {
         + this.dCell(r.dollarVar)
         + '<td>' + (varPct != null ? this.badge('Food', varPct, null, r.pid, r.name) : '') + '</td></tr>';
     }).join('');
-    return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', '$ Var', ''], body);
+    return this.usageTbl([label, 'Unit', 'Recipe Use', 'Counted Use', 'Use Var', 'Var %', '$ Var', 'Status'], body);
   },
   renderUsageCat(cat, rows) {
     // Misc rows are mixers, Food rows are recipe ingredients — name them so.
