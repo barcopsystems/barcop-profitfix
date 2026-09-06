@@ -501,7 +501,23 @@ S.RevenueMenuEngineering = {
       +   '<div class="f" style="width:140px;flex-shrink:0;"><label>New Price</label><div class="fw"><span class="pre">$</span>'
       +     '<input class="form-input pre" type="number" id="re-price" value="' + (Math.round(start * 100) / 100) + '" step="0.01" oninput="S.RevenueMenuEngineering.reCalc()"/></div></div>'
       +   '<div class="f" style="width:160px;flex-shrink:0;"><label>Expected Volume Change</label><div class="fw"><input class="form-input suf" type="number" id="re-vol" value="' + (item.planned_vol_pct != null ? item.planned_vol_pct : '') + '" step="1" placeholder="0" oninput="S.RevenueMenuEngineering.reCalc()"/><span class="suf">%</span></div></div>'
-      +   (sugg ? '<button class="btn btn-ghost btn-sm" id="re-use-sugg">Use suggested ' + f(sugg) + '</button>' : '')
+      /* ⛔ CENTRED ON THE INPUT, NOT ON THE ROW AND NOT ON THE CELL (Kyle, 2026-09-06: *"vertically
+         center the use suggested button with the data cell .. not the row.. but the cell"*).
+         ⚠ THE ROW IS `align-items:flex-end`, which put the 22px button on the 34px input's BOTTOM
+           edge — MEASURED 6px below the input's centre line.
+         ⛔ AND `align-self:center` IS THE WRONG FIX, which is why it is not used here: the two
+           cells beside it are a LABEL STACKED ON AN INPUT, so centring against the 50px cell lands
+           14px ABOVE the input. Kyle sent exactly that back once already on the Set Variance
+           Standards Save button (ic-report-variance.js), and this is that button's wrapper.
+         ⭐ NO MEASUREMENT IN IT. The wrapper stretches to the row and carries the same label band
+           the other cells do; the box below it takes what is left, which is an input tall by
+           construction, and centres inside. Measured after: both centres on 360, and the box is
+           34px — the input's own height — whatever that height later becomes. */
+      +   (sugg ? '<div class="f" style="flex-shrink:0;margin-bottom:0;align-self:stretch;display:flex;flex-direction:column;">'
+        +   '<label>&nbsp;</label>'
+        +   '<div style="flex:1;display:flex;align-items:center;">'
+        +     '<button class="btn btn-ghost btn-sm" id="re-use-sugg">Use suggested ' + f(sugg) + '</button>'
+        +   '</div></div>' : '')
       + '</div>'
       + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:var(--r2);padding:14px 18px;margin-top:6px;">'
       +   '<div style="display:flex;gap:28px;flex-wrap:wrap;">'
