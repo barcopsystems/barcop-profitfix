@@ -1038,6 +1038,14 @@ input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;}
    inside a form card. */
 .content .card:has(.form-row){container-type:inline-size;}
 @container (max-width:700px){
+  /* ⛔ RELEASE THE NOWRAP FIRST, OR THE CELLS CANNOT GO ANYWHERE. `.data-row` is
+     `flex-wrap:nowrap` (line 637), so setting its cells to a 100% basis without this just crams
+     them all onto one line at a fraction of the width they asked for — which is what Kyle saw on
+     Log Time Off and Log Call-Out the moment the container query started firing. The viewport
+     block at 768 has always carried this companion; the container block shipped without it.
+     ⚠ FIVE FORMS USE `.data-row`: lc-time-off, lc-callout-log, lc-staff-roster, lc-log-hours and
+     sc-drawers. Kyle named two; all five had it. */
+  .data-row{flex-wrap:wrap;}
   .form-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
   /* #mi-adaptive and #ip-divisor-wrap cells live one level deeper (display:contents), so the
      direct-child rule above misses them; stack them full-width too. */
