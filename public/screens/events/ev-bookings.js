@@ -589,9 +589,14 @@ S.EventsBookings = {
     };
     // Compact (the inline landing form): all data cells on two rows; notes below.
     if (compact) {
-      // Event Name leads (wider); all data cells fit on two rows, notes below.
-      const nameW = '<div class="f" style="flex:2 1 170px;"><label>Event Name</label><input type="text" id="' + p + '-name" value="' + esc(b?.event_name || '') + '" placeholder="Smith Rehearsal Dinner"/></div>';
-      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + nameW + C.cname + C.phone + C.email + C.date + C.time + '</div>'
+      /* ⛔ TWELVE CELLS, SIX TO A ROW, ALL ONE WIDTH. Kyle: *"make the 12 data cells all the same
+         width so they line up in 6 even columns."* `.eb-crow>.f` is already `flex:1 1 130px`, so
+         every cell shares its row equally by default — Event Name carried an inline `flex:2 1
+         170px` that took a double share, which both squeezed the other five on row one and threw
+         them out of line with row two.
+         ⚠ BOTH ROWS HOLD EXACTLY SIX CELLS at the same 12px gap, so removing the override is what
+         makes the two rows read as COLUMNS rather than just each row being even within itself. */
+      return '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.name + C.cname + C.phone + C.email + C.date + C.time + '</div>'
         + '<div class="form-row eb-crow" style="gap:12px;flex-wrap:wrap;">' + C.party + C.type + C.space + C.recv + C.source + C.stage + '</div>'
         + C.notes;
     }
