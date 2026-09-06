@@ -305,7 +305,19 @@ S.RevenueServerCheck = {
       + '</div>'
       + '<div id="' + p + '-result" style="margin-top:16px;">'
         + '<div style="background:var(--input);border:1px solid var(--b-edge);border-radius:8px;padding:14px 18px;">'
-          + '<div style="display:flex;align-items:center;gap:36px;flex-wrap:wrap;">'
+          /* ⛔ 20px IN THE POP-UP, 36 ON THE PAGE (Kyle, 2026-09-06: *"if the status is below standard
+             it doesn't fit in the row and gets pushed down"*). MEASURED in the Edit Shift Check
+             modal: the row is 464px and the four items plus three 36px gaps need 481px, so BELOW
+             STANDARD — the longest of the three statuses, and 138px wide at letter-spacing 2 —
+             dropped to a second line. 17px short.
+             ⚠ 20, NOT THE HOUSE 28. Walked every value against real content: at 28 and 24 a typical
+               row fits but a busy one ($149.99 against -$109.99) still wraps. 20 is the widest gap
+               that holds BOTH. A four-figure check average still wraps and that is fine — it is not
+               a per-cover number anyone rings.
+             ⚠ BRANCHED ON `narrow`, LIKE `w()` ABOVE, so the always-on page form keeps its 36px.
+               The page form is wide and never had this problem; tightening it would be changing a
+               surface nobody reported. */
+          + '<div style="display:flex;align-items:center;gap:' + (narrow ? '20px' : '36px') + ';flex-wrap:wrap;">'
             + '<div class="calc-item"><div class="calc-label">Check Average</div><div class="calc-val lg" id="' + p + '-ca">-</div></div>'
             + '<div class="calc-item"><div class="calc-label">Target</div><div class="calc-val lg" style="color:var(--t3);">' + App.fmtCurrency(targetCA) + '</div></div>'
             + '<div class="calc-item"><div class="calc-label">vs Target</div><div class="calc-val lg" id="' + p + '-var">-</div></div>'
