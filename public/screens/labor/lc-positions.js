@@ -106,36 +106,56 @@ S.LaborPositions = {
     const payVal = isSalPos
       ? ((item && item.default_salary != null && item.default_salary !== '') ? item.default_salary : '')
       : ((item && item.default_wage != null && item.default_wage !== '') ? item.default_wage : '');
-    const cs = w => narrow ? 'flex:0 1 calc(50% - 8px);min-width:140px;' : 'width:' + w + 'px;flex-shrink:0;';
+    /* ⛔ FIVE EQUAL COLUMNS, AND THE TIP FIELDS LINE UP UNDER THEM. Kyle, 2026-09-06: *"the 5
+       showing across the top row equally in 5 columns, and then the cells that open up if tipped
+       is selected align in the 2nd row with the 1st row columns."*
+       ⚠ ALL EIGHT CELLS USED TO SHARE ONE WRAPPING ROW at eight different pixel widths (200/170/
+       130/150/150/150/160/150), so picking Tipped pushed three cells onto a second line wherever
+       they happened to land — never under a column.
+       ⭐ `flex:0 0 calc((100% - 64px) / 5)` IS THE WHOLE TRICK: a fifth of the row minus the four
+       16px gaps, with NO grow. Grow is what would have stretched row two's three cells across the
+       full width and broken the alignment, and it is why a plain `flex:1 1 <basis>` — which is
+       what the roster and bookings forms use — is wrong here. Both rows compute the same column,
+       so the tip cells sit on columns 1-3.
+       ⚠ FLEX, NOT GRID, ON PURPOSE. A 5-track grid would ignore `.form-row > .f{flex:1 1 100%
+       !important}`, the app's own phone rule, and leave five 60px columns on a handset. Keeping
+       flex means that rule still stacks them. */
+    const cs = () => narrow ? 'flex:0 1 calc(50% - 8px);min-width:140px;'
+                            : 'flex:0 0 calc((100% - 64px) / 5);min-width:0;';
     return '<div class="form-row" style="gap:16px;flex-wrap:wrap;">'
-      + '<div class="f" style="' + cs(200) + '"><label>Position Name</label>'
+      + '<div class="f" style="' + cs() + '"><label>Position Name</label>'
       + '<input type="text" id="' + p + 'name" value="' + esc(item?.name || '') + '" placeholder="e.g. Bartender"/></div>'
-      + '<div class="f" style="' + cs(170) + '"><label>Department' + App.manageListLink('department') + '</label>'
+      + '<div class="f" style="' + cs() + '"><label>Department' + App.manageListLink('department') + '</label>'
       + App.customSelect({ id: p + 'dept', key: 'department', builtin: this.DEPARTMENTS, selected: (item ? item.department : 'Bar'), blank: true, blankLabel: 'Select department...' }) + '</div>'
-      + '<div class="f" style="' + cs(130) + '"><label>Pay Type</label>'
+      + '<div class="f" style="' + cs() + '"><label>Pay Type</label>'
       + '<select id="' + p + 'paytype">'
       + '<option' + (isSalPos ? '' : ' selected') + '>Hourly</option>'
       + '<option' + (isSalPos ? ' selected' : '') + '>Salary</option>'
       + '</select></div>'
-      + '<div class="f" style="' + cs(150) + '"><label id="' + p + 'pay-label">' + (isSalPos ? 'Default Salary' : 'Default Wage') + '</label>'
+      + '<div class="f" style="' + cs() + '"><label id="' + p + 'pay-label">' + (isSalPos ? 'Default Salary' : 'Default Wage') + '</label>'
       + '<div class="fw"><span class="pre">$</span><input class="pre" type="number" id="' + p + 'wage" min="0" step="0.01" '
       + 'value="' + payVal + '" placeholder="0.00"/></div></div>'
-      + '<div class="f" style="' + cs(150) + '"><label>Type</label>'
+      + '<div class="f" style="' + cs() + '"><label>Type</label>'
       + '<select id="' + p + 'tipped">'
       + '<option value="no"' + (tipped ? '' : ' selected') + '>Non-Tipped</option>'
       + '<option value="yes"' + (tipped ? ' selected' : '') + '>Tipped</option>'
       + '</select></div>'
-      + '<div class="f" id="' + p + 'pays-wrap" style="' + cs(150) + (tipped ? '' : 'display:none;') + '"><label>Pays Tip Out</label>'
+      + '</div>'
+      /* The second row is hidden whole rather than cell by cell: three hidden cells inside a
+         `.form-row` still leave its 16px bottom margin, which read as a gap under the form on
+         every non-tipped position. `wireTipFields` toggles this alongside the cells. */
+      + '<div class="form-row" id="' + p + 'tiprow" style="gap:16px;flex-wrap:wrap;' + (tipped ? '' : 'display:none;') + '">'
+      + '<div class="f" id="' + p + 'pays-wrap" style="' + cs() + (tipped ? '' : 'display:none;') + '"><label>Pays Tip Out</label>'
       + '<select id="' + p + 'pays">'
       + '<option value="no"' + (pays ? '' : ' selected') + '>No</option>'
       + '<option value="yes"' + (pays ? ' selected' : '') + '>Yes</option>'
       + '</select></div>'
-      + '<div class="f" id="' + p + 'basis-wrap" style="' + cs(160) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out On</label>'
+      + '<div class="f" id="' + p + 'basis-wrap" style="' + cs() + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out On</label>'
       + '<select id="' + p + 'basis">'
       + '<option value="sales"' + (basis === 'tips' ? '' : ' selected') + '>% of Sales</option>'
       + '<option value="tips"' + (basis === 'tips' ? ' selected' : '') + '>% of Tips</option>'
       + '</select></div>'
-      + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs(150) + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out %</label>'
+      + '<div class="f" id="' + p + 'tipout-wrap" style="' + cs() + ((tipped && pays) ? '' : 'display:none;') + '"><label>Tip Out %</label>'
       + '<div class="fw"><input class="suf" type="number" id="' + p + 'tipout" min="0" step="0.1" value="' + (item && item.tip_out_pct != null ? item.tip_out_pct : '') + '" placeholder="0"/><span class="suf">%</span></div></div>'
       + '</div>'
       + App.noteField({ id: p + 'notes', value: item?.notes });
@@ -149,9 +169,12 @@ S.LaborPositions = {
     const paysWrap = document.getElementById(p + 'pays-wrap');
     const basisWrap = document.getElementById(p + 'basis-wrap');
     const tipoutWrap = document.getElementById(p + 'tipout-wrap');
+    const tipRow = document.getElementById(p + 'tiprow');
     const refresh = () => {
       const tipped = typeEl?.value === 'yes';
       const pays = paysEl?.value === 'yes';
+      // The row itself, or a non-tipped position keeps an empty row's bottom margin.
+      if (tipRow) tipRow.style.display = tipped ? '' : 'none';
       if (paysWrap) paysWrap.style.display = tipped ? '' : 'none';
       if (basisWrap) basisWrap.style.display = (tipped && pays) ? '' : 'none';
       if (tipoutWrap) tipoutWrap.style.display = (tipped && pays) ? '' : 'none';
