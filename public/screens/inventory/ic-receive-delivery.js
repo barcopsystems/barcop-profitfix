@@ -165,16 +165,25 @@ S.InventoryReceiveDelivery = {
     // One flowing form card: delivery details up top (Worksheet across from the
     // heading), then the line-item builder, the totals box, Notes at the bottom,
     // and the save actions.
+    const eq = 'flex:0 0 calc((100% - 48px) / 5);min-width:0;';
     const formCard = '<div class="card form-card"><div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
       + '<span>Delivery Details</span>'
       + '<button class="btn btn-ghost btn-sm no-print" id="rd-worksheet" type="button">Worksheet</button>'
       + '</div>'
+      /* ⛔ FIVE EQUAL COLUMNS (Kyle, 2026-09-06). The cells ran 1.3 / 140px fixed / 1 / 1 / 1.2, so
+         Vendor and Received By took visibly more room than Invoice # and Driver and Date sat short
+         between them. `flex:0 0 calc((100% - 48px) / 5)` is a fifth of the row minus the four 12px
+         gaps, with NO grow — same idiom as ic-spot-check and lc-time-off.
+         ⚠ min-width:0 REPLACES the old 120-150px floors on purpose: leaving them in would let a
+           cell refuse to shrink below its floor on a narrow card and push the row off its fifths.
+         ⚠ THE STACK IS NOT LOST — `@container (max-width:700px)` sets `.form-row > .f` to
+           `flex:1 1 100% !important`, and an !important author rule beats this inline flex. */
       + '<div class="form-row" style="gap:12px;">'
-      + '<div class="f" style="flex:1.3;min-width:150px;"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
-      + '<div class="f" style="width:140px;flex-shrink:0;"><label>Date</label><input type="date" id="rd-date" value="' + today + '"/></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Invoice #</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1;min-width:120px;"><label>Driver</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
-      + '<div class="f" style="flex:1.2;min-width:150px;"><label>Received By</label>'
+      + '<div class="f" style="' + eq + '"><label>Vendor</label><select id="rd-vendor">' + vendorOpts + '</select></div>'
+      + '<div class="f" style="' + eq + '"><label>Date</label><input type="date" id="rd-date" value="' + today + '"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Invoice #</label><input type="text" id="rd-invoice" placeholder="Optional"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Driver</label><input type="text" id="rd-driver" placeholder="Optional"/></div>'
+      + '<div class="f" style="' + eq + '"><label>Received By</label>'
       + '<select id="rd-by">' + App.staffOptions(App.activeManagerId(), { placeholder: 'Select staff...' }) + '</select></div>'
       + '</div>'
       // Open Order picker. Hidden until a vendor with at least one open order is
