@@ -1354,7 +1354,11 @@ S.InventorySpotCheck = {
         + (it.variance_pours != null ? (it.variance_pours > 0 ? '+' : '') + it.variance_pours.toFixed(1) + ' ' + sw : '-') + '</td>'
         + '<td class="' + (it.flagged ? 'neg' : '') + '">'
         + (vd != null ? (vd > 0 ? '+' : '') + App.fmtBal(vd, 2) : '-') + '</td>'
-        + '<td><div class="row-actions">' + action + '</div></td></tr>';
+        /* ⛔ NOT `.row-actions` (Kyle, 2026-09-06). That class is the ACTION wrapper — it is
+           `display:flex;justify-content:flex-end`, so it pushed the High / Over word to the right
+           edge while its Status header sat left. There are no actions in this cell, only a status
+           word, and style.css:988 says a data cell that happens to be last stays left. */
+        + '<td>' + action + '</td></tr>';
     }).join('');
 
     const meta = (label, val, cls) =>

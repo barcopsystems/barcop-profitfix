@@ -1116,18 +1116,25 @@ S.InventoryVarianceReport = {
   },
   // Plain-English "why flagged" line shown as the investigation popup subtitle,
   // e.g. "Aperol is running 3.5% over your 2% variance standard."
-  // The last column is action-only: a right-aligned Review / Reviewing / Resolved
-  // button that opens a variance investigation for that product in Profit Recovery.
-  // An in-tolerance ("OK") row shows nothing at all — no status text, no button.
+  // The last column is the Status column: an amber Over or a red High, and nothing
+  // at all on an in-tolerance row.
   /* ⛔ NO REVIEW BUTTON AND NO INVESTIGATION (Kyle, 2026-08-23): *"instead of putting a 'Review'
      button on high variances i would rather just a amber or red text warning.. the manager can
      check it out on their own just like with the sales integrity.. i don't think either needs a
      popup checklist"*. An in-tolerance row still shows nothing at all. */
+  /* ⛔ NO `text-align:right`, AND THAT IS THE RULE, NOT A PREFERENCE (Kyle, 2026-09-06: *"the
+     column header is not aligned with the column text"*). style.css:988 already says it: action
+     cells align right, and "a data cell that happens to be last stays left like every other data
+     cell". Status is a data cell. The right-alignment was a leftover from the Review BUTTON the
+     comment above says was removed in August — the button went, its alignment did not, and the
+     word sat 70px right of its own header once the header existed to compare it against.
+     ⚠ FIX THE CELL, NEVER THE HEADER. Right-aligning the <th> would hide this by making the
+       column disagree with all seven beside it instead of with itself. */
   badge(key, pct, unitVar, pid, name) {
     if (!pid) return '';
     const lvl = this.level(key, pct, unitVar);
     if (!lvl) return '';
-    return '<div style="text-align:right;color:' + (lvl === 'High' ? 'var(--red)' : 'var(--amber)')
+    return '<div style="color:' + (lvl === 'High' ? 'var(--red)' : 'var(--amber)')
       + ';font-weight:700;white-space:nowrap;">' + lvl + '</div>';
   },
   /* ⭐ TWO WORDS OFF ONE NUMBER, AND IT IS THE OPERATOR'S OWN. `Over` is past the standard they
