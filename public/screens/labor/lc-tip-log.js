@@ -437,12 +437,13 @@ S.LaborTipLog = {
             ? 'No tipped staff were scheduled for this day. Add staff below if somebody worked.'
             : 'Pick a day above to load its scheduled tipped staff, or add staff by hand.') + '</div>' + addBtn;
     }
-    /* ⛔ `wide`, BECAUSE NINE COLUMNS DO NOT COMPRESS TO A PHONE. Percentages stopped the table
-       running out the side, but the CONTENT still does: `.ing-tbl th` is `white-space:nowrap`, so
-       "Pays / Receives Tip-Out" bleeds into the Hours header, and a Remove button will not shrink
-       below about 60px. `.pill-wrap` stacks its rows into labelled cards at 680px, which is far
-       too late for this builder — the wide modifier stacks it at 900px instead. */
-    const tbl = (head, body) => '<div class="pill-wrap wide" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
+    /* ⚠ A 900px STACK THRESHOLD WAS THE WRONG ANSWER, AND KYLE CALLED IT: *"that breaks to mobile
+       way too soon now. Why don't you just get rid of the Hours column in the pays/receives
+       tip-out section... put the mobile break back where it was, change something else."* Right —
+       stacking a desktop-width card into phone cards is a worse bug than the one it fixed. The
+       builder is EIGHT columns now, not nine, and the rest are narrower, so it fits the 680px the
+       standard `.pill-wrap` has always used. */
+    const tbl = (head, body) => '<div class="pill-wrap" style="margin-bottom:12px;"><table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
       + head + '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
     /* ⚠ THE SPLIT-SHIFT NOTE WENT WITH THE DAYPARTS. It named anyone who appeared on two shifts
@@ -480,8 +481,26 @@ S.LaborTipLog = {
        ⭐ THE STACK WAS ALWAYS THERE; nothing could reach it. The style.css comment says this
        builder should "compress then stack, never horizontal-scroll through the cramped middle
        zone" — percentages are what makes the compress half true, so no CSS had to move. */
-    const grid = '<th style="width:18%;">Pays / Receives Tip-Out</th><th style="width:8%;">Hours</th><th style="width:11%;">Cash Tips</th><th style="width:11%;">Card Tips</th><th style="width:12%;">Total Sales</th><th style="width:10%;">Tip-Out</th><th style="width:11%;">Received</th><th style="width:11%;">Net</th><th style="width:8%;"></th>';
-    const sGrid = '<th style="width:18%;">Receives Tip-Out</th><th style="width:8%;">Hours</th><th style="width:11%;"></th><th style="width:11%;"></th><th style="width:12%;"></th><th style="width:10%;"></th><th style="width:11%;">Received</th><th style="width:11%;"></th><th style="width:8%;"></th>';
+    /* ⛔ HOURS IS OFF THE EARNER TABLE. Kyle: *"hours does nothing in the pays / receives tip-out
+       section... it is only needed in the receives tip-out section to distribute the tips
+       correctly."* MEASURED against `computeTipOut`, which is the only thing on this screen that
+       turns a row into money: an earner's tip-out is `App.tipOutPaid(staff, sales, cash + card)`.
+       Hours is never read for them. It was a column of inputs asking a manager for a number that
+       changed nothing, on the screen with the least room to spare.
+       ⚠ THE VALUE IS STILL SAVED, from `hoursForStaffOnDate` at save time — see `saveBatch`.
+       `t.hours` feeds Form 8027 twice (the worksheet's own Hours column and the per-employee
+       totals), so dropping the INPUT must not drop the FIGURE.
+       ⚠ `white-space:normal` here rather than in style.css: under `table-layout:fixed` a nowrap
+       header overflows its own cell instead of widening the column, and "Pays / Receives Tip-Out"
+       is the longest label on the screen. Inline keeps every other pill builder untouched. */
+    const wrapTh = 'white-space:normal;';
+    /* ⚠ THE LAST COLUMN IS SIZED FROM THE BUTTON, MEASURED, not eyeballed. The Remove button is
+       62.5px wide (9px type, 9px side padding), and the narrowest this table is ever laid out as a
+       TABLE is a 681px container — one pixel above where `.pill-wrap` stacks it. 11% of 681 is
+       75px, which clears it. At 7% it was 48px and the button hung out of the card at every width
+       up to 1000px, which is what Kyle kept seeing. */
+    const grid = '<th style="' + wrapTh + 'width:21%;">Pays / Receives Tip-Out</th><th style="width:12%;">Cash Tips</th><th style="width:12%;">Card Tips</th><th style="width:13%;">Total Sales</th><th style="width:10%;">Tip-Out</th><th style="width:12%;">Received</th><th style="width:9%;">Net</th><th style="width:11%;"></th>';
+    const sGrid = '<th style="' + wrapTh + 'width:21%;">Receives Tip-Out</th><th style="width:12%;">Hours</th><th style="width:12%;"></th><th style="width:13%;"></th><th style="width:10%;"></th><th style="width:12%;">Received</th><th style="width:9%;"></th><th style="width:11%;"></th>';
     const eTable = tbl(grid, eBody);
     const sTable = tbl(sGrid, sBody);
     const tables = '<div id="tl-b-rows">' + eTable + sTable + '</div>';
@@ -524,7 +543,6 @@ S.LaborTipLog = {
     r = r || {};
     return '<tr class="tl-line" data-idx="' + i + '">'
       + '<td data-label="Staff"><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
-      + '<td data-label="Hours"><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
       + '<td data-label="Cash Tips"><input class="form-input tl-b-cash" type="number" min="0" step="0.01" value="' + (r.cash != null ? r.cash : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td data-label="Card Tips"><input class="form-input tl-b-card" type="number" min="0" step="0.01" value="' + (r.card != null ? r.card : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td data-label="Total Sales"><input class="form-input tl-b-sales" type="number" min="0" step="0.01" value="' + (r.sales != null && r.sales !== '' ? r.sales : '') + '" placeholder="0.00" style="width:100%;"/></td>'
@@ -545,7 +563,7 @@ S.LaborTipLog = {
     return '<tr class="tl-line" data-idx="' + i + '">'
       + '<td data-label="Staff"><select class="form-input tl-b-staff" style="width:100%;">' + App.staffOptions(r.staff_id) + '</select></td>'
       + '<td data-label="Hours"><input class="form-input tl-b-hours" type="number" min="0" step="0.25" value="' + (r.hours != null && r.hours !== '' ? r.hours : '') + '" placeholder="Auto" style="width:100%;"/></td>'
-      + '<td data-label=""></td><td data-label=""></td><td data-label=""></td><td data-label=""></td>'
+      + '<td data-label=""></td><td data-label=""></td><td data-label=""></td>'
       + '<td data-label="Received"><input class="form-input tl-b-received" type="number" min="0" step="0.01" value="' + (r.received != null && r.received !== '' ? r.received : '') + '" placeholder="0.00" style="width:100%;"/></td>'
       + '<td data-label=""></td>'
       + '<td data-label="" style="text-align:right;"><button type="button" class="btn btn-ghost btn-sm tl-b-remove">Remove</button></td>'
@@ -893,7 +911,15 @@ S.LaborTipLog = {
       if ((o.cash + o.card) <= 0 && o.received <= 0) return;
       const prior = this.tips().find(t => t.staff_id === staff.id && App.tipShiftKey(t.date, t.shift_type) === shiftId);
       if (prior) overwrites.push(staff.name);
-      const h = (r.hours !== '' && r.hours != null) ? parseFloat(r.hours) : null;
+      /* ⛔ DERIVED WHEN THERE IS NO BOX TO TYPE IN. The earner rows lost their Hours column (it
+         changed nothing on this screen), but `t.hours` is read by Form 8027 in two places — the
+         worksheet's Hours column and the per-employee totals — so the FIGURE has to survive the
+         input. `hoursForStaffOnDate` gives what the person logged, else what they were rostered,
+         which is the same answer the row was pre-filled with when the box existed.
+         ⚠ A TYPED VALUE STILL WINS, including a typed zero: support keeps its box, and a zero
+         there is data, not absence ([[empty-is-not-an-answer]]). */
+      const typed = (r.hours !== '' && r.hours != null) ? parseFloat(r.hours) : null;
+      const h = (typed != null && !isNaN(typed)) ? typed : this.hoursForStaffOnDate(r.staff_id, date);
       const r2 = n => Math.round((n || 0) * 100) / 100;
       recs.push({
         id: prior ? prior.id : App.uid(), shift_id: shiftId, manager_id: managerId, date,
@@ -1066,7 +1092,7 @@ S.LaborTipLog = {
     const rows = this._poolRows || [];
     const rowHtml = rows.map((r, i) => this.poolRowHtml(r, i, equal)).join('');
     const rowsBlock = rows.length
-      ? '<div class="pill-wrap wide" style="margin-bottom:12px;">'
+      ? '<div class="pill-wrap" style="margin-bottom:12px;">'
         + '<table class="ing-tbl pill" style="table-layout:fixed;"><thead><tr>'
         + '<th style="width:34%;">Staff</th><th style="width:17%;">Hours</th>'
         + '<th style="width:19%;">Tip Share</th><th></th><th style="width:15%;"></th>'
