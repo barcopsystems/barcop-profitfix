@@ -2954,6 +2954,7 @@ const App = {
          and it was doing the opposite: the row it wrote carried the permit's TYPE as its vendor, so
          the same fee off a bank statement imported as a second row. Build piece 5 closed that door. */
       { h: 'Marking one renewed', p: ['When you renew a permit, click Mark Renewed and set the next renewal date (Bar Cop suggests it from the recurrence). That is all this page does. What the renewal cost is a bill like any other: it comes in with your statement on Money Out, or you type it there once, and it lands on the Licenses and Permits line of your P&L.'] },
+      { h: 'Worksheet', p: ['Worksheet prints a blank sheet to walk your office wall with. Write down every permit and licence you actually hold, its issuing agency and when it renews, then enter them here so Bar Cop watches the dates.'] },
       { h: 'Good to know', p: ['Bar Cop tracks the dates you enter. It does not verify that a permit or license is valid, current, or accepted by any agency, and it is not legal advice. Confirm requirements and deadlines with your issuing agency.'] }
     ] },
     /* ⛔⛔ RENAMED AND NARROWED 2026-08-08. The sidebar has said Money Out since the one-ledger
