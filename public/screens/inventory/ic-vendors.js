@@ -1100,20 +1100,37 @@ S.InventoryVendors = {
        measured) which also carries the Date; 240 is the Size label and the Product name-over-
        category stack; 150 covers Par and Old Cost with room. Re-measure before trimming any of
        them, because each width has to clear the widest cell in TWO tables. */
-  COL_LEAD: '<col style="width:240px;"/><col style="width:240px;"/><col style="width:150px;"/>',
+  /* ⛔ ONE FIVE-TRACK GRID, AND BOTH CARDS SIT ON ALL FIVE (Kyle, 2026-09-07: *"they are too close
+     to the par/old cost column.. they need moved more to the right and centered between par/old
+     cost and the change column"*).
+     ⚠ THE THIRD TRACK USED TO BE A FIXED 150px AND THAT WAS THE FAULT. MEASURED on a 1062px card:
+       the price row stepped 240 / 240 / 150 / 216, so New Cost sat 150 after Old Cost but 216
+       before Change — 66px off centre, hard against the column on its left and stranded from the
+       one on its right. Products had the same 150 step, so Unit Cost crowded Par.
+     ⭐ LETTING THE LAST THREE RUN AUTO MAKES THEM EQUAL BY CONSTRUCTION: fixed layout splits what
+       is left of the table evenly between them, so New Cost is centred at ANY card width rather
+       than at the one width a hand-picked number happens to suit. Measured after: 240 / 240 / 194
+       / 194, and Unit Cost and New Cost both start at 843.
+     ⚠ THE PRODUCTS TABLE HAS FOUR COLUMNS AND STILL USES ALL FIVE TRACKS — its Unit Cost cell
+       carries `colspan=2`. That is what keeps the two cards aligned (yesterday's ask): an auto
+       track's share depends on how many tracks a table has, so a four-column table left to split
+       the remainder in two would put Unit Cost at 940 while New Cost sat at 843. */
+  COLS: '<colgroup><col style="width:240px;"/><col style="width:240px;"/><col/><col/><col/></colgroup>',
+  // The products table's trailing cell spans the two tracks its fifth column would have used.
+  SPAN2: ' colspan="2"',
 
   renderProductsCard(prods) {
     if (prods.length === 0) {
       return '<div class="card" style="overflow-x:auto;margin-top:24px;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + '<colgroup>' + this.COL_LEAD + '<col/></colgroup><thead><tr>'
-        + '<th>Product</th><th>Size</th><th>Par</th><th>Unit Cost</th>'
-        + '</tr></thead><tbody><tr><td colspan="4" style="color:var(--t3);padding:12px 8px;">No products are linked to this vendor yet. Set the Primary Vendor field on a product in the Products screen.</td></tr></tbody></table></div>';
+        + this.COLS + '<thead><tr>'
+        + '<th>Product</th><th>Size</th><th>Par</th><th' + this.SPAN2 + '>Unit Cost</th>'
+        + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No products are linked to this vendor yet. Set the Primary Vendor field on a product in the Products screen.</td></tr></tbody></table></div>';
     }
     const rowHtml = p => '<tr><td><div class="val">' + esc(p.name) + '</div>'
       + (p.brand ? '<div style="font-size:10px;color:var(--t3);">' + esc(p.brand) + '</div>' : '') + '</td>'
       + '<td>' + esc(this.sizeLabel(p)) + '</td>'
       + '<td>' + (p.par_level != null && p.par_level !== '' ? esc(p.par_level + ' ' + (App.productUnit(p, p.par_level) || '')) : '<span style="color:var(--t4);">-</span>') + '</td>'
-      + '<td>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>';
+      + '<td' + this.SPAN2 + '>' + (p.unit_cost != null ? App.fmtCurrency(p.unit_cost) : '<span style="color:var(--t4);">-</span>') + '</td></tr>';
     // Group by category like the Count History view: one table per category, the
     // category in the first header, a shared fixed colgroup so columns line up
     // down the page (the Category column drops into the header).
@@ -1127,8 +1144,8 @@ S.InventoryVendors = {
     const tables = cats.map(c => {
       const catProds = byCat[c].slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       return '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + '<colgroup>' + this.COL_LEAD + '<col/></colgroup>'
-        + '<thead><tr><th>' + esc(c) + '</th><th>Size</th><th>Par</th><th>Unit Cost</th></tr></thead>'
+        + this.COLS
+        + '<thead><tr><th>' + esc(c) + '</th><th>Size</th><th>Par</th><th' + this.SPAN2 + '>Unit Cost</th></tr></thead>'
         + '<tbody>' + catProds.map(rowHtml).join('') + '</tbody></table></div>';
     }).join('');
     return '<div style="margin-top:24px;">' + tables + '</div>';
@@ -1168,12 +1185,12 @@ S.InventoryVendors = {
     const heading = '<div class="sh" style="margin-top:24px;">Recent Price Changes</div>';
     if (recent.length === 0) {
       return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-        + '<colgroup>' + this.COL_LEAD + '<col/><col/></colgroup><thead><tr>'
+        + this.COLS + '<thead><tr>'
         + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
         + '</tr></thead><tbody><tr><td colspan="5" style="color:var(--t3);padding:12px 8px;">No price changes recorded yet for this vendor. Bar Cop logs every cost change automatically when you apply price updates in Receive Delivery.</td></tr></tbody></table></div>';
     }
     return heading + '<div class="card" style="overflow-x:auto;"><table class="row-list" style="table-layout:fixed;width:100%;">'
-      + '<colgroup>' + this.COL_LEAD + '<col/><col/></colgroup><thead><tr>'
+      + this.COLS + '<thead><tr>'
       + '<th>Date</th><th>Product</th><th>Old Cost</th><th>New Cost</th><th>Change</th>'
       + '</tr></thead><tbody>'
       + recent.map(r => '<tr>'
