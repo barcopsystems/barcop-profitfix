@@ -1529,6 +1529,12 @@ const App = {
     // is a real account with data and falls to the safe, non-destructive branch.
     const isPastDue   = status === 'past_due' || status === 'unpaid';
     const isTrialExpired = status === 'trial_expired';
+    /* ⛔ THE ONE STATE THAT OPENS THIS SCREEN WITHOUT BEING SENT HERE. A trialing account is a
+       fully working bar: nothing is locked, nothing has lapsed, and the only way to be looking at
+       this gate is to have pressed "Choose Your Plan" on the Hub banner on purpose. Every other
+       branch below is written for somebody who cannot use the app, which is why this one needs
+       its own copy AND its own way out. */
+    const isVoluntary = status === 'trialing';
     // POSITIVELY identify a never-paid signup — a genuinely new account reads 'inactive'
     // (no subscription row). Do NOT include `!status`: an empty/unexpected status must
     // fall to the safe "Subscription Inactive" branch (Sign Out only), never light up the
@@ -1553,6 +1559,22 @@ const App = {
         ? (barName ? 'Your new bar ' + nameB + ' is set up.' : 'Your new bar is set up.')
         : (barName ? 'Your account for ' + nameB + ' is now set up.' : 'Your account is now set up.');
       bodyHtml = acctLine + '<br>Start your plan for instant access.';
+    } else if (isVoluntary) {
+      /* ⚠ NOT "Subscription Inactive". Theirs IS active — trialing is a live state in
+         LIVE_ACCESS_STATES and in the database gate — so the old copy told a working customer
+         their account was dead and their data was "waiting", which reads as lost.
+         ⚠ AND IT PROMISES NOTHING ABOUT WHAT HAPPENS TO THE REST OF THE TRIAL IF THEY BUY TODAY.
+         As built, choosing a plan starts billing immediately and the remaining free days are
+         forfeited. Saying "you will not be charged until day 31" would be false; saying nothing
+         is honest. Carrying the trial end onto the Stripe subscription would make the generous
+         version true, and that is Kyle's call, not a thing to imply in copy first. */
+      heading = 'Choose Your Plan';
+      const left = this.trialDaysLeft();
+      bodyHtml = (left === null ? 'Your free trial is running. '
+                  : (left === 0 ? 'Your free trial ends today. '
+                     : 'You have <b style="color:var(--t1);">' + left + (left === 1 ? ' day' : ' days')
+                       + '</b> left of your free trial. '))
+        + 'Pick a plan whenever you are ready.';
     } else if (status === 'trial_expired') {
       /* ⛔ THIS SCREEN IS THE WHOLE REASON THE DATABASE GATE WAS SPLIT IN TWO. Behind this popup
          is a month of the operator's own counting, still on screen and still readable, because
@@ -1648,10 +1670,16 @@ const App = {
       // ⛔ START OVER IS WITHHELD WHILE CONNECTING. It DELETES the account, and offering a
       // destructive escape beside "one moment" during a payment hand-off is the worst possible
       // pairing. Sign Out is the safe exit and it stays on every branch.
-      /* ⛔ ONLY THE EXPIRED TRIAL GETS A WAY PAST THIS, and only because only it has something
-         behind the cover. A never-paid signup dismissing this would be looking at an empty
-         app, and a past-due customer needs the card fixed, not a tour. */
-      + (isTrialExpired
+      /* ⛔ TWO STATES GET A WAY PAST THIS, and both because they have a working app behind the
+         cover. A never-paid signup dismissing it would be looking at an empty app, and a
+         past-due customer needs their card fixed rather than a tour — so neither gets one.
+         ⛔ THE VOLUNTARY ONE IS NOT OPTIONAL POLISH. A trialing operator opened this screen
+           themselves out of a bar that is working perfectly; with no close, the only exit is
+           Sign Out, so looking at the price costs them their session. Kyle hit exactly that on
+           day one: "there is no cancel... so i cannot close it without signing out." */
+      + (isVoluntary
+          ? '<div style="text-align:center;margin-top:14px;"><button class="auth-link" id="gate-close" style="font-size:11px;">Not yet, take me back</button></div>'
+          : isTrialExpired
           ? '<div style="text-align:center;margin-top:14px;"><button class="auth-link" id="gate-look" style="font-size:11px;">Keep looking at my numbers</button></div>'
           : '')
       + (connecting
@@ -1662,6 +1690,12 @@ const App = {
             ? '<div style="text-align:center;margin-top:18px;font-size:11px;color:var(--t2);">Used wrong email? <button class="auth-link" id="gate-cancel" style="font-size:11px;">Start Over</button>'
               + '<span style="color:var(--b-edge);margin:0 10px;">|</span>'
               + '<button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
+            : isVoluntary
+            /* ⚠ NO SIGN OUT HERE. On every other branch it is the safe exit from a bar the
+               operator cannot use. This operator can use theirs — the safe exit is the close
+               link above, and offering "Sign Out" beside it invites the very thing that made
+               this screen a trap. */
+            ? ''
             : '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>')
       + '</div>';
     document.body.appendChild(m);
@@ -1701,6 +1735,11 @@ const App = {
        fix. A carried plan still beats it, which is the line above. */
     const defaultOpt = opts.filter(o => o.dataset.plan === 'monthly')[0] || opts[0];
     if (wantedOpt || defaultOpt) { selectOpt(wantedOpt || defaultOpt); clauseFor(wantedOpt || defaultOpt); }
+    /* Straight back to the bar they were already using. Nothing to restore and nothing to
+       re-render: the gate is an overlay over a Hub that never stopped working. */
+    document.getElementById('gate-close')?.addEventListener('click', () => {
+      this._removePlanGate();
+    });
     document.getElementById('gate-look')?.addEventListener('click', () => {
       this._removePlanGate();
       this._showTrialEndedBanner();
