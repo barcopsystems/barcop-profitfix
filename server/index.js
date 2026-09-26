@@ -1407,6 +1407,24 @@ app.post('/api/reconcile-subscriptions', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+/* Manual trigger for the TRIAL sweep, the twin of the one above. Same secret, same refusal.
+   ⛔ IT EXISTS BECAUSE THE SWEEP WAS OTHERWISE UNVERIFIABLE. expireTrials runs 90 seconds after
+   boot and then hourly; with no way to call it, confirming that a trial actually ends means
+   waiting up to an hour, which is why the read-only state stayed the one piece never exercised
+   against live data. reconcileSubscriptions has had this since it was written and the trial
+   sweep shipped without it.
+   ⚠ IT CREATES NOTHING AND CHARGES NOTHING. The sweep only ever moves rows whose own stored end
+     date has already passed, and it is idempotent — a second call does what the first did. So
+     the worst a leaked secret buys is making an already-expired trial expire again. */
+app.post('/api/expire-trials', async (req, res) => {
+  const secret = (process.env.RECONCILE_SECRET || '').trim();
+  if (!secret || String(req.headers['x-reconcile-secret'] || '') !== secret) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  try { const r = await expireTrials(); res.json({ ok: true, ...r }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 /* ⭐⭐ THE ONE PLACE A PAID CHECKOUT BECOMES AN ACCOUNT.
    Lifted out of the webhook so the CLAIM route (checkout-first signup) and the WEBHOOK can both
    call it. Two callers, one implementation, deliberately: the claim is fast and the webhook is
