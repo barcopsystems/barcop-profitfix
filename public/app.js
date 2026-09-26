@@ -9911,6 +9911,22 @@ const App = {
     if (r.configGate) return { msg: 'Settings were not saved — Bar Cop has not loaded this account on this device yet. Reconnect, reload, and try again.', ownedBy: '' };
     if (r.storageFull) return { msg: 'Out of space on this device. Nothing was saved — free up some space and try again.', ownedBy: 'storage-full-banner' };
     const err = String((r.error && r.error.message) || r.error || '');
+    /* ⛔⛔ AN EXPIRED TRIAL IS NOT A CONNECTION PROBLEM EITHER, and this is the third time that
+       class has cost something (see the membership note below, S167, and the S10 banner before
+       it). Kyle hit it on day 31 of his own trial: he tried to save, and Bar Cop told him to
+       check his wifi. The write never left the device — db.js `_writeBlock()` refused it on a
+       BILLING state — so the one remedy he was offered was the one that cannot work.
+       ⚠ IT IS MATCHED BEFORE the viewer branch because both are read-only refusals and the
+         viewer pattern would otherwise swallow it: an expired trial is not view-only access,
+         it is a bar that has stopped taking new entries, and the remedy is different.
+       ⚠ AND IT IS NOT `ownedBy` THE TRIAL BANNER, deliberately, unlike viewer and storage-full.
+         Those two are standing states the operator already knows about, and their banners carry
+         the remedy. This one answers a question asked at a specific moment — "why did that not
+         save" — and the banner sits at the foot of the page where a dialog can cover it. The
+         toast is the answer at the point of the action. */
+    if (/free trial has ended|trial_expired/i.test(err)) {
+      return { msg: 'Your free trial has ended, so nothing new was saved. Everything you entered is still here to read. Choose a plan to start adding again.', ownedBy: '' };
+    }
     if (/read-only|viewer/i.test(err)) return { msg: 'Your access is view-only, so nothing was saved.', ownedBy: 'viewer-banner' };
     // ⚠ A MEMBERSHIP FAILURE IS NOT A CONNECTION PROBLEM (S167). db.js returns this when the write
     // reaches the server but the user has no membership row for the active account (removed from a

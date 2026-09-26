@@ -490,7 +490,11 @@ const DB = {
     /* An expired free trial keeps every row it entered and keeps SEEING them — that is what
        has_readable_subscription() in the database is for — and loses the ability to add more. */
     if (this._subStatus === 'trial_expired') {
-      return 'Your free trial has ended. Everything you entered is still here to read, but new entries need the one-time purchase.';
+      /* ⚠ "the one-time purchase" WAS IN HERE UNTIL 2026-09-26 and named a product retired the
+         same day the trial shipped. The wording stays plan-agnostic now: what the operator needs
+         to know is that reading still works and writing needs a plan, and naming WHICH plan is
+         how this sentence goes stale the next time the model moves. */
+      return 'Your free trial has ended. Everything you entered is still here to read, but adding new entries needs a plan.';
     }
     return null;
   },
