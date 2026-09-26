@@ -1136,12 +1136,29 @@ S.HubSettings = {
     /* ⚠ THE DEMO BILLS ITSELF AT THE REAL PRICE, so the number a visitor meets on the pricing page
        is the number they meet again inside the product. Left stale it shows the OLD price on the
        one screen that is meant to look like their own books.
-       $189 -> $87 (2026-08-31) -> $149 (2026-09-05) -> $129 (2026-09-25).
-       ⚠ IT STAYS A MONTHLY BILL THOUGH LIFETIME NOW EXISTS, and that is deliberate: this line feeds
-         a RECURRING-bills demo (projectedBills, the forecast, Safe to Spend). A one-time $849 would
-         be a single historical row and would teach those screens nothing. The demo bar is on the
-         monthly plan; that is a coherent choice, not a stale one. */
-    monthlyBill(5, 2, { category:'Software and Subscriptions', vendor:'Bar Cop', amount:129, notes:'Monthly software subscription.' });
+       $189 -> $87 (2026-08-31) -> $149 (2026-09-05) -> $129 (2026-09-25) -> $849 once (2026-09-26,
+       for a few hours) -> back to $149/mo behind a 30-day free trial (2026-09-26).
+       ⚠ IT STAYS A MONTHLY BILL because this row feeds the RECURRING-bill machinery: projectedBills,
+         the 13-week forecast and Safe to Spend all read it. During the few hours Bar Cop was sold
+         as a one-time licence this row was re-pointed at a fictional POS to keep that machinery
+         fed, since an $849 one-off is a single historical row and teaches those screens nothing.
+       ⛔ THE PARAGRAPH BELOW ARGUES FOR A CHANGE THAT HAS SINCE BEEN REVERSED and is kept only as
+       history. Do not act on it. ── THIS WAS "Bar Cop, $129, Monthly software subscription" AND IT HAD TO GO ON 2026-09-26,
+       when the monthly plan was replaced by a 30-day free trial and a one-time price. The old
+       comment here argued the case for it — "the demo bar is on the monthly plan; that is a
+       coherent choice, not a stale one" — and that argument died with the plan. Left alone, the
+       one screen meant to look like the operator's own books would show them paying Bar Cop a
+       monthly fee that cannot be bought.
+       ⛔ AND IT COULD NOT JUST BE DELETED. This row feeds the RECURRING-bill machinery:
+       projectedBills, the 13-week forecast and Safe to Spend all read it. An $849 one-time
+       purchase is a single historical row and teaches those screens nothing, so the demo keeps a
+       recurring software bill — it is simply the bar's POS, which is what a real bar's monthly
+       software line actually is.
+       ⚠ THE AMOUNT IS UNCHANGED at 129 on purpose. Other demo figures are derived from these
+         totals, and moving a number to make a point would shift screens this change has nothing
+         to do with. ⚠ The vendor is FICTIONAL, like Anchor Bar itself: naming a real POS in the
+         sample data would read as a partnership on a product that is deliberately POS-agnostic. */
+    monthlyBill(5, 2, { category:'Software and Subscriptions', vendor:'Bar Cop', amount:149, notes:'Monthly software subscription.' });
     monthlyBill(5, 2, { category:'Other', vendor:'Sonitrol', amount:89, notes:'Alarm and security monitoring.' });
     monthlyBill(5, 2, { category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.' });
     monthlyBill(5, 2, { category:'Utilities', vendor:'Austin Energy', amount:2600, notes:'Power, gas, water.' });

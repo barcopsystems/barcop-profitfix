@@ -507,6 +507,45 @@ S.Hub = {
 
   /* Good morning / afternoon / evening, off the operator's own clock. Kyle's call, 2026-08-10.
      Takes the hour so a harness can drive all three without waiting for the day to pass. */
+  /* ── THE FREE-TRIAL BANNER ───────────────────────────────────────────────────
+     Returns markup, or an empty string when there is no trial to talk about. Empty string
+     rather than a hidden element: the Hub is a grid, and a hidden child still takes a row gap,
+     so a paid bar would carry an 18px hole where somebody else's banner used to be.
+     ⚠ THE DEMO IS EXEMPT. It has no subscription at all and `App.demoMode` short-circuits the
+       paywall everywhere else; a countdown over a demo bar would be counting down nothing.
+     ⛔ THE TONE CHANGES BUT THE BAR DOES NOT MOVE. At 8 days or fewer it goes gold, because a
+       week is the point where an operator has to actually decide. It never turns red and never
+       grows: this is their own Hub, not a dunning notice, and nothing has gone wrong.
+     ⚠ THE BUTTON IS THE ONLY EARLY-BUY DOOR IN THE APP. A trialing account reads as live to
+       enforcePaywall(), so the plan gate never opens over it — without this there is no way to
+       pay before the trial runs out. */
+  _trialBanner() {
+    if (App.demoMode) return '';
+    const days = App.trialDaysLeft();
+    if (days === null) return '';
+    const soon = days <= 8;
+    const fg = soon ? 'var(--gold)' : 'var(--t2)';
+    const left = days === 0 ? 'Your free trial ends today'
+      : (days === 1 ? '1 day left of your free trial' : days + ' days left of your free trial');
+    return '<div id="hub-trial-bar" style="display:flex;align-items:center;gap:14px;'
+      + 'flex-wrap:wrap;justify-content:space-between;padding:11px 16px;background:var(--zone);'
+      + 'border:1px solid ' + (soon ? 'var(--gold)' : 'var(--b-edge)') + ';border-radius:var(--r2);">'
+      +   '<span style="font-size:13px;font-weight:600;color:' + fg + ';">' + left + '</span>'
+      +   '<span style="font-size:12px;color:var(--t3);flex:1 1 auto;min-width:160px;">'
+      +     'Everything you enter is yours to keep.</span>'
+      +   '<button class="btn btn-primary btn-sm" id="hub-trial-buy">Choose Your Plan</button>'
+      + '</div>';
+  },
+
+  /* Wired after the Hub paints, like every other Hub control. Opens the ordinary plan gate —
+     the one screen that already holds the prices, the picker and the billing clause — rather
+     than a second checkout path that could drift out of step with it. */
+  _wireTrialBanner() {
+    document.getElementById('hub-trial-buy')?.addEventListener('click', () => {
+      App.showPlanGate({ status: 'trialing', plan: App._urlPlan });
+    });
+  },
+
   _greeting(hour) {
     const h = (hour == null) ? new Date().getHours() : hour;
     return h < 12 ? 'Good morning' : (h < 17 ? 'Good afternoon' : 'Good evening');
@@ -2099,6 +2138,7 @@ S.Hub = {
             <div class="hub-greet" style="font-size:19px;font-weight:700;color:var(--t1);">${esc(this._greeting())}, <span id="hub-greet-account-switcher" class="hub-greet-bar">${esc(barName)}</span></div>
             <div style="font-size:12px;color:var(--t3);">${esc(dateLine)}</div>
           </div>
+          ${this._trialBanner()}
           <div class="hub-grid-row">${this._sectionCards()}</div>
         </div>`;
 
@@ -2270,6 +2310,9 @@ S.Hub = {
       this.render(this._stage || container);
       this._keepPlace('.hub-sec-head[data-sec="' + k + '"]', yBefore);
     }));
+    // ⚠ RE-WIRED ON EVERY RENDER, with the rest. The Hub re-renders whenever a section card is
+    //   opened, so a banner wired once at init loses its handler the first time that happens.
+    this._wireTrialBanner();
     // ── Wire sign-out, sidebar toggle, sidebar nav clicks, recovery target ──
     document.getElementById('hub-signout')?.addEventListener('click', async () => {
       if (App.demoMode) { window.location.href = '/'; return; }
