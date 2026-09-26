@@ -1135,8 +1135,13 @@ S.HubSettings = {
     // read a bar that actually pays its bills, and the forecast derives the commitment from them.
     /* ⚠ THE DEMO BILLS ITSELF AT THE REAL PRICE, so the number a visitor meets on the pricing page
        is the number they meet again inside the product. Left stale it shows the OLD price on the
-       one screen that is meant to look like their own books. $189 -> $87 (2026-08-31) -> $149. */
-    monthlyBill(5, 2, { category:'Software and Subscriptions', vendor:'Bar Cop', amount:149, notes:'Monthly software subscription.' });
+       one screen that is meant to look like their own books.
+       $189 -> $87 (2026-08-31) -> $149 (2026-09-05) -> $129 (2026-09-25).
+       ⚠ IT STAYS A MONTHLY BILL THOUGH LIFETIME NOW EXISTS, and that is deliberate: this line feeds
+         a RECURRING-bills demo (projectedBills, the forecast, Safe to Spend). A one-time $849 would
+         be a single historical row and would teach those screens nothing. The demo bar is on the
+         monthly plan; that is a coherent choice, not a stale one. */
+    monthlyBill(5, 2, { category:'Software and Subscriptions', vendor:'Bar Cop', amount:129, notes:'Monthly software subscription.' });
     monthlyBill(5, 2, { category:'Other', vendor:'Sonitrol', amount:89, notes:'Alarm and security monitoring.' });
     monthlyBill(5, 2, { category:'Occupancy (Rent, Property Tax)', vendor:'Barton Springs Holdings', amount:12000, notes:'Monthly lease.' });
     monthlyBill(5, 2, { category:'Utilities', vendor:'Austin Energy', amount:2600, notes:'Power, gas, water.' });
