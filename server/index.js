@@ -785,6 +785,44 @@ app.post('/api/demo-visit', async (req, res) => {
 // on a machine nobody watches. These two functions close that: alertOps() for the handful of
 // events that mean act-now, and a once-a-day digest for everything else so the immediate alerts
 // stay rare enough to still mean something.
+/* ⭐ GOOD NEWS, AND IT GETS ITS OWN CHANNEL FOR A REASON. This is the same Resend plumbing and the
+   same recipient as alertOps below, but it is NOT alertOps: that one stamps "Bar Cop ALERT:" on
+   the subject and paints a red OPS ALERT header, and its whole design note is that immediate
+   alerts must "stay rare enough to still mean something". A signup arriving dressed as an alarm
+   erodes exactly that, and the cost lands on the next real alert, not on this one.
+   ⚠ BEST-EFFORT AND NEVER THROWS, like sendWelcomeEmail: a mail problem must never fail the
+     thing being reported. A trial that was granted, or a payment that landed, must not come
+     apart because an email did.
+   ⛔ BUT IT IS LOUD IN THE LOG WHEN IT FAILS. Nothing can be emailed about a failed email, so a
+     silent send failure means Kyle believes nobody has signed up while people have — the one
+     wrong belief this function exists to prevent. */
+async function notifySignup(subject, lines) {
+  try {
+    const apiKey = (process.env.RESEND_API_KEY || '').trim();
+    const to = (process.env.OPS_ALERT_EMAIL || process.env.BUG_REPORT_NOTIFY_EMAIL || '').trim();
+    if (!apiKey || !to) { console.warn('notifySignup: not configured, skipping:', subject); return false; }
+    const from = (process.env.BUG_REPORT_SENDER || 'onboarding@resend.dev').trim();
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    const html = '<div style="font-family:-apple-system,Segoe UI,sans-serif;max-width:640px;padding:20px;color:#111;">'
+      + '<div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#518A79;">BAR COP SIGNUP</div>'
+      + '<div style="font-size:17px;font-weight:700;margin:6px 0 14px;">' + esc(subject) + '</div>'
+      + '<pre style="font-size:12px;background:#f6f6f6;padding:12px;white-space:pre-wrap;">'
+      + esc((lines || []).join('\n')) + '</pre>'
+      + '<div style="font-size:11px;color:#888;margin-top:14px;">' + esc(new Date().toISOString()) + '</div></div>';
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to, subject: 'Bar Cop: ' + subject, html })
+    });
+    if (!resp.ok) {
+      console.error('!! notifySignup SEND FAILED — this signup was NOT reported:', resp.status, await resp.text());
+      console.error('!! the signup was:', subject, '|', (lines || []).join(' | '));
+      return false;
+    }
+    return true;
+  } catch (e) { console.error('notifySignup failed (non-fatal):', (e && e.message) || e); return false; }
+}
+
 async function alertOps(subject, lines) {
   try {
     const apiKey = (process.env.RESEND_API_KEY || '').trim();
@@ -1741,6 +1779,27 @@ app.post('/api/start-trial', async (req, res) => {
       return res.status(500).json({ error: 'Could not start your trial. Try again, or contact support.' });
     }
     console.log('start-trial: account ' + accountId + ' trialing until ' + ends);
+    /* ⚠ NOT AWAITED, AND THE ORDER IS THE POINT: the operator gets their bar the moment the row
+       is written, and the email happens behind them. Awaiting a mail round trip here would put
+       Resend between a customer and the product they just signed up for.
+       ⚠ The bar name is read best-effort and only shown when it is worth showing — at this point
+         in the flow onboarding has often not written it yet, so it is frequently the default. */
+    (async () => {
+      let barName = null;
+      try {
+        const { data: a } = await supabaseAdmin.from('accounts').select('name').eq('id', accountId).maybeSingle();
+        barName = a && a.name;
+      } catch (e) {}
+      const named = barName && barName !== 'My Bar' ? barName : null;
+      await notifySignup('New free trial' + (named ? ': ' + named : ''), [
+        'Email:      ' + (userData.user.email || 'unknown'),
+        'Bar:        ' + (named || '(not named yet)'),
+        'Account:    ' + accountId,
+        'Trial ends: ' + ends,
+        '',
+        'No card was taken. Nothing is charged unless they choose a plan.'
+      ]);
+    })().catch(() => {});
     res.json({ ok: true, status: 'trialing', trial_ends_at: ends, trial_days: TRIAL_DAYS });
   } catch (e) {
     console.error('start-trial exception:', e);
@@ -1904,6 +1963,20 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
         // delay the webhook ack (a delayed ack makes Stripe retry the whole event). The
         // isNewSubscriber check gates it to the first activation, so it fires exactly once.
         sendWelcomeEmail(prov.email, acctRow && acctRow.name).catch(() => {});
+        /* ⭐ AND TELL KYLE. Measured 2026-09-26 while adding the trial notification: this block was
+           the ONLY thing that fired on a new subscriber, and it emails the CUSTOMER. Nothing
+           reached Kyle at all — he had no way to learn about a sale except going and looking, which
+           is the same gap he asked about for trials. Same gate (`isNewSubscriber`), so it fires
+           once, and fire-and-forget for the same reason the line above is. */
+        notifySignup('New paid signup' + (acctRow && acctRow.name && acctRow.name !== 'My Bar'
+            ? ': ' + acctRow.name : ''), [
+          'Email:   ' + prov.email,
+          'Bar:     ' + ((acctRow && acctRow.name) || '(not named)'),
+          'Account: ' + prov.accountId,
+          'Status:  ' + prov.status,
+          '',
+          'Stripe has sent its own receipt. The welcome email is on its way to them.'
+        ]).catch(() => {});
       }
     }
 
