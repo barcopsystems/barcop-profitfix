@@ -341,7 +341,16 @@ const ALL_MODULES     = ['profit', 'revenue'];
      unknown. Removing it outright would make anyone holding a ?plan=monthly link — a bookmark,
      a cached search result, the win-back email draft — hit 'plan not recognised' and see nothing
      charged with no explanation. Named and refused, the caller can say what is actually true:
-     Bar Cop is a one-time purchase now, here is the one price.
+     this plan is not sold, here are the ones that are.
+   ⛔⛔ AND THE MESSAGE MUST NOT DESCRIBE THE PRICING MODEL. It used to read "Bar Cop is a
+     one-time purchase now, so that monthly plan is no longer offered" — written the morning
+     monthly was retired, and FALSE BY THAT AFTERNOON when the model inverted: it told anyone
+     holding a ?plan=lifetime link that Bar Cop was a one-time purchase (it is not) and that the
+     monthly plan was gone (it is the one they should buy). Found live, by probing production.
+     Any sentence naming the current model, or a specific retired plan, goes false the next time
+     the model moves — three times in a month so far. The machine meaning rides in
+     `reason: 'plan_retired'`, which is what the client keys on; the prose says only what stays
+     true. Pinned by verify-checkout-plan-price-map.js.
    ⛔⛔ AND IT IS REFUSED, NOT QUIETLY SWAPPED FOR LIFETIME. Resolving a $129/month link to an
      $849 charge is a price the visitor did not pick; Stripe would show it before taking the
      money, but the app would have chosen a different product on their behalf. Never. */
@@ -574,7 +583,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
     if (chosenPlan.retired) {
       console.log('create-checkout-session: retired plan ' + chosenPlan.key + ' refused — nothing charged.');
       return res.status(400).json({
-        error: 'Bar Cop is a one-time purchase now, so that monthly plan is no longer offered.',
+        error: 'That plan is no longer offered. Choose from the current plans to continue.',
         reason: 'plan_retired'
       });
     }
@@ -1746,7 +1755,7 @@ app.post('/api/start-checkout', async (req, res) => {
   if (chosen.retired) {
     console.log('start-checkout: retired plan ' + chosen.key + ' refused — nothing charged.');
     return res.status(400).json({
-      error: 'Bar Cop is a one-time purchase now, so that monthly plan is no longer offered.',
+      error: 'That plan is no longer offered. Choose from the current plans to continue.',
       reason: 'plan_retired'
     });
   }
