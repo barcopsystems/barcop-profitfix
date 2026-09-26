@@ -2122,6 +2122,30 @@ body.chrome-on .hub-app .nav-item.active{background:var(--c4);}
 /* wrap, so the three-across rows become one-per-line on a narrow card rather than overflowing */
 .su-row{display:flex;gap:12px;flex-wrap:wrap;}
 .su-row > .f{flex:1;min-width:150px;}
+/* ⛔⛔ `min-width:150px` ALONE LEAVES A CRAMPED MIDDLE ZONE, and Kyle found it (2026-09-26,
+   "on mobile.. the create account form.. shouldn't the data cells stack?"). Wrapping only happens
+   when two fields can no longer hold 150px each, so it fires late and by accident rather than by
+   decision. MEASURED, because the zone is not obvious: the panel's content box is the view width
+   less 32px of view padding, 44px of card padding and 28px of panel padding.
+     · 660px desktop view -> 560px  : two up, comfortable, correct
+     · 484px viewport     -> 380px  : two up and CRAMPED — the screenshot Kyle sent
+     · 390px phone        -> 286px  : wraps, but only because 286 < 312, by 26px
+   So it stacked on a phone by a 26px margin and not at all on anything wider. A field wants ~180px
+   to be readable, so two plus the gap want ~372; below about 420px of container they should stack
+   as a decision instead of a coincidence.
+   ⛔ A CONTAINER QUERY, NOT A VIEWPORT ONE, which is this file's own standard for exactly this:
+     "stack as soon as the BUILDER itself gets too narrow, not at a viewport breakpoint... never
+     horizontal-scrolls through the cramped middle zone" (the .pill-wrap block below).
+   ⚠ SCOPED TO .auth-view-wide, so login, reset, set-password and the paywall are untouched —
+     restyling four screens nobody asked about is the blanket change this project does not make,
+     which is the same scoping the 768px block above already uses.
+   ⛔ `!important` IS LOAD-BEARING: every one of these cells carries an INLINE `flex` (1.25 on
+     email, 1.4 on the bar name, 0 0 150px on state). An author rule without it loses to the
+     attribute and the row never stacks. Same reason `.form-row > .f` carries it. */
+.auth-view-wide .auth-inputs{container-type:inline-size;}
+@container (max-width:420px){
+  .su-row > .f{width:100% !important;min-width:0 !important;flex:1 1 100% !important;}
+}
 /* ⚠ MEASURED, AND IT CORRECTED ME: there was NO pre-existing overflow. `.auth-screen` is a FLEX
    container, so a 400px card already shrinks to fit a 375px phone — every panel measures 375 and
    fits without any rule at all. An earlier note here claimed a 25px overflow; it was wrong.
