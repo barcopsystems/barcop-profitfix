@@ -9925,7 +9925,7 @@ const App = {
          save" — and the banner sits at the foot of the page where a dialog can cover it. The
          toast is the answer at the point of the action. */
     if (/free trial has ended|trial_expired/i.test(err)) {
-      return { msg: 'Your free trial has ended, so nothing new was saved. Everything you entered is still here to read. Choose a plan to start adding again.', ownedBy: '' };
+      return { msg: 'Your free trial has ended, so nothing was saved. Your data is still here. Choose a plan to add again.', ownedBy: '' };
     }
     if (/read-only|viewer/i.test(err)) return { msg: 'Your access is view-only, so nothing was saved.', ownedBy: 'viewer-banner' };
     // ⚠ A MEMBERSHIP FAILURE IS NOT A CONNECTION PROBLEM (S167). db.js returns this when the write
