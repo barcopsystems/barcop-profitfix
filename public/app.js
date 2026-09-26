@@ -642,7 +642,7 @@ const App = {
   },
 
   // One-time welcome overlay on demo landing. Dimmed background like onboarding,
-  // orients the visitor (nothing saves, nothing breaks), points at Run It On My Bar,
+  // orients the visitor (nothing saves, nothing breaks), points at Get Started Free,
   // and closes on Dig In (or clicking the backdrop).
   _showDemoWelcome() {
     const m = document.createElement('div');
@@ -651,7 +651,7 @@ const App = {
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b-edge);border-radius:10px;padding:32px 30px;max-width:460px;text-align:center;box-shadow:0 8px 24px var(--panel-shadow);">'
       + '<div style="margin-bottom:14px;"><img src="assets/logo.png" alt="Bar Cop" style="height:30px;"/></div>'
       + '<div style="font-size:18px;font-weight:800;color:var(--w);margin-bottom:12px;">Welcome to the Bar Cop Live Demo</div>'
-      + '<div style="font-size:13.5px;color:var(--t2);line-height:1.7;margin-bottom:24px;">This is a real bar loaded with real numbers, so you can see exactly how Bar Cop runs the place. Open any section, run an audit, change a price, count some stock, change whatever you want. Nothing here saves and nothing breaks. When you are ready to run your own place, hit <b style="color:var(--gold);">Run It On My Bar</b> down in the corner. Now go dig around.</div>'
+      + '<div style="font-size:13.5px;color:var(--t2);line-height:1.7;margin-bottom:24px;">This is a real bar loaded with real numbers, so you can see exactly how Bar Cop runs the place. Open any section, run an audit, change a price, count some stock, change whatever you want. Nothing here saves and nothing breaks. When you are ready to run your own place, hit <b style="color:var(--gold);">Get Started On My Bar</b> down in the corner. Now go dig around.</div>'
       + '<button class="btn btn-primary" id="demo-welcome-go" style="width:100%;padding:14px 20px;font-size:12px;">Dig In</button>'
       + '</div>';
     document.body.appendChild(m);
@@ -728,7 +728,7 @@ const App = {
          ⚠ AND IT MUST NOT MATCH THE PRICING PAGE'S BUTTON. This lands on /pages/pricing, whose own
          CTA is "Get Started". Same words twice in one funnel reads as the first press not working,
          which is the collision that ruled out "Get Bar Cop" (the header nav already owns it). */
-      + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Run It On My Bar</button>';
+      + '<button id="demo-signup-btn" class="btn btn-primary btn-sm" style="flex-shrink:0;">Get Started Free</button>';
     document.body.appendChild(bar);
     document.getElementById('demo-signup-btn').addEventListener('click', () => { window.location.href = 'https://www.barcop.com/pages/pricing'; });
   },
@@ -753,7 +753,7 @@ const App = {
     m.innerHTML = '<div style="background:var(--surface);border:1px solid var(--b1);border-radius:8px;padding:30px;max-width:430px;text-align:center;">'
       + '<div style="font-size:15px;font-weight:800;color:var(--w);margin-bottom:10px;">' + esc(title) + '</div>'
       + '<div style="font-size:13px;color:var(--t2);line-height:1.65;margin-bottom:22px;">' + esc(body) + '</div>'
-      + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Run It On My Bar</button>'
+      + '<button class="btn btn-primary" id="demo-go" style="width:100%;">Get Started Free</button>'
       + '<button class="btn btn-ghost btn-sm" id="demo-stay" style="margin-top:10px;">Keep Exploring</button>'
       + '</div>';
     document.body.appendChild(m);
@@ -12431,7 +12431,7 @@ function wireAuth() {
   });
 
   /* Signups closed: cover the card so EVERY route into it lands on the same message — the login
-     link, the demo's "Run It On My Bar" button, and a bookmarked /?signup=1. The button handler
+     link, the demo's "Get Started Free" button, and a bookmarked /?signup=1. The button handler
      refuses independently below, so a hidden form is not the only stop.
      ⛔⛔⛔ IT COVERS. IT DOES NOT REPLACE, AND THAT IS THE WHOLE POINT. This used to write over
      `#auth-signup .auth-card` — and that card is ALSO the "Finish Setting Up" screen every paying
