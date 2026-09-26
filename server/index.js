@@ -310,8 +310,12 @@ app.get('/api/health', async (req, res) => {
 // .trim() so a stray leading/trailing space pasted into the env var can't produce
 // a "No such price: ' price_...'" error (a space in the pasted value is invisible
 // in most dashboards but Stripe searches for the literal, space-and-all).
-const STRIPE_PRICE_MONTHLY = (process.env.STRIPE_PRICE_MONTHLY || '').trim(); // $149/mo
-const STRIPE_PRICE_ANNUAL  = (process.env.STRIPE_PRICE_ANNUAL  || '').trim(); // $1,488/yr
+const STRIPE_PRICE_MONTHLY  = (process.env.STRIPE_PRICE_MONTHLY  || '').trim(); // $129/mo
+const STRIPE_PRICE_ANNUAL   = (process.env.STRIPE_PRICE_ANNUAL   || '').trim(); // retired 2026-09-25, kept so an in-flight session still resolves
+/* ⛔ LIFETIME IS A ONE-TIME PRICE, NOT A RECURRING ONE. In Stripe it must be created as a
+   one-time price or the session below is built with mode:'payment' against a recurring price,
+   which Stripe rejects outright — a payment screen that never opens, not a mis-charge. */
+const STRIPE_PRICE_LIFETIME = (process.env.STRIPE_PRICE_LIFETIME || '').trim(); // $849 once
 const ALL_MODULES     = ['profit', 'revenue'];
 
 /* ⭐⭐ THE PLAN -> PRICE MAP, AND THE ONLY ONE. Two routes ask it now: the authenticated checkout
@@ -328,14 +332,23 @@ const ALL_MODULES     = ['profit', 'revenue'];
    one would walk past the "is it configured" guard and reach Stripe as a price id.
    ⚠ Non-strings are refused rather than coerced: `String(['annual'])` is 'annual', and a JSON
    body can carry an array. Returns null for "no such plan"; the CALLER decides the refusal. */
+/* ⛔⛔ THE MAP NOW CARRIES THE CHECKOUT MODE, AND THAT IS NOT DECORATION. A lifetime licence is
+   a ONE-TIME payment: Stripe's `mode` decides whether the session creates a subscription at all,
+   and getting it from the same map as the price id is what stops a plan ever being priced by one
+   branch and moded by another. The alternative — `plan === 'lifetime' ? 'payment' : 'subscription'`
+   at each call site — is the same binary ternary this map replaced, two more times.
+   ⚠ ANNUAL STAYS IN THE MAP THOUGH IT IS RETIRED FROM THE PRICING PAGE. Removing it would make a
+     customer mid-checkout, or anyone holding a ?plan=annual link, hit 'plan not recognised' and
+     see nothing charged with no explanation. It leaves when the Stripe price is archived. */
 function planPrice(plan) {
   const PLAN_PRICES = {
-    monthly: { id: STRIPE_PRICE_MONTHLY, env: 'STRIPE_PRICE_MONTHLY' },
-    annual:  { id: STRIPE_PRICE_ANNUAL,  env: 'STRIPE_PRICE_ANNUAL'  }
+    monthly:  { id: STRIPE_PRICE_MONTHLY,  env: 'STRIPE_PRICE_MONTHLY',  mode: 'subscription' },
+    annual:   { id: STRIPE_PRICE_ANNUAL,   env: 'STRIPE_PRICE_ANNUAL',   mode: 'subscription' },
+    lifetime: { id: STRIPE_PRICE_LIFETIME, env: 'STRIPE_PRICE_LIFETIME', mode: 'payment'      }
   };
   const key = (typeof plan === 'string' ? plan : '').trim().toLowerCase();
   if (!Object.prototype.hasOwnProperty.call(PLAN_PRICES, key)) return null;
-  return { key: key, id: PLAN_PRICES[key].id, env: PLAN_PRICES[key].env };
+  return { key: key, id: PLAN_PRICES[key].id, env: PLAN_PRICES[key].env, mode: PLAN_PRICES[key].mode };
 }
 /* The statuses that GRANT access, and the single source for it. Must stay in step with
    has_active_subscription() in SUPABASE_SETUP.sql, which is ('active', 'trialing') — if the two
@@ -508,7 +521,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
     }
     const sessionArgs = {
       ui_mode: 'embedded',
-      mode: 'subscription',
+      mode: chosenPlan.mode,
       line_items: [{ price: priceId, quantity: 1 }],
       // Embedded checkout stays on app.barcop.com; on completion Stripe redirects
       // the page to return_url, where the existing ?checkout=success boot flow
@@ -516,10 +529,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
       // on the bar that was just paid for (needed for Add Another Bar).
       return_url: 'https://app.barcop.com/?checkout=success&bar=' + accountId,
       metadata: { user_id: userId, account_id: accountId },
-      // Stamp account_id onto the SUBSCRIPTION itself (session metadata does NOT propagate to
-      // the subscription). The source-of-truth dup guard above reads this to scope "already
-      // has a live sub" to THIS bar, so a multi-bar owner isn't blocked from adding another.
-      subscription_data: { metadata: { user_id: userId, account_id: accountId } },
+      // (subscription_data / payment_intent_data is attached below — it depends on the mode.)
       /* ⭐ THE PROMO-CODE BOX (P2). Embedded Checkout shows a "add promotion code" field only when
          the session is created with this. Without it there is no field on the payment screen, and
          every code sent out in the win-back email is unredeemable.
@@ -534,6 +544,20 @@ app.post('/api/create-checkout-session', async (req, res) => {
          verify-checkout-promo-codes.js pins the absence of `discounts` for exactly that reason. */
       allow_promotion_codes: true
     };
+    /* ⛔⛔ `subscription_data` IS INVALID IN PAYMENT MODE AND STRIPE REJECTS THE WHOLE SESSION.
+       Not a missing bit of metadata — a payment screen that does not open at all. So the metadata
+       rides the object that exists in each mode.
+       ⚠ WHY IT IS STAMPED AT ALL: session metadata does NOT propagate to the subscription, and the
+         source-of-truth dup guard above reads account_id off the subscription to scope "already has
+         a live sub" to THIS bar, so a multi-bar owner is not blocked from adding another. A lifetime
+         purchase creates no subscription for that guard to read, which is correct — it cannot lapse
+         and cannot be double-charged by renewal — and the payment intent carries the same stamp so
+         the charge is still traceable to the bar it bought. */
+    if (chosenPlan.mode === 'subscription') {
+      sessionArgs.subscription_data = { metadata: { user_id: userId, account_id: accountId } };
+    } else {
+      sessionArgs.payment_intent_data = { metadata: { user_id: userId, account_id: accountId } };
+    }
     // Pre-fill the checkout with the account's own email so Stripe Link can't
     // auto-fill a different email remembered from a prior checkout in the same
     // browser. (Billing still keys to account_id in the webhook regardless.)
@@ -1394,6 +1418,20 @@ async function provisionFromSession(session, stripe) {
   } catch (e) {
     console.error('provisionFromSession: could not read subscription status:', e.message);
   }
+  /* ⛔⛔⛔ A LIFETIME SESSION HAS NO SUBSCRIPTION, SO THE READ ABOVE FINDS NOTHING AND `status`
+     WOULD FALL TO 'incomplete' — access WITHHELD from someone who just paid $849 in full, with a
+     welcome email and no way in. The fallback is the right default for a subscription whose status
+     could not be read; it is simply the wrong question for a one-time purchase.
+     ⭐ `payment_status`, NOT `mode` ALONE. A payment-mode session exists from the moment checkout
+       opens and is 'unpaid' until the card clears, so moding alone would grant access to an
+       abandoned checkout. Stripe sets 'paid' only once the money is actually taken, which keeps
+       the safe direction this fallback was written for.
+     ⚠ AND NOTHING ELSE HAS TO CHANGE FOR THE ACCOUNT TO STAY LIVE FOREVER, which was worth
+       checking rather than assuming: `stripe_subscription_id` is written null below, and the
+       nightly reconcile selects `.not('stripe_subscription_id','is',null)` — so a lifetime row is
+       skipped by construction and can never be flipped inactive by a job that finds no
+       subscription at Stripe. The app gate is `status === 'active'` with no period test. */
+  if (!status && session.mode === 'payment' && session.payment_status === 'paid') status = 'active';
   if (!status) status = 'incomplete';
   const live = LIVE_ACCESS_STATES.includes(status);
 
@@ -1454,8 +1492,15 @@ app.post('/api/start-checkout', async (req, res) => {
   }
   try {
     const stripe = require('stripe')((process.env.STRIPE_SECRET_KEY || '').trim());
+    /* ⚠ THE METADATA PARAM FOLLOWS THE MODE. `subscription_data` in payment mode is rejected by
+       Stripe outright, so the lifetime session stamps the payment intent instead. Both carry the
+       same two keys the claim and the webhook read. */
+    const planMeta = { source: 'public_signup', plan: chosen.key };
+    const modeArgs = chosen.mode === 'subscription'
+      ? { subscription_data: { metadata: planMeta } }
+      : { payment_intent_data: { metadata: planMeta } };
     const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
+      mode: chosen.mode,
       line_items: [{ price: chosen.id, quantity: 1 }],
       // {CHECKOUT_SESSION_ID} is substituted by Stripe. The claim re-reads it from Stripe, so a
       // forged or edited id resolves to nothing rather than provisioning anything.
@@ -1464,8 +1509,8 @@ app.post('/api/start-checkout', async (req, res) => {
       // The marker BOTH the claim and the webhook read to know this was a public signup, which is
       // what turns on the already-has-an-account refusal. On the subscription too, so a later
       // event can still tell where it came from.
-      metadata: { source: 'public_signup', plan: chosen.key },
-      subscription_data: { metadata: { source: 'public_signup', plan: chosen.key } },
+      metadata: planMeta,
+      ...modeArgs,
       allow_promotion_codes: true,
       // Terms accepted and RECORDED on the session itself, at the moment money changes hands —
       // stronger evidence than a checkbox on a page we do not control. Needs the Terms URL set in
