@@ -310,12 +310,12 @@ app.get('/api/health', async (req, res) => {
 // .trim() so a stray leading/trailing space pasted into the env var can't produce
 // a "No such price: ' price_...'" error (a space in the pasted value is invisible
 // in most dashboards but Stripe searches for the literal, space-and-all).
-const STRIPE_PRICE_MONTHLY  = (process.env.STRIPE_PRICE_MONTHLY  || '').trim(); // $129/mo
-const STRIPE_PRICE_ANNUAL   = (process.env.STRIPE_PRICE_ANNUAL   || '').trim(); // retired 2026-09-25, kept so an in-flight session still resolves
+const STRIPE_PRICE_MONTHLY  = (process.env.STRIPE_PRICE_MONTHLY  || '').trim(); // $149/mo
+const STRIPE_PRICE_ANNUAL   = (process.env.STRIPE_PRICE_ANNUAL   || '').trim(); // $1,488/yr = $124.00/mo exactly
 /* ⛔ LIFETIME IS A ONE-TIME PRICE, NOT A RECURRING ONE. In Stripe it must be created as a
    one-time price or the session below is built with mode:'payment' against a recurring price,
    which Stripe rejects outright — a payment screen that never opens, not a mis-charge. */
-const STRIPE_PRICE_LIFETIME = (process.env.STRIPE_PRICE_LIFETIME || '').trim(); // $849 once
+const STRIPE_PRICE_LIFETIME = (process.env.STRIPE_PRICE_LIFETIME || '').trim(); // retired 2026-09-26, kept so a held link resolves and is refused by name
 const ALL_MODULES     = ['profit', 'revenue'];
 
 /* ⭐⭐ THE PLAN -> PRICE MAP, AND THE ONLY ONE. Two routes ask it now: the authenticated checkout
@@ -337,9 +337,24 @@ const ALL_MODULES     = ['profit', 'revenue'];
    and getting it from the same map as the price id is what stops a plan ever being priced by one
    branch and moded by another. The alternative — `plan === 'lifetime' ? 'payment' : 'subscription'`
    at each call site — is the same binary ternary this map replaced, two more times.
-   ⚠ ANNUAL STAYS IN THE MAP THOUGH IT IS RETIRED FROM THE PRICING PAGE. Removing it would make a
-     customer mid-checkout, or anyone holding a ?plan=annual link, hit 'plan not recognised' and
-     see nothing charged with no explanation. It leaves when the Stripe price is archived. */
+   ⚠ A RETIRED PLAN STAYS IN THE MAP AND IS REFUSED BY NAME, which is not the same as being
+     unknown. Removing it outright would make anyone holding a ?plan=monthly link — a bookmark,
+     a cached search result, the win-back email draft — hit 'plan not recognised' and see nothing
+     charged with no explanation. Named and refused, the caller can say what is actually true:
+     Bar Cop is a one-time purchase now, here is the one price.
+   ⛔⛔ AND IT IS REFUSED, NOT QUIETLY SWAPPED FOR LIFETIME. Resolving a $129/month link to an
+     $849 charge is a price the visitor did not pick; Stripe would show it before taking the
+     money, but the app would have chosen a different product on their behalf. Never. */
+/* ⚠ THE RETIRED SET INVERTED ON 2026-09-26, the same day it was created, and the reason is worth
+   keeping: the monthly plan was retired because a $129 price beside an $849 one read as "pay
+   $129 to try it". A 30-day free trial answers that objection directly, and once it does, the
+   subscription is the better landing — $1,488 a year out-earns the whole lifetime licence in
+   year one and does it again every year. Kyle: *"now that there is actually going to be a free
+   30 day trial.. what is the better landing when the free trial ends"*.
+   ⚠ Lifetime stays in the map, refused by name, so anyone holding a ?plan=lifetime link is told
+     it is no longer sold rather than that their link is broken. It leaves the map when its
+     Stripe price is archived. */
+const RETIRED_PLANS = ['lifetime'];
 function planPrice(plan) {
   const PLAN_PRICES = {
     monthly:  { id: STRIPE_PRICE_MONTHLY,  env: 'STRIPE_PRICE_MONTHLY',  mode: 'subscription' },
@@ -348,8 +363,35 @@ function planPrice(plan) {
   };
   const key = (typeof plan === 'string' ? plan : '').trim().toLowerCase();
   if (!Object.prototype.hasOwnProperty.call(PLAN_PRICES, key)) return null;
-  return { key: key, id: PLAN_PRICES[key].id, env: PLAN_PRICES[key].env, mode: PLAN_PRICES[key].mode };
+  return { key: key, id: PLAN_PRICES[key].id, env: PLAN_PRICES[key].env,
+           mode: PLAN_PRICES[key].mode, retired: RETIRED_PLANS.indexOf(key) >= 0 };
 }
+
+/* ══ THE FREE TRIAL ══════════════════════════════════════════════════════════════════════════
+   ⭐ THE ACCESS HALF WAS ALREADY BUILT, which is why this is short. 'trialing' has been in
+   LIVE_ACCESS_STATES and in has_active_subscription() from the beginning, and the client gate at
+   enforcePaywall() has always let it through. A trial account is therefore a NORMAL live bar to
+   every other line of code in this file. Only two things were missing: a way in without Stripe,
+   and a way out.
+   ⛔ 30 DAYS IS NOT AN ARBITRARY ROUND NUMBER. recovery.js needs BASELINE_WEEKS (3) +
+   MIN_MEASURE (1) = FOUR closed operating weeks before it returns anything but status:'building'.
+   A 14-day trial ends two weeks before the app can show its headline figure, so the operator
+   would never see the thing they are being asked to buy. Shorten this and that breaks first. */
+const TRIAL_DAYS = 30;
+/* ⛔ OUR WORD, NOT STRIPE'S. Every other status in this file comes from Stripe's vocabulary, and
+   an expired free trial is not a Stripe concept at all — no subscription, no invoice, nothing for
+   reconcile to check. Borrowing 'canceled' would make a trial that simply ran out indistinguishable
+   from a customer who left, in the logs and in the copy the operator is shown. */
+const TRIAL_EXPIRED = 'trial_expired';
+/* ⛔⛔ READABLE IS A WIDER SET THAN LIVE, AND THE GAP IS THE WHOLE POINT. An expired trial can
+   still SEE the month of counts they did; it just cannot write. Kyle, 2026-09-26, choosing this
+   over a hard lock: an operator looking at an empty app reads it as "my month of work is gone",
+   which is the worst possible frame for the question being asked on that screen.
+   ⚠ MUST STAY IN STEP WITH has_readable_subscription() IN SUPABASE_SETUP.sql, exactly as
+     LIVE_ACCESS_STATES must stay in step with has_active_subscription(). If the two disagree the
+     app shows an operator a screen the database then refuses to fill, which reads as broken
+     software rather than as a billing state. */
+const READABLE_STATES = ['active', 'trialing', TRIAL_EXPIRED];
 /* The statuses that GRANT access, and the single source for it. Must stay in step with
    has_active_subscription() in SUPABASE_SETUP.sql, which is ('active', 'trialing') — if the two
    ever disagree the app lets someone in that the database then refuses every write for, which
@@ -434,13 +476,25 @@ app.post('/api/create-checkout-session', async (req, res) => {
     // has one active. The UI gates this, but a duplicate/direct call must not
     // create a second Stripe subscription and double-charge the customer.
     const { data: existingSub } = await supabaseAdmin
-      .from('subscriptions').select('subscription_status').eq('account_id', accountId).maybeSingle();
+      .from('subscriptions').select('subscription_status, stripe_subscription_id').eq('account_id', accountId).maybeSingle();
     // Block on ANY live Stripe state, not just 'active'. A past_due/unpaid/incomplete/paused
-    // (or trialing) subscription is still a live subscription in Stripe; letting one through
-    // here would mint a SECOND recurring subscription for the same bar (the webhook upsert
-    // then orphans the first in the DB while it keeps billing in Stripe). Only terminal
-    // states (canceled, incomplete_expired) fall through so reactivation still works.
-    if (existingSub && CHECKOUT_BLOCK_STATES.includes(existingSub.subscription_status)) {
+    // subscription is still a live subscription in Stripe; letting one through here would mint
+    // a SECOND recurring subscription for the same bar (the webhook upsert then orphans the
+    // first in the DB while it keeps billing in Stripe). Only terminal states (canceled,
+    // incomplete_expired) fall through so reactivation still works.
+    /* ⛔⛔ EXCEPT OUR OWN FREE TRIAL, AND THIS EXCEPTION IS THE CONVERSION PATH ITSELF.
+       'trialing' is in the block list because a STRIPE trial is a live subscription. The 30-day
+       trial written by /api/start-trial is not: it has no Stripe customer, no subscription, and
+       `stripe_subscription_id` is null by construction. Blocking on it answered an operator who
+       wanted to buy on day 12 with "manage it under Billing", pointing them at a Stripe portal
+       that has nothing in it. A customer trying to pay, sent to a door that does not exist.
+       ⛔ THE EXCEPTION IS NARROW ON PURPOSE. A null id ALSO means a lifetime licence (payment
+       mode stores no subscription), and that one must stay blocked or they buy the same bar
+       twice. So it is 'trialing' AND null, which is our trial and nothing else. */
+    const isOurFreeTrial = !!existingSub
+      && existingSub.subscription_status === 'trialing'
+      && !existingSub.stripe_subscription_id;
+    if (existingSub && !isOurFreeTrial && CHECKOUT_BLOCK_STATES.includes(existingSub.subscription_status)) {
       return res.status(409).json({ error: 'This bar already has a subscription. Manage it under Billing.' });
     }
 
@@ -510,6 +564,19 @@ app.post('/api/create-checkout-session', async (req, res) => {
       // JSON.stringify so a newline in the body cannot forge a log line, and capped.
       console.error('create-checkout-session: unrecognised plan ' + JSON.stringify(String(plan == null ? '' : plan)).slice(0, 60) + ' — refusing, nothing charged.');
       return res.status(400).json({ error: 'That subscription plan was not recognised. Please choose a plan and try again.' });
+    }
+    /* ⛔ RETIRED IS NOT THE SAME AS UNRECOGNISED, and the message says which. Bar Cop stopped
+       selling subscriptions on 2026-09-26; the price ids stay configured so an in-flight session
+       still settles, but no NEW one may be created against them. Links carrying ?plan=monthly
+       exist in bookmarks, in search results and in the win-back email draft, and every one of
+       them lands here. What they must not do is quietly buy the $849 licence instead — that is a
+       product the visitor did not choose. Refuse, say why, and let the gate offer the one plan. */
+    if (chosenPlan.retired) {
+      console.log('create-checkout-session: retired plan ' + chosenPlan.key + ' refused — nothing charged.');
+      return res.status(400).json({
+        error: 'Bar Cop is a one-time purchase now, so that monthly plan is no longer offered.',
+        reason: 'plan_retired'
+      });
     }
     const priceId = chosenPlan.id;
     // Fail loudly if the price env for this plan is not configured, rather than
@@ -1231,6 +1298,68 @@ async function reconcileSubscriptions() {
   return { checked, fixed, writeFailed };
 }
 
+/* ⭐⭐ THE OTHER HALF OF THE TRIAL: THE END OF IT.
+   ⛔ NOTHING ELSE IN THIS FILE CAN DO THIS JOB. `current_period_end` is written from Stripe
+   everywhere else, and reconcileSubscriptions() deliberately reads only rows that HAVE a
+   stripe_subscription_id — which a trial row never does. Without this sweep a free trial is a
+   free licence: the date would sit in the row, correct and unread, forever.
+   ⛔ THE FILTERS ARE THE SAFETY. Three of them, and each one is load-bearing:
+     · status = trialing  — a paid licence is never a candidate, whatever its dates say.
+     · stripe_subscription_id IS NULL — a REAL Stripe trial (a subscription with a trial period)
+       belongs to Stripe and its webhook, and this job must not race them for it.
+     · current_period_end in the past — the actual question being asked.
+   ⚠ IT IS NOT DESTRUCTIVE AND MUST NOT BECOME SO. Expiring a trial changes one word in one
+     column; every count, week and note the operator entered stays exactly where it is, and
+     has_readable_subscription() keeps it visible to them. Nothing here deletes anything. */
+async function expireTrials() {
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseAdmin
+    .from('subscriptions')
+    .select('account_id, current_period_end')
+    .eq('subscription_status', 'trialing')
+    .is('stripe_subscription_id', null)
+    .lt('current_period_end', nowIso);
+  if (error) { console.error('expireTrials: could not read subscriptions:', error.message); return { expired: 0, failed: 0 }; }
+  const due = data || [];
+  if (!due.length) return { expired: 0, failed: 0 };
+
+  /* ⚠ A LOUD NUMBER, NOT A CAP. reconcileSubscriptions aborts past its cancel cap because a
+     wrong Stripe key can make it cancel the entire customer base — a catastrophe worth stopping
+     mid-pass. This job cannot do that: it only ever touches rows whose own stored date has
+     passed. So a big number here means a bad date was WRITTEN, which is a different bug and one
+     that stopping the pass would only hide. It runs, and it says so. */
+  if (due.length > 25) {
+    await alertOps('Trial expiry: ' + due.length + ' trials ended in one pass', [
+      due.length + ' trial(s) passed their end date in a single nightly pass.',
+      'That is a lot at once. If it was not a real cohort, check what wrote current_period_end at /api/start-trial.'
+    ]);
+  }
+
+  let expired = 0, failed = 0;
+  for (const row of due) {
+    /* ⛔ THE STATUS FILTER IS REPEATED ON THE WRITE. Between the read above and this update the
+       operator may have PAID — the gate is on screen in front of them the whole time this job
+       could be running. Without `.eq(status, trialing)` here, the sweep would overwrite a
+       brand-new lifetime licence with trial_expired and lock out somebody who just paid $849. */
+    const { data: upd, error: upErr } = await supabaseAdmin.from('subscriptions')
+      .update({ subscription_status: TRIAL_EXPIRED, active_modules: [], updated_at: new Date().toISOString() })
+      .eq('account_id', row.account_id)
+      .eq('subscription_status', 'trialing')
+      .is('stripe_subscription_id', null)
+      .select('account_id');
+    if (upErr) { failed++; console.error('expireTrials: FAILED for account ' + row.account_id + ': ' + upErr.message); }
+    else if ((upd || []).length) { expired++; console.log('expireTrials: account ' + row.account_id + ' -> ' + TRIAL_EXPIRED); }
+  }
+  if (failed > 0) {
+    await alertOps('Trial expiry: ' + failed + ' write(s) FAILED', [
+      failed + ' trial(s) could not be marked expired this pass.',
+      'Those accounts keep full access until a later pass succeeds. Usually transient; if it repeats, check Supabase.'
+    ]);
+  }
+  console.log('expireTrials: expired ' + expired + ', failed ' + failed);
+  return { expired, failed };
+}
+
 // Manual trigger (optional — the nightly interval is the primary path). Protected by a shared
 // secret: set RECONCILE_SECRET in the server env, then POST with header X-Reconcile-Secret.
 app.post('/api/reconcile-subscriptions', async (req, res) => {
@@ -1470,6 +1599,101 @@ async function provisionFromSession(session, stripe) {
    create nothing but a Stripe session, and the claim below trusts NOTHING from the browser
    except a session id it immediately re-reads from Stripe. */
 
+/* ⭐⭐ START A FREE TRIAL. The one route that grants access without money changing hands.
+   THE SHAPE: the browser has already created the auth user and the account (that is ordinary
+   signup, which goes browser-to-Supabase and never touches this server). This route only writes
+   the subscriptions row that turns a locked shell into a live bar for 30 days.
+   ⛔⛔ IT IS SERVER-SIDE FOR ONE REASON: THE CLIENT MUST NEVER BE ABLE TO GRANT ITSELF ACCESS.
+   The subscriptions table is what has_active_subscription() reads, so a browser that could write
+   its own row could hand itself a permanent free licence. Only the service-role key writes here.
+   ⛔⛔ ONE TRIAL PER USER, AND THAT IS WHAT MAKES "ADD ANOTHER BAR" INELIGIBLE BY CONSTRUCTION.
+   Kyle, 2026-09-26: "The only thing that won't have a free trial is the Add another bar .. that
+   just goes straight to the one-time price." The lazy version of that is a flag passed from the
+   add-a-bar screen saying "no trial please" — which works until some other path forgets to pass
+   it. This asks the database instead: if this user already holds ANY account carrying a
+   subscriptions row, they have had their trial, and a second bar is refused one. Nothing on the
+   add-a-bar path has to know the rule for the rule to hold.
+   ⚠ IT ALSO CANNOT BE REPLAYED. The row is written only when the account has none, so calling
+     this twice cannot extend a trial, restart an expired one, or overwrite a PAID licence. */
+app.post('/api/start-trial', async (req, res) => {
+  // Same door as every other new bar: if signups are shut, a trial is a signup too.
+  if (!SIGNUPS_OPEN) {
+    return res.status(503).json({ error: 'Bar Cop is not taking new accounts right now. Please check back shortly.' });
+  }
+  try {
+    const authHeader = req.headers.authorization || '';
+    const jwt = authHeader.replace(/^Bearer\s+/, '');
+    if (!jwt) return res.status(401).json({ error: 'Missing auth token' });
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(jwt);
+    if (userError || !userData?.user) return res.status(401).json({ error: 'Invalid auth token' });
+    const userId = userData.user.id;
+
+    const { accountId } = req.body || {};
+    if (!accountId) return res.status(400).json({ error: 'Missing accountId' });
+
+    /* ⛔ THE CALLER MUST OWN THE ACCOUNT. Never trust an account id off a request body: without
+       this, any signed-in user could start a trial on somebody else's bar and, worse, the write
+       below would land on THEIR subscriptions row. */
+    const { data: mem, error: memErr } = await supabaseAdmin
+      .from('memberships').select('account_id, role')
+      .eq('user_id', userId).eq('account_id', accountId).maybeSingle();
+    if (memErr) return res.status(500).json({ error: memErr.message });
+    if (!mem || !['owner', 'admin'].includes(String(mem.role || ''))) {
+      return res.status(403).json({ error: 'Not your bar.' });
+    }
+
+    /* ⛔ EVERY account this user holds, not just this one. This is the Add-Another-Bar rule, and
+       it is asked as a question about the USER so no caller has to remember to say no. */
+    const { data: mine, error: mineErr } = await supabaseAdmin
+      .from('memberships').select('account_id').eq('user_id', userId);
+    if (mineErr) return res.status(500).json({ error: mineErr.message });
+    const ids = (mine || []).map(r => r.account_id);
+    const { data: subs, error: subsErr } = await supabaseAdmin
+      .from('subscriptions').select('account_id, subscription_status').in('account_id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000']);
+    if (subsErr) return res.status(500).json({ error: subsErr.message });
+    if ((subs || []).length) {
+      /* Not an error state the operator caused, so it is not phrased as one. The client turns
+         this into the plan gate with the one price on it, which is exactly right for a second
+         bar and for anyone whose trial already ran. */
+      const already = (subs || []).some(s => s.account_id === accountId);
+      return res.status(409).json({
+        error: already ? 'This bar already has a plan.' : 'Your free trial has already been used.',
+        reason: already ? 'account_has_plan' : 'user_had_trial'
+      });
+    }
+
+    const now = new Date();
+    const ends = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    /* ⚠ stripe_customer_id and stripe_subscription_id stay NULL, deliberately. The nightly
+       reconcile selects `.not('stripe_subscription_id','is',null)`, so a trial row is skipped by
+       construction and can never be marked canceled by a job that finds no subscription at
+       Stripe — the same property that keeps a lifetime licence alive forever. */
+    const { error: writeErr } = await supabaseAdmin.from('subscriptions').insert({
+      account_id:             accountId,
+      user_id:                userId,
+      stripe_customer_id:     null,
+      stripe_subscription_id: null,
+      subscription_status:    'trialing',
+      subscription_plan:      'full_access',
+      active_modules:         ALL_MODULES,
+      current_period_end:     ends,
+      updated_at:             now.toISOString()
+    });
+    /* ⛔ CHECK THE WRITE. supabase-js returns {error} rather than throwing, so a discarded result
+       falls through to a 200 and the operator is told their trial started while the row that
+       grants it does not exist — a Hub that locks itself on the next reload with no explanation. */
+    if (writeErr) {
+      console.error('start-trial: subscriptions insert FAILED for account', accountId, writeErr.message || writeErr);
+      return res.status(500).json({ error: 'Could not start your trial. Try again, or contact support.' });
+    }
+    console.log('start-trial: account ' + accountId + ' trialing until ' + ends);
+    res.json({ ok: true, status: 'trialing', trial_ends_at: ends, trial_days: TRIAL_DAYS });
+  } catch (e) {
+    console.error('start-trial exception:', e);
+    res.status(500).json({ error: e.message || 'Could not start your trial.' });
+  }
+});
+
 /* START — a pricing-page button lands here. Creates a HOSTED Stripe session and hands back its
    url. No account, no user, no membership: if the customer walks away at Stripe, nothing exists.
    That single property is what deletes the whole abandoned-unpaid-account class. */
@@ -1485,6 +1709,19 @@ app.post('/api/start-checkout', async (req, res) => {
   const chosen = planPrice((req.body || {}).plan);
   if (!chosen) {
     return res.status(400).json({ error: 'That subscription plan was not recognised.' });
+  }
+  /* ⛔ RETIRED IS NOT THE SAME AS UNRECOGNISED, and the message says which. Bar Cop stopped
+     selling subscriptions on 2026-09-26; the price ids stay configured so an in-flight session
+     still settles, but no NEW one may be created against them. Links carrying ?plan=monthly
+     exist in bookmarks, in search results and in the win-back email draft, and every one of
+     them lands here. What they must not do is quietly buy the $849 licence instead — that is a
+     product the visitor did not choose. Refuse, say why, and let the gate offer the one plan. */
+  if (chosen.retired) {
+    console.log('start-checkout: retired plan ' + chosen.key + ' refused — nothing charged.');
+    return res.status(400).json({
+      error: 'Bar Cop is a one-time purchase now, so that monthly plan is no longer offered.',
+      reason: 'plan_retired'
+    });
   }
   if (!chosen.id) {
     console.error('start-checkout: ' + chosen.env + ' is not set — refusing checkout.');
@@ -2992,6 +3229,18 @@ if ((process.env.STRIPE_SECRET_KEY || '').trim()) {
   setTimeout(() => { reconcileSubscriptions().catch(e => console.error('reconcile (startup):', (e && e.message) || e)); }, 5 * 60 * 1000);
   setInterval(() => { reconcileSubscriptions().catch(e => console.error('reconcile (interval):', (e && e.message) || e)); }, RECONCILE_MS);
 }
+
+/* ⛔⛔ SCHEDULED SEPARATELY, AND OUTSIDE THE STRIPE-KEY GUARD ON PURPOSE. Everything above needs
+   Stripe; a free trial needs nothing but a clock and the database. Folded into the block above,
+   a missing or mistyped STRIPE_SECRET_KEY would silently stop every trial from ever ending —
+   a misconfiguration whose only symptom is that the product becomes free, which is exactly the
+   kind of failure nobody notices until the accounting does.
+   ⚠ Offset from the reconcile pass so the two jobs are not writing the subscriptions table in
+     the same second, and run hourly rather than daily: a 30-day trial ending at 3pm should not
+     keep full write access until the small hours. */
+const TRIAL_SWEEP_MS = 60 * 60 * 1000;
+setTimeout(() => { expireTrials().catch(e => console.error('expireTrials (startup):', (e && e.message) || e)); }, 90 * 1000);
+setInterval(() => { expireTrials().catch(e => console.error('expireTrials (interval):', (e && e.message) || e)); }, TRIAL_SWEEP_MS);
 
 // ── Boot-time email configuration audit ─────────────────────────────────────────
 // Every email path in this file is best-effort and fails QUIETLY by design (a bad send must
