@@ -1277,12 +1277,38 @@ const App = {
      accept a word the server refuses and the operator gets a 400 at the moment they press pay.
      ⚠ NOTHING ON THE WEBSITE SENDS `?plan=` YET. This is the half that RECEIVES it; it is inert
      until a link carries one, and a plan id is not personal data, so a URL is a fine place for it. */
+  /* The terms the operator agrees to BY PAYING. Kept in step with the website Refund Policy and
+     Terms of Use — the lifetime wording says what the Lifetime Access clause there says: access
+     lasts as long as Bar Cop is operating, not forever, and the export is the part that does not
+     depend on us. If one moves, move both. */
+  billingClauseFor(plan) {
+    const terms = ' See our <a href="' + App.TOS_TERMS_URL + '" target="_blank" rel="noopener" style="color:var(--gold);">Terms of Use</a>.';
+    if (plan === 'lifetime') {
+      return 'Continuing buys a lifetime licence for this bar at the price shown, charged once. '
+        + 'There is no renewal and nothing to cancel. Lifetime means for as long as Bar Cop is '
+        + 'operating, not forever, and you can export a full backup of your data at any time from '
+        + 'inside the app. The payment is not refunded.' + terms;
+    }
+    return 'Continuing starts a recurring subscription for this bar at the price shown, charged to '
+      + 'your card and renewing automatically each billing period until you cancel. You can cancel '
+      + 'anytime under Manage Billing; cancellation stops future charges, and the current period is '
+      + 'not refunded.' + terms;
+  },
+
   _urlPlan: null,
   _captureUrlPlan() {
     try {
       const raw = new URLSearchParams(window.location.search).get('plan');
       const key = (typeof raw === 'string' ? raw : '').trim().toLowerCase();
-      this._urlPlan = (key === 'monthly' || key === 'annual') ? key : null;
+      /* ⛔ THIS LIST MUST HOLD EVERY PLAN `planPrice()` KNOWS, and it is pinned that way
+         (verify-url-plan-carry D1/D2 compares the two sets). It caught this exact omission on
+         2026-09-25: the server had gained `lifetime` and this still read monthly-or-annual, so a
+         `?plan=lifetime` link off the pricing page was dropped here and the buyer landed on the
+         default plan instead of the one they clicked. Silent on both sides.
+         ⚠ `annual` STAYS even though the pricing page no longer offers it: an old link or a
+           bookmarked URL should resolve to the plan it names rather than quietly becoming another
+           one. It leaves this list when it leaves the server map. */
+      this._urlPlan = (key === 'monthly' || key === 'annual' || key === 'lifetime') ? key : null;
     } catch (e) { this._urlPlan = null; }
     return this._urlPlan;
   },
@@ -1475,7 +1501,7 @@ const App = {
     if (connecting) {
       heading = 'Setting Up Your Subscription';
       bodyHtml = 'Opening secure checkout for the <b style="color:var(--t1);">'
-        + ((ctx.plan === 'annual') ? 'Yearly' : 'Monthly') + '</b> plan. One moment.';
+        + ({ lifetime: 'Lifetime', annual: 'Yearly' }[ctx.plan] || 'Monthly') + '</b> plan. One moment.';
     }
     const planOpt = (plan, label, note) =>
       '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
@@ -1503,14 +1529,14 @@ const App = {
                is exactly how "two months free" survived the last one ([[pricing-decision]]).
                ⛔ `data-plan` IS THE SERVER'S PLAN ID: only the LABEL is "Yearly". Renaming the
                value sends a plan `planPrice()` does not know and the checkout is refused. */
-            +   planOpt('monthly', '<b>Monthly</b> &middot; $149 / month', '')
-            +   planOpt('annual',  '<b>Yearly</b> &middot; $124 / month', 'billed annually &middot; save $300')
+            +   planOpt('lifetime', '<b>Lifetime</b> &middot; $849 once', 'one payment &middot; no renewal')
+            +   planOpt('monthly',  '<b>Monthly</b> &middot; $129 / month', 'cancel anytime')
             + '</div>'
             // In-app billing clause: the terms the operator agrees to by paying. Kept
             // in step with the website Refund Policy (recurring, per bar, auto-renews,
             // cancel stops future charges, current term is non-refundable).
-            + '<div style="font-size:10px;color:var(--t3);line-height:1.5;margin-bottom:16px;">'
-            +   'Continuing starts a recurring subscription for this bar at the price shown, charged to your card and renewing automatically each billing period until you cancel. You can cancel anytime under Manage Billing; cancellation stops future charges, and the current period is not refunded. See our <a href="' + App.TOS_TERMS_URL + '" target="_blank" rel="noopener" style="color:var(--gold);">Terms of Use</a>.'
+            + '<div id="gate-billing-clause" style="font-size:10px;color:var(--t3);line-height:1.5;margin-bottom:16px;">'
+            +   this.billingClauseFor((ctx && ctx.plan) || 'lifetime')
             + '</div>'
           : '')
       // No pay button while connecting: there is nothing to press, and a disabled-looking primary
@@ -1543,7 +1569,14 @@ const App = {
          They are NOT this colour and must not follow it ([[color-system-locked]]). */
       o.style.background = on ? 'var(--sel-plan-bg)' : 'var(--gold-tint)';
     });
-    opts.forEach(o => o.addEventListener('click', () => selectOpt(o)));
+    /* ⛔ THE CLAUSE IS PART OF THE SELECTION, NOT PART OF THE FRAME. Left out of here it renders
+       once with the default plan's terms and then contradicts whatever the operator actually
+       picked — agreeing them to a renewal they are not buying, or to no renewal when they are. */
+    const clauseFor = (el) => {
+      const box = document.getElementById('gate-billing-clause');
+      if (box && el && el.dataset) box.innerHTML = App.billingClauseFor(el.dataset.plan);
+    };
+    opts.forEach(o => o.addEventListener('click', () => { selectOpt(o); clauseFor(o); }));
     /* ⭐ OPEN ON THE PLAN THEY CHOSE. This is correctness, not polish: with a carried plan the
        payment sheet opens straight over this gate, and cancelling reveals it — so a gate that
        always defaulted to its FIRST option would sit there with Monthly highlighted after an
@@ -1555,8 +1588,10 @@ const App = {
        Yearly. Opening on Monthly here made the two surfaces disagree about the default. A carried
        plan still beats it, which is the line above and what J5 controls. */
     const wantedOpt = (ctx && ctx.plan) ? opts.filter(o => o.dataset.plan === ctx.plan)[0] : null;
-    const defaultOpt = opts.filter(o => o.dataset.plan === 'annual')[0] || opts[0];
-    if (wantedOpt || defaultOpt) selectOpt(wantedOpt || defaultOpt);
+    // ⚠ LIFETIME IS THE DEFAULT because it is what the pricing page leads with, and these two
+    //   surfaces disagreeing about the default is the defect this line already existed to fix.
+    const defaultOpt = opts.filter(o => o.dataset.plan === 'lifetime')[0] || opts[0];
+    if (wantedOpt || defaultOpt) { selectOpt(wantedOpt || defaultOpt); clauseFor(wantedOpt || defaultOpt); }
     const gateErr = (t) => { const e = document.getElementById('gate-err'); if (e) { e.textContent = t; e.style.display = 'block'; } };
     document.getElementById('gate-pay')?.addEventListener('click', async () => {
       const btn = document.getElementById('gate-pay');

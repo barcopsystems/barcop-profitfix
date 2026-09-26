@@ -150,8 +150,14 @@
         <div class="auth-sub">This bar needs an active subscription to use Bar Cop. Pick a plan to continue to checkout.</div>
         <label style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);">Choose Your Plan</label>
         <div id="paywall-plan-picker" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 14px;">
-          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $149/mo</span></div>
-          <div class="plan-opt" data-plan="annual" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Annual</b> &middot; $1,488/yr</span><span style="font-size:11px;color:var(--gold);">save $240</span></div>
+          <!-- ⛔ LIFETIME FIRST, matching the pricing page and the in-app gate. The picker this
+               replaces carried TWO defects worth recording: it printed "save $240", which was the
+               saving at the $87 price and survived the 2026-09-05 reprice untouched (the real
+               saving at $149/$1,488 was $300), and it used a whole YEAR of money as a headline
+               ($1,488/yr) while the gate's picker showed the same plan as $124/month. Two pickers,
+               two stories, one product. Both faults leave with the annual plan. -->
+          <div class="plan-opt" data-plan="lifetime" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Lifetime</b> &middot; $849 once</span><span style="font-size:11px;color:var(--gold);">no renewal</span></div>
+          <div class="plan-opt" data-plan="monthly" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;"><span><b>Monthly</b> &middot; $129/mo</span></div>
         </div>
         <button class="btn btn-primary" id="paywall-btn" style="width:100%;">Continue to Payment</button>
         <div id="paywall-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none;text-align:center;"></div>
@@ -502,7 +508,7 @@
 <script src="screens/audit-ui.js?v=51"></script>
 <script src="screens/audit-tracker.js?v=108"></script>
 <script src="screens/reports.js?v=39"></script>
-<script src="screens/settings.js?v=338"></script>
+<script src="screens/settings.js?v=339"></script>
 <script src="screens/hub-help.js?v=43"></script>
 <script src="screens/hub-report-bug.js?v=13"></script>
 <script src="screens/hub-support.js?v=9"></script>
@@ -616,6 +622,6 @@
      sweep goes red instead. -->
 <script src="https://js.stripe.com/v3/"></script>
 <script src="db.js?v=178"></script>
-<script src="app.js?v=962"></script>
+<script src="app.js?v=963"></script>
 </body>
 </html>
