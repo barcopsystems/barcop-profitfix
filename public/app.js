@@ -27,6 +27,20 @@ const App = {
   TOS_VERSION:     '2026-04-08',
   TOS_TERMS_URL:   'https://www.barcop.com/pages/terms-of-use',
   TOS_PRIVACY_URL: 'https://www.barcop.com/pages/privacy-policy',
+  /* ⛔⛔ THIS GUARD WAS DEAD FROM THE DAY IT WAS WRITTEN AND NOBODY NOTICED, because the thing
+     it protects against happened to look correct. It was declared here and read once in the
+     SIGNED_IN handler, and set to true NOWHERE in the file — measured 2026-09-26, two hits in
+     the whole repo. So `supabase.auth.signUp` fired SIGNED_IN, the handler booted, read a
+     subscription that did not exist yet and raised the paywall, mid-signup, exactly as the
+     comment beside the read says must not happen. It was invisible because the gate it raised
+     was the gate that screen was about to show anyway.
+     ⚠ THE FREE TRIAL IS WHAT MADE IT VISIBLE. The trial row is written AFTER the account
+     exists, so a boot that races it reads 'inactive' and shows "choose your plan" to somebody
+     who was just given thirty days free. A wording nit that turns out to be a dead mechanism
+     ([[lessons-paid-for]] #173) — the wording was right all along, the mechanism was missing.
+     ⛔ SET TRUE IMMEDIATELY BEFORE DB.signUp AND CLEARED ON EVERY PATH OUT, including both
+     post-signUp refusals, or a retry's SIGNED_IN is swallowed and the operator sits on a dead
+     form. The signup handler boots explicitly once it has finished its own work. */
   _signupInProgress: false,  // guards the SIGNED_IN handler from booting mid-signup
   _newBarFlow: null,         // { originAccountId, accountId?, draft? } during Add Another Bar
 
@@ -1142,6 +1156,30 @@ const App = {
     this.maybeShowWelcome(); // first Hub load after payment → one-time "You're All Set" popup
   },
 
+  /* ── THE TRIAL, AS THE APP SEES IT ───────────────────────────────────────────
+     ⚠ `period_end` CARRIES THE TRIAL END on a trial row — db.js maps current_period_end onto it —
+       and it is the SAME field a paid subscription uses for its RENEWAL date. That is why every
+       one of these asks the STATUS first: a live subscription renewing on the 12th must never be
+       described as having twelve days left.
+     ⚠ These were written, deleted the same day for having no caller (verify-no-retired-code.js
+       caught it), and are back because the Hub banner Kyle placed on 2026-09-26 calls them.
+       A no-card trial makes them load-bearing rather than decorative: with nothing on file, day
+       31 is not a surprise charge, it is SILENCE — the operator simply drifts off. The countdown
+       is the only thing that turns that into a decision. */
+  onTrial() { return !!(this.subscription && this.subscription.status === 'trialing'); },
+  trialExpired() { return !!(this.subscription && this.subscription.status === 'trial_expired'); },
+  /* Whole days remaining, never negative, null when there is no trial to count. Rounded UP so
+     the last part-day reads "1 day left" rather than "0 days left" while the bar still works —
+     a countdown saying zero on a working app is a lie the operator will act on. */
+  trialDaysLeft() {
+    if (!this.onTrial()) return null;
+    const end = this.subscription && this.subscription.period_end;
+    if (!end) return null;
+    const ms = new Date(end).getTime() - Date.now();
+    if (isNaN(ms)) return null;
+    return Math.max(0, Math.ceil(ms / 86400000));
+  },
+
   // ── Subscription gate (in-app "Choose your plan" popup over the Hub) ──────────
   // A no-subscription account boots into the free tier (create account +
   // onboarding) and lands on the Hub with this popup. It can't be dismissed via
@@ -1153,7 +1191,15 @@ const App = {
     const s = this.subscription && this.subscription.status;
     // 'trialing' is a live, usable bar (db.listMyAccounts treats it as active too) — do
     // not throw the "Subscription Inactive" gate over a customer mid-trial.
-    if (s === 'active' || s === 'unknown' || s === 'trialing') { this._removePlanGate(); return; }
+    /* ⛔ THE BANNER GOES TOO, AND NOT ONLY FOR TIDINESS. This is the line an operator crosses
+       the instant they pay: enforcePaywall re-runs, the gate comes down, and a "your free trial
+       has ended" bar left pinned to the bottom of the screen would be telling somebody who just
+       spent $849 that they cannot write. Same for switching to a bar that is fine. */
+    if (s === 'active' || s === 'unknown' || s === 'trialing') {
+      this._removePlanGate();
+      document.getElementById('trial-ended-bar')?.remove();
+      return;
+    }
     // Pass the status through so the gate can tell a brand-new signup apart from
     // a returning customer whose subscription lapsed (past due / cancelled).
     /* ⛔ THE GATE IS BUILT IN ITS FINAL MODE ONCE. An earlier version rendered the picker here and
@@ -1256,6 +1302,30 @@ const App = {
 
   _removePlanGate() { const g = document.getElementById('plan-gate'); if (g) g.remove(); },
 
+  /* THE ASK, AFTER THE MODAL IS DISMISSED. An expired trial that could wave the gate away and
+     never see it again would be a free licence with extra steps, so the ask does not leave — it
+     changes shape. Pressing it puts the full gate back, which is where the price and the billing
+     clause live; this bar deliberately carries neither, because a price quoted in two places is
+     a price that goes stale in one of them.
+     ⚠ It is rebuilt rather than toggled so it cannot survive into a state that should not have
+       it — sign out, a bar switch, or the moment they actually pay. */
+  _showTrialEndedBanner() {
+    document.getElementById('trial-ended-bar')?.remove();
+    if (!this.trialExpired()) return;   // never show it over a bar that is fine
+    const b = document.createElement('div');
+    b.id = 'trial-ended-bar';
+    b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9600;background:var(--zone);'
+      + 'border-top:1px solid var(--b-edge);padding:10px 16px;display:flex;gap:12px;'
+      + 'align-items:center;justify-content:center;flex-wrap:wrap;font-size:12px;color:var(--t2);';
+    b.innerHTML = '<span>Your free trial has ended. You can read everything you entered, but not add to it.</span>'
+      + '<button class="btn btn-primary btn-sm" id="trial-ended-buy">Unlock Bar Cop</button>';
+    document.body.appendChild(b);
+    document.getElementById('trial-ended-buy')?.addEventListener('click', () => {
+      b.remove();
+      this.showPlanGate({ status: 'trial_expired', plan: 'lifetime' });
+    });
+  },
+
   /* ⭐ PIECE A PART 2 — CARRY A PLAN NAMED IN THE URL ACROSS THE SIGNUP.
      ⛔⛔ THIS RUNS AT BOOT RATHER THAN WHERE THE PLAN IS USED, AND THAT IS THE WHOLE POINT.
      `showAuth` runs `history.replaceState({}, '', window.location.pathname)` the moment
@@ -1308,7 +1378,12 @@ const App = {
          ⚠ `annual` STAYS even though the pricing page no longer offers it: an old link or a
            bookmarked URL should resolve to the plan it names rather than quietly becoming another
            one. It leaves this list when it leaves the server map. */
-      this._urlPlan = (key === 'monthly' || key === 'annual' || key === 'lifetime') ? key : null;
+      /* ⛔ ONLY PLANS THAT ARE ACTUALLY SOLD ARE CARRIED. A held ?plan=lifetime link still exists
+         and is refused server-side (planPrice marks it retired); dropping the name here is the
+         half that decides what the operator SEES, so such a link lands them on the gate with the
+         real plans instead of auto-starting a checkout that cannot complete. It must never
+         quietly substitute a different plan for the one they asked for. */
+      this._urlPlan = (key === 'monthly' || key === 'annual') ? key : null;
     } catch (e) { this._urlPlan = null; }
     return this._urlPlan;
   },
@@ -1453,6 +1528,7 @@ const App = {
     // Any other status (canceled, paused, trialing, or anything Stripe adds later)
     // is a real account with data and falls to the safe, non-destructive branch.
     const isPastDue   = status === 'past_due' || status === 'unpaid';
+    const isTrialExpired = status === 'trial_expired';
     // POSITIVELY identify a never-paid signup — a genuinely new account reads 'inactive'
     // (no subscription row). Do NOT include `!status`: an empty/unexpected status must
     // fall to the safe "Subscription Inactive" branch (Sign Out only), never light up the
@@ -1476,9 +1552,19 @@ const App = {
       const acctLine = isNewBar
         ? (barName ? 'Your new bar ' + nameB + ' is set up.' : 'Your new bar is set up.')
         : (barName ? 'Your account for ' + nameB + ' is now set up.' : 'Your account is now set up.');
-      bodyHtml = acctLine + '<br>Start your subscription plan for instant access.';
+      bodyHtml = acctLine + '<br>Start your plan for instant access.';
+    } else if (status === 'trial_expired') {
+      /* ⛔ THIS SCREEN IS THE WHOLE REASON THE DATABASE GATE WAS SPLIT IN TWO. Behind this popup
+         is a month of the operator's own counting, still on screen and still readable, because
+         has_readable_subscription() keeps it there. So the copy may say "everything you entered
+         is still here" and be literally true — and they can close nothing, but they can SEE it.
+         ⚠ Never "your trial expired" on its own. The fact that matters to them is not that a
+           clock ran out, it is what happened to their work. */
+      heading = 'Your Free Trial Has Ended';
+      bodyHtml = (barName ? 'The 30 days on ' + nameB + ' are up. ' : 'Your 30 days are up. ')
+        + 'Everything you entered is still here and still on screen. Pick a plan and pick up where you left off.';
     } else {
-      // canceled / paused / trialing / any other non-active status on a real account
+      // canceled / paused / any other non-active status on a real account
       heading = 'Subscription Inactive';
       bodyHtml = (barName ? 'Your subscription for ' + nameB + ' is not active. ' : 'Your subscription is not active. ')
         + 'Start it back up whenever you are ready. Your data is safe and waiting.';
@@ -1501,7 +1587,9 @@ const App = {
     if (connecting) {
       heading = 'Setting Up Your Subscription';
       bodyHtml = 'Opening secure checkout for the <b style="color:var(--t1);">'
-        + ({ lifetime: 'Lifetime', annual: 'Yearly' }[ctx.plan] || 'Monthly') + '</b> plan. One moment.';
+        /* ⚠ THE FALLBACK NAMES A PLAN THAT IS SOLD. A default naming a retired product is a label
+           that can only ever be wrong, which is what 'Monthly' became for one day. */
+        + ({ monthly: 'Monthly', annual: 'Yearly' }[ctx.plan] || 'Monthly') + '</b> plan. One moment.';
     }
     const planOpt = (plan, label, note) =>
       '<div class="plan-opt" data-plan="' + plan + '" style="border:1px solid var(--b-edge);background:var(--gold-tint);border-radius:6px;padding:12px 14px;cursor:pointer;font-size:13px;color:var(--t1);display:flex;justify-content:space-between;align-items:center;">'
@@ -1529,8 +1617,22 @@ const App = {
                is exactly how "two months free" survived the last one ([[pricing-decision]]).
                ⛔ `data-plan` IS THE SERVER'S PLAN ID: only the LABEL is "Yearly". Renaming the
                value sends a plan `planPrice()` does not know and the checkout is refused. */
-            +   planOpt('lifetime', '<b>Lifetime</b> &middot; $849 once', 'one payment &middot; no renewal')
-            +   planOpt('monthly',  '<b>Monthly</b> &middot; $129 / month', 'cancel anytime')
+            /* ⛔ BOTH PLANS ARE PRICED PER MONTH, and that is not cosmetic. Setting $149/mo beside
+               a $1,488 annual TOTAL makes the cheaper plan read as the expensive one, which is
+               why that comparison came off the pricing page in August — and this gate, the
+               screen a lapsed customer is recovered on, was still running it. $124 is the figure
+               the website and Stripe's own checkout page both print.
+               ⛔ THE SAVING IS IN DOLLARS, NEVER "two months free" OR A PERCENTAGE. A ratio claim
+               goes false on the next reprice with no number in it for any sweep to catch, which
+               is exactly how "two months free" survived the 189 -> 87 move ([[pricing-decision]]).
+               THE ARITHMETIC: 149 x 12 = 1,788, less the 1,488 annual = 300 saved. 1,488 / 12 =
+               124.00 exactly, which is why the annual total is 1,488 and not 1,490.
+               ⛔ `data-plan` IS THE SERVER'S PLAN ID: only the LABEL is prose. Renaming the value
+               sends a plan planPrice() does not know and the checkout is refused.
+               ⚠ MONTHLY LEADS. After 30 free days $1,488 up front is a hard ask and $149 is an
+               easy yes, and someone who stays ten months has paid the same either way. */
+            +   planOpt('monthly', '<b>Monthly</b> &middot; $149 / month', 'cancel anytime')
+            +   planOpt('annual',  '<b>Yearly</b> &middot; $124 / month', 'save $300 &middot; billed $1,488')
             + '</div>'
             // In-app billing clause: the terms the operator agrees to by paying. Kept
             // in step with the website Refund Policy (recurring, per bar, auto-renews,
@@ -1546,6 +1648,12 @@ const App = {
       // ⛔ START OVER IS WITHHELD WHILE CONNECTING. It DELETES the account, and offering a
       // destructive escape beside "one moment" during a payment hand-off is the worst possible
       // pairing. Sign Out is the safe exit and it stays on every branch.
+      /* ⛔ ONLY THE EXPIRED TRIAL GETS A WAY PAST THIS, and only because only it has something
+         behind the cover. A never-paid signup dismissing this would be looking at an empty
+         app, and a past-due customer needs the card fixed, not a tour. */
+      + (isTrialExpired
+          ? '<div style="text-align:center;margin-top:14px;"><button class="auth-link" id="gate-look" style="font-size:11px;">Keep looking at my numbers</button></div>'
+          : '')
       + (connecting
           ? '<div style="text-align:center;margin-top:18px;"><button class="auth-link" id="gate-signout" style="font-size:11px;">Sign Out</button></div>'
           : isNewBar
@@ -1588,10 +1696,15 @@ const App = {
        Yearly. Opening on Monthly here made the two surfaces disagree about the default. A carried
        plan still beats it, which is the line above and what J5 controls. */
     const wantedOpt = (ctx && ctx.plan) ? opts.filter(o => o.dataset.plan === ctx.plan)[0] : null;
-    // ⚠ LIFETIME IS THE DEFAULT because it is what the pricing page leads with, and these two
-    //   surfaces disagreeing about the default is the defect this line already existed to fix.
-    const defaultOpt = opts.filter(o => o.dataset.plan === 'lifetime')[0] || opts[0];
+    /* ⚠ MONTHLY IS THE DEFAULT because it is what the pricing page leads with after the trial,
+       and these two surfaces disagreeing about the default is the defect this line exists to
+       fix. A carried plan still beats it, which is the line above. */
+    const defaultOpt = opts.filter(o => o.dataset.plan === 'monthly')[0] || opts[0];
     if (wantedOpt || defaultOpt) { selectOpt(wantedOpt || defaultOpt); clauseFor(wantedOpt || defaultOpt); }
+    document.getElementById('gate-look')?.addEventListener('click', () => {
+      this._removePlanGate();
+      this._showTrialEndedBanner();
+    });
     const gateErr = (t) => { const e = document.getElementById('gate-err'); if (e) { e.textContent = t; e.style.display = 'block'; } };
     document.getElementById('gate-pay')?.addEventListener('click', async () => {
       const btn = document.getElementById('gate-pay');
@@ -1611,6 +1724,8 @@ const App = {
         return;
       }
       const sel = m.querySelector('#gate-plan-picker .plan-opt.plan-selected');
+      /* ⚠ THE FALLBACK IS A PLAN THAT IS ACTUALLY SOLD, whatever that is at the time. Pointed at
+         a retired one it sends the server something it refuses, with nothing to show for it. */
       const plan = (sel && sel.dataset.plan) || 'monthly';
       btn.disabled = true; btn.textContent = 'Going to checkout...';
       if (isNewBar) await this.startNewBarCheckout(plan, ctx.draft, gateErr);
@@ -12345,7 +12460,7 @@ function wireAuth() {
   })();
   const selectedPlan = (pickerId) => {
     const sel = document.querySelector('#' + pickerId + ' .plan-opt.plan-selected');
-    return (sel && sel.dataset.plan) || 'monthly';
+    return (sel && sel.dataset.plan) || 'monthly';   // monthly leads after the trial; see showPlanGate
   };
 
   // Shared: create a checkout session for the signed-in owner and go to Stripe.
@@ -12448,8 +12563,12 @@ function wireAuth() {
         App.boot();
         return;
       }
+      /* ⛔ RAISED BEFORE THE CALL THAT FIRES SIGNED_IN, not after. supabase-js emits the event
+         from inside signUp, so a flag set on the next line is already too late. */
+      App._signupInProgress = true;
       const { data: suData, error: signErr } = await DB.signUp(email, pw1);
       if (signErr) {
+        App._signupInProgress = false;   // or the retry's SIGNED_IN is swallowed too
         btn.textContent = 'Create Account'; btn.disabled = false;
         const already = (signErr.message || '').toLowerCase().includes('registered');
         return showErr(already
@@ -12462,6 +12581,7 @@ function wireAuth() {
       // live session). Without this guard the handler falls through, SIGNED_IN
       // never fires, and the button hangs on "Creating account..." forever.
       if (!suData || !suData.session) {
+        App._signupInProgress = false;
         btn.textContent = 'Create Account'; btn.disabled = false;
         const already = Array.isArray(suData && suData.user && suData.user.identities)
           && suData.user.identities.length === 0;
@@ -12480,7 +12600,39 @@ function wireAuth() {
       }
       try { await DB.recordTosAcceptance(accountId, App.TOS_VERSION, App.TOS_TERMS_URL, App.TOS_PRIVACY_URL); }
       catch (e) { console.error('ToS record failed', e); }
+
+      /* ⭐⭐ THE TRIAL. Thirty days of a real bar, no card, granted by the server — the browser
+         cannot write its own subscriptions row and must never be able to.
+         ⛔ BEST-EFFORT ON PURPOSE, AND THE FAILURE IS SURVIVABLE BY DESIGN. If this call fails,
+         boot below reads no subscription and the operator lands on the plan gate with the one
+         price — which is the app's behaviour today and a door they can still walk through.
+         Throwing here instead would strand a brand-new account on a dead form with an auth user
+         already minted, which is strictly worse than being asked to pay.
+         ⚠ A 409 IS NOT A FAILURE, it is the Add-Another-Bar rule answering: this user has had
+           their trial. Logged, not shown, because the gate that follows says the same thing in
+           the operator's language. */
+      try {
+        const th = await DB._authHeaders();
+        const tr = await fetch('/api/start-trial', {
+          method: 'POST', headers: th, body: JSON.stringify({ accountId })
+        });
+        const tj = await tr.json().catch(() => ({}));
+        if (tr.ok) console.log('trial started, ends ' + tj.trial_ends_at);
+        else console.log('trial not granted (' + tr.status + '): ' + (tj.reason || tj.error || 'unknown'));
+      } catch (e) { console.error('start-trial failed', e); }
+
+      /* ⛔ AND NOW BOOT, EXPLICITLY. The SIGNED_IN handler was told to stand down while this ran
+         (that is what _signupInProgress is for), so nothing else is going to do it. Order
+         matters: lower the flag first, or a SIGNED_IN that arrives during loadAllData is still
+         ignored; read the subscription AFTER the trial write, or the gate goes up over a bar
+         that was just granted thirty days. */
+      App._signupInProgress = false;
+      App._bootedUserId = (DB._user && DB._user.id) || null;
+      await App.loadAllData();
+      App.subscription = await DB.getSubscription();
+      App.boot();
     } catch (e) {
+      App._signupInProgress = false;
       btn.textContent = 'Create Account'; btn.disabled = false;
       showErr('Connection error. Try again.');
     }

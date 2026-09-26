@@ -284,6 +284,7 @@ const DB = {
         // and throw the plan gate (with its destructive Start Over) over a paying
         // customer's Hub. 'unknown' keeps them usable — RLS still gates data — and it
         // recovers on the next read. A genuine no-account still reports 'inactive'.
+        this._subStatus = null;
         return { status: this._acctResolveErr ? 'unknown' : 'inactive', plan: null, active_modules: [], period_end: null };
       }
       const { data, error } = await this._sb
@@ -295,16 +296,20 @@ const DB = {
       if (error) {
         // PGRST116 = no matching row = genuinely no subscription on this bar.
         if (error.code === 'PGRST116') {
+          this._subStatus = null;
           return { status: 'inactive', plan: null, active_modules: [], period_end: null };
         }
         // Any other error = we could not READ the subscription (transient DB/RLS
         // hiccup). Report 'unknown' so the paywall never locks out a paying
         // customer over a momentary read failure.
+        this._subStatus = null;
         return { status: 'unknown', plan: null, active_modules: [], period_end: null };
       }
       if (!data) {
+        this._subStatus = null;
         return { status: 'inactive', plan: null, active_modules: [], period_end: null };
       }
+      this._subStatus = data.subscription_status;
       return {
         status:         data.subscription_status,
         plan:           data.subscription_plan,
@@ -472,6 +477,27 @@ const DB = {
   // holds an 'admin' membership plus accounts.owner_user_id — see isOwner.)
   role() { return this._role; },
   permissions() { return this._permissions || {}; },
+  /* ⛔⛔ THE ONE ANSWER TO "MAY THIS ACCOUNT BE WRITTEN TO", asked at nine call sites that used to
+     ask only about the role. Returns the REASON as a string, or null when writing is fine, so a
+     caller cannot accidentally treat "blocked" as "fine" the way a bare boolean invites.
+     ⛔ IT MUST BE CALLED BEFORE ANYTHING IS QUEUED. That is the whole value: a write that is
+     going to be refused by RLS must be refused HERE, or it lands in the replay queue and fails
+     there forever while the operator believes it saved.
+     ⚠ THE CLIENT IS NOT THE ENFORCEMENT and must never be mistaken for it. RLS is. This exists
+       so the refusal is honest and immediate instead of silent and permanent. */
+  _writeBlock() {
+    if (this._role === 'viewer') return 'Viewer access is read-only.';
+    /* An expired free trial keeps every row it entered and keeps SEEING them — that is what
+       has_readable_subscription() in the database is for — and loses the ability to add more. */
+    if (this._subStatus === 'trial_expired') {
+      return 'Your free trial has ended. Everything you entered is still here to read, but new entries need the one-time purchase.';
+    }
+    return null;
+  },
+  /* ⚠ MIRRORED OFF getSubscription SO IT CANNOT BE STALE IN THE ONE DIRECTION THAT MATTERS.
+     It is set on every subscription read, including the one right after a payment, so the moment
+     an operator pays the block lifts without a reload. */
+  _subStatus: null,
   isAdmin()  { return this._role === 'admin'; },
   isStaff()  { return this._role === 'staff'; },
   canWrite() { return this._role !== 'viewer'; },
@@ -889,7 +915,7 @@ const DB = {
     if (this._sb && this._user) {
       // Viewer is read-only — reject before the offline queue so a viewer's edit
       // never lands in the pending list to fail RLS forever on replay.
-      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       // Never overwrite the server blob until the initial load confirmed what the
       // account holds (_dataReady). A save that fires before readData completes, or
       // after it fell back to an empty local copy on a server error, would otherwise
@@ -948,9 +974,7 @@ const DB = {
       // Viewer role: read-only. Silently swallow writes so the UI doesn't
       // pretend a save succeeded. Server-side RLS is the real enforcement;
       // this is the friendly client-side rejection.
-      if (this._role === 'viewer') {
-        return { ok: false, error: 'Viewer access is read-only.' };
-      }
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       try {
         const { error } = await this._sb
           .from('user_data')
@@ -1308,7 +1332,7 @@ const DB = {
     if (this._demo) return { ok: true };
     if (this._sb && this._user) {
       // Viewer is read-only — reject before the offline queue (see writeData).
-      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       // Hydration gate, now PER-CONTROL: never overwrite a control blob (ic/lc/sc_data)
       // until THIS control's own read confirmed the account. _dataReady (core) is not
       // enough — a control read that failed transiently on a fresh device leaves the blob
@@ -1342,9 +1366,7 @@ const DB = {
         this._markPending(lsKey);
         return { ok: false, error: 'no account membership found' };
       }
-      if (this._role === 'viewer') {
-        return { ok: false, error: 'Viewer access is read-only.' };
-      }
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       try {
         const { error } = await this._sb
           .from(table)
@@ -1848,7 +1870,7 @@ const DB = {
     if (this._sb && this._user) {
       // Viewer is read-only — reject BEFORE queuing (a queued write would only
       // fail RLS forever on replay and sit in the pending queue permanently).
-      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       // queue() now REPORTS whether the op actually reached disk. On a full localStorage it
       // returns false and the caller must treat the write as failed, not as "pending sync".
       const queue = () => { const q = this._queueEvent(table, kind, 'put', rec); if (q) this._patchEventCache(table, kind, [rec], []); return q; };
@@ -1863,7 +1885,7 @@ const DB = {
         if (this._acctScopeAvailable()) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: 'no account membership found' }; }
         return { ok: false, error: 'no account membership found' };
       }
-      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       try {
         const { error } = await this._sb.from(table).upsert({
           account_id: accountId, kind: kind, id: String(rec.id),
@@ -1885,7 +1907,7 @@ const DB = {
   async removeEvent(table, kind, id) {
     if (this._demo || id == null) return { ok: this._demo === true };
     if (this._sb && this._user) {
-      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       const queue = () => { const q = this._queueEvent(table, kind, 'del', { id }); if (q) this._patchEventCache(table, kind, [], [id]); return q; };
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         const q = queue(); return { ok: false, offline: true, queued: q, storageFull: !q };
@@ -1897,7 +1919,7 @@ const DB = {
         if (this._acctScopeAvailable()) { const q = queue(); return { ok: false, queued: q, storageFull: !q, error: 'no account membership found' }; }
         return { ok: false, error: 'no account membership found' };
       }
-      if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+      { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
       try {
         const { error } = await this._sb.from(table).delete()
           .eq('account_id', accountId).eq('kind', kind).eq('id', String(id));
@@ -1924,7 +1946,7 @@ const DB = {
     if (!this._sb || !this._user) return { ok: false, error: 'No connection to Bar Cop.' };
     const list = (recs || []).filter(r => r && r.id != null);
     if (!list.length) return { ok: true };
-    if (this._role === 'viewer') return { ok: false, error: 'Viewer access is read-only.' };
+    { const b = this._writeBlock(); if (b) return { ok: false, error: b }; }
     // Every row must land, not just some: a partially-stored batch is a silent partial save.
     const queueAll = () => {
       // ONE merged write (S287) — all-or-nothing, so `storageFull` below is truthful.
