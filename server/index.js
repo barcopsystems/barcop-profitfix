@@ -476,7 +476,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
     // has one active. The UI gates this, but a duplicate/direct call must not
     // create a second Stripe subscription and double-charge the customer.
     const { data: existingSub } = await supabaseAdmin
-      .from('subscriptions').select('subscription_status, stripe_subscription_id').eq('account_id', accountId).maybeSingle();
+      .from('subscriptions').select('subscription_status, stripe_subscription_id, current_period_end').eq('account_id', accountId).maybeSingle();
     // Block on ANY live Stripe state, not just 'active'. A past_due/unpaid/incomplete/paused
     // subscription is still a live subscription in Stripe; letting one through here would mint
     // a SECOND recurring subscription for the same bar (the webhook upsert then orphans the
@@ -622,6 +622,33 @@ app.post('/api/create-checkout-session', async (req, res) => {
          the charge is still traceable to the bar it bought. */
     if (chosenPlan.mode === 'subscription') {
       sessionArgs.subscription_data = { metadata: { user_id: userId, account_id: accountId } };
+      /* ⭐⭐ THE REST OF THE FREE TRIAL COMES WITH THEM. Without this, choosing a plan on day 12
+         starts billing on day 12: the operator pays for eighteen days they already had, and the
+         rational move is to wait until day 30 — so the button on the Hub banner would be asking
+         them to do the expensive thing. Handing Stripe the trial end they already have makes
+         converting early free, which is what makes the button honest.
+         ⛔⛔ AT LEAST 48 HOURS, OR STRIPE REJECTS THE WHOLE SESSION. `trial_end` must be more
+         than two days out; hand it anything closer and checkout.sessions.create throws, so the
+         payment screen never opens — at the exact moment somebody finally decided to pay, and on
+         the last days of a trial, which is when most of them will decide. Inside that window the
+         carry is simply dropped and they are billed now, which is what happened before this
+         existed. Losing a day of trial is a rounding error; a checkout that will not open is the
+         conversion.
+         ⚠ ONLY OUR OWN TRIAL. `isOurFreeTrial` is already the narrow test the guard above uses:
+           status trialing AND no Stripe subscription. A real Stripe trial is Stripe's to manage
+           and is blocked from reaching here at all. */
+      if (isOurFreeTrial && existingSub.current_period_end) {
+        const endsAt = Math.floor(new Date(existingSub.current_period_end).getTime() / 1000);
+        const twoDays = Math.floor(Date.now() / 1000) + (48 * 60 * 60);
+        if (!isNaN(endsAt) && endsAt > twoDays) {
+          sessionArgs.subscription_data.trial_end = endsAt;
+          console.log('create-checkout-session: carrying trial end ' + existingSub.current_period_end
+            + ' onto the new subscription for account ' + accountId);
+        } else {
+          console.log('create-checkout-session: trial ends within 48h (' + existingSub.current_period_end
+            + '), billing starts now for account ' + accountId);
+        }
+      }
     } else {
       sessionArgs.payment_intent_data = { metadata: { user_id: userId, account_id: accountId } };
     }
